@@ -1,0 +1,46 @@
+import React, { useEffect } from 'react';
+import { X } from 'lucide-react';
+
+export interface DrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}
+
+export const Drawer: React.FC<DrawerProps> = ({ isOpen, onClose, title, children }) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
+      <div
+        className="relative w-full max-h-[85vh] bg-slate-900 dark:bg-slate-900 light:bg-white border-t border-slate-800 dark:border-slate-800 light:border-slate-200 rounded-t-2xl shadow-2xl z-10 flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-12 h-1 bg-slate-700 dark:bg-slate-700 light:bg-slate-300 rounded-full mx-auto mt-3 mb-1 shrink-0" />
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 dark:border-slate-800 light:border-slate-200 shrink-0">
+          <h3 className="text-sm font-semibold text-slate-100 dark:text-slate-100 light:text-slate-900">{title}</h3>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-slate-100 dark:hover:text-slate-100 light:text-slate-500 light:hover:text-slate-800 rounded-lg cursor-pointer transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-5 overflow-y-auto space-y-3">{children}</div>
+      </div>
+    </div>
+  );
+};
