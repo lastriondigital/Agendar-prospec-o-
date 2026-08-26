@@ -42,7 +42,7 @@ export const PipelineView: React.FC = () => {
     services,
     icps,
     settings,
-    historyEvents,
+    history,
     advanceLeadStage,
     scheduleNextAction,
     setActiveRoute,
@@ -253,7 +253,7 @@ export const PipelineView: React.FC = () => {
 
                   // Calcula o score de qualificação em tempo real
                   const leadScoreResult = comp
-                    ? calculateLeadScore(comp, cont, lead, icps, services, historyEvents, settings.scoringWeights)
+                    ? calculateLeadScore(comp, cont, lead, icps, services, history, settings.scoringWeights)
                     : null;
                   const finalScore = leadScoreResult ? leadScoreResult.score : (lead.score || 50);
 

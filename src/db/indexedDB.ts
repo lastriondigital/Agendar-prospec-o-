@@ -1,15 +1,24 @@
 import {
+  ABTestExperiment,
   AppSettings,
   Campaign,
   Client,
   Company,
   Contact,
+  CtaItem,
+  FollowUpStrategyItem,
   HistoryEvent,
+  IdealCustomerProfile,
   Lead,
   MessageTemplate,
+  ObjectionItem,
+  PainPointItem,
   PipelineStage,
+  PricingItem,
+  ProofItem,
   ProspectAction,
   Service,
+  ValueArgumentItem,
 } from '../types';
 import { DB_NAME, DB_VERSION, DEFAULT_PIPELINE_STAGES } from '../utils/constants';
 import {
@@ -25,6 +34,16 @@ import {
   SEED_SERVICES,
   SEED_TEMPLATES,
 } from './seedData';
+import {
+  SEED_ARGUMENTS,
+  SEED_CTAS,
+  SEED_FOLLOWUPS,
+  SEED_OBJECTIONS,
+  SEED_PAIN_POINTS,
+  SEED_PRICING,
+  SEED_PROOFS,
+} from './salesEngineSeed';
+import { SEED_AB_TESTS } from './abTestSeed';
 
 export type StoreName =
   | 'clients'
@@ -38,7 +57,15 @@ export type StoreName =
   | 'templates'
   | 'actions'
   | 'stages'
-  | 'settings';
+  | 'settings'
+  | 'objections'
+  | 'pricing'
+  | 'proofs'
+  | 'painPoints'
+  | 'arguments'
+  | 'ctas'
+  | 'followups'
+  | 'abTests';
 
 let dbInstance: IDBDatabase | null = null;
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -152,6 +179,51 @@ export async function getDB(): Promise<IDBDatabase> {
       // Settings store
       if (!db.objectStoreNames.contains('settings')) {
         db.createObjectStore('settings');
+      }
+
+      // Sales Engine stores
+      if (!db.objectStoreNames.contains('objections')) {
+        const objStore = db.createObjectStore('objections', { keyPath: 'id' });
+        objStore.createIndex('name', 'name', { unique: false });
+        objStore.createIndex('serviceId', 'serviceId', { unique: false });
+        objStore.createIndex('stage', 'stage', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('pricing')) {
+        const priceStore = db.createObjectStore('pricing', { keyPath: 'id' });
+        priceStore.createIndex('serviceId', 'serviceId', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('proofs')) {
+        const proofStore = db.createObjectStore('proofs', { keyPath: 'id' });
+        proofStore.createIndex('serviceId', 'serviceId', { unique: false });
+        proofStore.createIndex('niche', 'niche', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('painPoints')) {
+        const painStore = db.createObjectStore('painPoints', { keyPath: 'id' });
+        painStore.createIndex('niche', 'niche', { unique: false });
+        painStore.createIndex('type', 'type', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('arguments')) {
+        const argStore = db.createObjectStore('arguments', { keyPath: 'id' });
+        argStore.createIndex('serviceId', 'serviceId', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('ctas')) {
+        const ctaStore = db.createObjectStore('ctas', { keyPath: 'id' });
+        ctaStore.createIndex('category', 'category', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains('followups')) {
+        db.createObjectStore('followups', { keyPath: 'id' });
+      }
+
+      if (!db.objectStoreNames.contains('abTests')) {
+        const abStore = db.createObjectStore('abTests', { keyPath: 'id' });
+        abStore.createIndex('channel', 'channel', { unique: false });
+        abStore.createIndex('status', 'status', { unique: false });
       }
     };
 
@@ -338,6 +410,17 @@ export async function seedDemoData(force = false): Promise<boolean> {
   await putManyInStore<HistoryEvent>('history', SEED_HISTORY);
   await putManyInStore<Client>('clients', SEED_CLIENTS);
   await putManyInStore<ProspectAction>('actions', SEED_ACTIONS);
+
+  // Seed Sales Engine libraries
+  await putManyInStore<ObjectionItem>('objections', SEED_OBJECTIONS);
+  await putManyInStore<PricingItem>('pricing', SEED_PRICING);
+  await putManyInStore<ProofItem>('proofs', SEED_PROOFS);
+  await putManyInStore<PainPointItem>('painPoints', SEED_PAIN_POINTS);
+  await putManyInStore<ValueArgumentItem>('arguments', SEED_ARGUMENTS);
+  await putManyInStore<CtaItem>('ctas', SEED_CTAS);
+  await putManyInStore<FollowUpStrategyItem>('followups', SEED_FOLLOWUPS);
+  await putManyInStore<ABTestExperiment>('abTests', SEED_AB_TESTS);
+
   await saveStoredSettings(INITIAL_SETTINGS);
 
   return true;
@@ -368,6 +451,14 @@ export async function resetAllDataToEmpty(): Promise<void> {
     'templates',
     'actions',
     'stages',
+    'objections',
+    'pricing',
+    'proofs',
+    'painPoints',
+    'arguments',
+    'ctas',
+    'followups',
+    'abTests',
   ];
   for (const s of stores) {
     await clearStore(s);
@@ -380,24 +471,52 @@ export async function resetAllDataToEmpty(): Promise<void> {
  * Exports full IndexedDB state as JSON string for backup & migration
  */
 export async function exportDatabaseToJSON(): Promise<string> {
-  const [companies, contacts, leads, history, clients, campaigns, services, icps, templates, actions, stages, settings] =
-    await Promise.all([
-      getAllFromStore<Company>('companies'),
-      getAllFromStore<Contact>('contacts'),
-      getAllFromStore<Lead>('leads'),
-      getAllFromStore<HistoryEvent>('history'),
-      getAllFromStore<Client>('clients'),
-      getAllFromStore<Campaign>('campaigns'),
-      getAllFromStore<Service>('services'),
-      getAllFromStore<IdealCustomerProfile>('icps'),
-      getAllFromStore<MessageTemplate>('templates'),
-      getAllFromStore<ProspectAction>('actions'),
-      getAllFromStore<PipelineStage>('stages'),
-      getStoredSettings(),
-    ]);
+  const [
+    companies,
+    contacts,
+    leads,
+    history,
+    clients,
+    campaigns,
+    services,
+    icps,
+    templates,
+    actions,
+    stages,
+    objections,
+    pricing,
+    proofs,
+    painPoints,
+    args,
+    ctas,
+    followups,
+    abTests,
+    settings,
+  ] = await Promise.all([
+    getAllFromStore<Company>('companies'),
+    getAllFromStore<Contact>('contacts'),
+    getAllFromStore<Lead>('leads'),
+    getAllFromStore<HistoryEvent>('history'),
+    getAllFromStore<Client>('clients'),
+    getAllFromStore<Campaign>('campaigns'),
+    getAllFromStore<Service>('services'),
+    getAllFromStore<IdealCustomerProfile>('icps'),
+    getAllFromStore<MessageTemplate>('templates'),
+    getAllFromStore<ProspectAction>('actions'),
+    getAllFromStore<PipelineStage>('stages'),
+    getAllFromStore<ObjectionItem>('objections'),
+    getAllFromStore<PricingItem>('pricing'),
+    getAllFromStore<ProofItem>('proofs'),
+    getAllFromStore<PainPointItem>('painPoints'),
+    getAllFromStore<ValueArgumentItem>('arguments'),
+    getAllFromStore<CtaItem>('ctas'),
+    getAllFromStore<FollowUpStrategyItem>('followups'),
+    getAllFromStore<ABTestExperiment>('abTests'),
+    getStoredSettings(),
+  ]);
 
   const payload = {
-    version: '3.0.0',
+    version: '5.0.0',
     exportDate: new Date().toISOString(),
     appName: 'PROSPECT OS',
     data: {
@@ -412,6 +531,14 @@ export async function exportDatabaseToJSON(): Promise<string> {
       templates,
       actions,
       stages,
+      objections,
+      pricing,
+      proofs,
+      painPoints,
+      arguments: args,
+      ctas,
+      followups,
+      abTests,
       settings,
     },
   };
@@ -441,6 +568,14 @@ export async function importDatabaseFromJSON(jsonStr: string): Promise<{ success
       templates,
       actions,
       stages,
+      objections,
+      pricing,
+      proofs,
+      painPoints,
+      arguments: args,
+      ctas,
+      followups,
+      abTests,
       settings,
     } = parsed.data;
 
@@ -455,6 +590,14 @@ export async function importDatabaseFromJSON(jsonStr: string): Promise<{ success
     if (Array.isArray(templates)) await putManyInStore('templates', templates);
     if (Array.isArray(actions)) await putManyInStore('actions', actions);
     if (Array.isArray(stages)) await putManyInStore('stages', stages);
+    if (Array.isArray(objections)) await putManyInStore('objections', objections);
+    if (Array.isArray(pricing)) await putManyInStore('pricing', pricing);
+    if (Array.isArray(proofs)) await putManyInStore('proofs', proofs);
+    if (Array.isArray(painPoints)) await putManyInStore('painPoints', painPoints);
+    if (Array.isArray(args)) await putManyInStore('arguments', args);
+    if (Array.isArray(ctas)) await putManyInStore('ctas', ctas);
+    if (Array.isArray(followups)) await putManyInStore('followups', followups);
+    if (Array.isArray(abTests)) await putManyInStore('abTests', abTests);
     if (settings) await saveStoredSettings(settings);
 
     return { success: true, message: 'Dados restaurados com sucesso!' };

@@ -1,30 +1,71 @@
-import { Client, ContactChannel, Service } from '../types';
+import { Client, Company, Contact, ContactChannel, Service } from '../types';
+
+export const ALLOWED_VARIABLES = [
+  'nome',
+  'primeiro_nome',
+  'empresa',
+  'cidade',
+  'pais',
+  'nicho',
+  'servico',
+  'problema',
+  'beneficio',
+  'preco',
+  'cta',
+  'cargo',
+  'proposta_valor',
+];
+
+export interface MessageValidationResult {
+  isValid: boolean;
+  isEmpty: boolean;
+  isTooLong: boolean;
+  invalidVariables: string[];
+  missingValueVariables: string[];
+  warnings: string[];
+}
 
 /**
- * Interpolates variables in a message template like {{nome}}, {{primeiro_nome}}, {{empresa}}, {{cargo}}, {{servico}}
+ * Interpolates variables in a message template
  */
 export function interpolateMessage(
   templateContent: string,
   client?: Partial<Client> | null,
-  service?: Partial<Service> | null
+  service?: Partial<Service> | null,
+  company?: Partial<Company> | null,
+  contact?: Partial<Contact> | null
 ): string {
   if (!templateContent) return '';
 
   let result = templateContent;
 
-  const firstName = client?.name ? client.name.trim().split(' ')[0] : 'colega';
-  const fullName = client?.name || 'colega';
-  const company = client?.company || 'sua empresa';
-  const role = client?.role || 'líder';
-  const serviceName = service?.name || 'nossas soluções especializadas';
-  const valueProp = service?.valueProposition || 'otimizar processos e gerar novos negócios';
+  const contactName = contact?.name || client?.name || 'Cliente';
+  const firstName = contactName.trim().split(' ')[0] || 'Cliente';
+  const companyName = company?.name || client?.company || 'sua empresa';
+  const role = contact?.role || client?.role || 'gestor';
+  const serviceName = service?.name || 'nossas soluções';
+  const city = company?.city || client?.segment || 'sua região';
+  const country = company?.country || 'Brasil';
+  const niche = company?.niche || client?.segment || 'seu setor';
+  const problem = company?.apparentNeed || service?.problemsSolved?.[0] || 'otimização de processos';
+  const benefit = service?.benefits?.[0] || 'resultados escaláveis';
+  const price = service?.basePrice ? `${service.currency || 'R$'} ${service.basePrice.toLocaleString('pt-BR')}` : 'sob consulta';
+  const cta = service?.defaultCta || 'Podemos agendar 15 minutos esta semana?';
+  const valueProp = service?.valueProposition || 'gerar mais receita e eficiência';
 
   const replaceMap: Record<string, string> = {
-    '{{nome}}': fullName,
+    '{{nome}}': contactName,
     '{{primeiro_nome}}': firstName,
-    '{{empresa}}': company,
-    '{{cargo}}': role,
+    '{{empresa}}': companyName,
+    '{{cidade}}': city,
+    '{{pais}}': country,
+    '{{nicho}}': niche,
     '{{servico}}': serviceName,
+    '{{problema}}': problem,
+    '{{beneficio}}': benefit,
+    '{{preco}}': price,
+    '{{cta}}': cta,
+    '{{cargo}}': role,
     '{{proposta_valor}}': valueProp,
   };
 
@@ -33,6 +74,52 @@ export function interpolateMessage(
   }
 
   return result;
+}
+
+/**
+ * Validates message template content against rules
+ */
+export function validateMessageContent(
+  content: string,
+  context?: { company?: Partial<Company> | null; service?: Partial<Service> | null; contact?: Partial<Contact> | null }
+): MessageValidationResult {
+  const isEmpty = !content || content.trim().length === 0;
+  const isTooLong = content.length > 1000;
+
+  // Extract all {{variable}} occurrences
+  const matches = content.match(/\{\{([^}]+)\}\}/g) || [];
+  const usedVars = matches.map((m) => m.replace(/\{\{|\}\}/g, '').trim());
+
+  const invalidVariables: string[] = [];
+  const missingValueVariables: string[] = [];
+  const warnings: string[] = [];
+
+  for (const v of usedVars) {
+    if (!ALLOWED_VARIABLES.includes(v)) {
+      invalidVariables.push(v);
+    } else if (context) {
+      // Check if value is missing in context
+      if (v === 'cidade' && !context.company?.city) missingValueVariables.push(v);
+      if (v === 'nicho' && !context.company?.niche) missingValueVariables.push(v);
+      if (v === 'preco' && !context.service?.basePrice) missingValueVariables.push(v);
+    }
+  }
+
+  if (isEmpty) warnings.push('A mensagem está vazia.');
+  if (isTooLong) warnings.push('A mensagem excede 1000 caracteres (pode ser longa para o WhatsApp).');
+  if (invalidVariables.length > 0) warnings.push(`Variável(is) desconhecida(s): ${invalidVariables.join(', ')}.`);
+  if (missingValueVariables.length > 0) warnings.push(`Variável(is) sem valor cadastrado no lead: ${missingValueVariables.join(', ')}.`);
+
+  const isValid = !isEmpty && invalidVariables.length === 0;
+
+  return {
+    isValid,
+    isEmpty,
+    isTooLong,
+    invalidVariables,
+    missingValueVariables,
+    warnings,
+  };
 }
 
 /**

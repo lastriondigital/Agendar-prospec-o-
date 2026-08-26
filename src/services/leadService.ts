@@ -451,6 +451,24 @@ export class LeadService {
   }
 
   /**
+   * Atualiza dados de um lead (incluindo preparedMessages)
+   */
+  async updateLead(lead: Lead): Promise<Lead> {
+    const saved = await this.leadRepo.save(lead);
+    const [company, contact] = await Promise.all([
+      this.compRepo.getById(lead.companyId),
+      lead.contactId ? this.contRepo.getById(lead.contactId) : Promise.resolve(null),
+    ]);
+    if (company) {
+      const primaryContact = contact || (await this.contRepo.getByCompanyId(company.id))[0];
+      if (primaryContact) {
+        await this.syncToClientStore(company, primaryContact, saved);
+      }
+    }
+    return saved;
+  }
+
+  /**
    * Adiciona um evento avulso diretamente na timeline de histórico da empresa
    */
   async addHistoryEvent(event: Omit<HistoryEvent, 'id' | 'timestamp'>): Promise<HistoryEvent> {

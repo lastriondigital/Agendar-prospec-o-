@@ -9,6 +9,7 @@ export interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -18,8 +19,10 @@ export const Modal: React.FC<ModalProps> = ({
   description,
   children,
   footer,
-  maxWidth = 'md',
+  maxWidth,
+  size = 'md',
 }) => {
+  const chosenSize = maxWidth || size;
   // ESC key listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -66,7 +69,7 @@ export const Modal: React.FC<ModalProps> = ({
       />
 
       <div
-        className={`relative w-full ${maxWidthStyles[maxWidth]} bg-slate-900 dark:bg-slate-900 light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-200 rounded-2xl shadow-xl z-10 flex flex-col max-h-[90vh] overflow-hidden`}
+        className={`relative w-full ${maxWidthStyles[chosenSize]} bg-slate-900 dark:bg-slate-900 light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-200 rounded-2xl shadow-xl z-10 flex flex-col max-h-[90vh] overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

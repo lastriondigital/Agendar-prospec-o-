@@ -3,6 +3,7 @@ export type RouteId =
   | 'prospecting'
   | 'clients'
   | 'pipeline'
+  | 'sales-engine'
   | 'planner'
   | 'messages'
   | 'campaigns'
@@ -18,7 +19,19 @@ export type ActionStatus = 'pending' | 'completed' | 'skipped' | 'rescheduled';
 
 export type ActionPriority = 'high' | 'medium' | 'low';
 
-export type TemplateType = 'first_contact' | 'follow_up' | 'break_up' | 'value_nudge' | 'custom';
+export type TemplateCategory =
+  | 'primeiro_contacto'
+  | 'follow_up'
+  | 'diagnóstico'
+  | 'prova'
+  | 'proposta'
+  | 'objeção'
+  | 'fechamento'
+  | 'pós_venda'
+  | 'reativação'
+  | 'custom';
+
+export type TemplateType = TemplateCategory;
 
 // Os 14 Estágios do PROSPECT OS
 export type LeadStage =
@@ -37,7 +50,7 @@ export type LeadStage =
   | 'PERDIDO'
   | 'REATIVAÇÃO';
 
-export type LeadPriority = 'alta' | 'média' | 'baixa' | 'high' | 'medium' | 'low';
+export type LeadPriority = 'alta' | 'média' | 'media' | 'baixa' | 'high' | 'medium' | 'low';
 export type LeadTemperature = 'quente' | 'morno' | 'frio' | 'hot' | 'warm' | 'cold';
 export type CompanyStatus = 'active' | 'archived' | 'lead' | 'client';
 
@@ -48,17 +61,24 @@ export interface Company {
   id: string;
   name: string; // nome
   tradeName?: string; // nome fantasia
-  category: string; // categoria
+  category?: string; // categoria
   niche: string; // nicho
   country: string; // país
+  state?: string; // estado/província
   city: string; // cidade
   address?: string; // endereço
   website?: string; // website
+  websiteQuality?: 'modern' | 'outdated' | 'slow' | 'broken' | 'good' | 'poor' | 'boa' | 'media' | 'ruim' | 'nenhuma' | string;
+  googleRating?: number;
+  googleReviewsCount?: number;
+  googleBusiness?: string; // Google Business
   instagram?: string; // Instagram
+  instagramActive?: boolean;
   facebook?: string; // Facebook
   linkedin?: string; // LinkedIn
-  googleBusiness?: string; // Google Business
   unitsCount?: number; // número de unidades
+  numberOfUnits?: number; // alias
+  apparentNeed?: string;
   notes?: string; // observações
   createdAt: string; // data de criação
   updatedAt: string; // data de atualização
@@ -103,6 +123,7 @@ export interface Lead {
   nextActionDate?: string; // próxima ação em
   nextActionChannel?: ContactChannel;
   notes?: string; // observações
+  preparedMessages?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 }
@@ -177,19 +198,31 @@ export interface Client {
   updatedAt: string;
 }
 
+export interface CampaignSequenceStep {
+  id: string;
+  dayOffset: number; // e.g. 0, 2, 5, 9, 20, 45
+  title: string; // e.g. "Primeiro contacto", "Follow-up", "Prova", "Reativação"
+  templateId?: string;
+  channel?: ContactChannel;
+}
+
 export interface Campaign {
   id: string;
   name: string;
   description?: string;
-  targetAudience?: string;
-  status: 'draft' | 'active' | 'paused' | 'completed';
+  targetAudience?: string; // ICP
+  icpId?: string;
+  objective?: string; // e.g. "Gerar Reuniões", "Venda Direta"
+  status: 'draft' | 'active' | 'paused' | 'completed' | 'inactive';
   serviceId?: string;
   defaultTemplateId?: string;
   channel: ContactChannel;
-  dailyGoal: number;
-  totalTarget: number;
+  dailyGoal: number; // limite diário
+  totalTarget: number; // meta total
   startDate?: string;
   endDate?: string;
+  criteria?: string;
+  sequence?: CampaignSequenceStep[];
   createdAt: string;
   updatedAt: string;
 }
@@ -206,16 +239,16 @@ export interface Service {
   id: string;
   name: string; // nome
   description: string; // descrição
-  basePrice: number; // preço base
+  basePrice?: number; // preço base
   currency: string; // moeda (ex: BRL, EUR, USD)
   anchorPrice?: number; // preço âncora
   benefits: string[]; // benefícios
-  targetAudience: string[]; // público ideal
-  problemsSolved: string[]; // problemas resolvidos
-  commonObjections: ServiceCommonObjection[]; // objeções comuns
-  arguments: string[]; // argumentos
-  proofs: string[]; // provas associadas
-  defaultCta: string; // CTA padrão
+  targetAudience?: string[]; // público ideal
+  problemsSolved?: string[]; // problemas resolvidos
+  commonObjections?: ServiceCommonObjection[]; // objeções comuns
+  arguments?: string[]; // argumentos
+  proofs?: string[]; // provas associadas
+  defaultCta?: string; // CTA padrão
   active: boolean; // ativo/inativo
 
   // Campos de retrocompatibilidade
@@ -225,6 +258,8 @@ export interface Service {
   valueProposition?: string; // alias para primeiro benefício ou descrição
   keyDifferentiators?: string[]; // alias para arguments
   idealCustomerProfile?: string; // alias textual
+  standardCTA?: string; // alias para defaultCta
+  associatedProofs?: string[]; // alias para proofs
   createdAt: string;
   updatedAt: string;
 }
@@ -235,16 +270,22 @@ export interface Service {
 export interface IdealCustomerProfile {
   id: string;
   name: string; // nome do perfil
+  description?: string; // descrição resumida do perfil
   niches: string[]; // nichos atendidos
   countries: string[]; // países
   cities: string[]; // cidades
-  size: string[]; // tamanho (ex: Micro, Pequena, Média, Grande)
+  size?: string[]; // tamanho (ex: Micro, Pequena, Média, Grande)
+  companySize?: string; // alias textual de porte
   unitsRange?: string; // número de unidades (ex: "1 a 3 unidades", "Redes 5+")
-  priceRange: {
+  minUnits?: number;
+  maxUnits?: number;
+  priceRange?: {
     min: number;
     max: number;
+    currency?: string;
   }; // faixa de preço / ticket ideal
-  problems: string[]; // problemas típicos
+  problems?: string[]; // problemas típicos
+  commonProblems?: string[]; // alias
   suitableServiceIds: string[]; // serviços adequados
   positiveCriteria: string[]; // critérios positivos (sinais verdes)
   negativeCriteria: string[]; // critérios negativos (red flags)
@@ -274,6 +315,7 @@ export interface LeadScoreResult {
   score: number;
   classification: LeadScoreClassification;
   breakdown: ScoringBreakdownItem[];
+  summaryReason?: string;
 }
 
 /**
@@ -303,9 +345,16 @@ export interface MessageTemplate {
   id: string;
   title: string;
   channel: ContactChannel;
+  category: TemplateCategory;
   type: TemplateType;
   content: string;
-  variables: string[]; // e.g. ['nome', 'empresa', 'cargo', 'servico']
+  variables: string[];
+  version: string; // e.g. "v1.0"
+  serviceId?: string; // mensagens por serviço
+  niche?: string; // mensagens por nicho
+  pipelineStage?: LeadStage; // mensagens por etapa do pipeline
+  isFavorite?: boolean;
+  isArchived?: boolean;
   notes?: string;
   isDefault?: boolean;
   createdAt: string;
@@ -396,3 +445,346 @@ export interface ExecutionQueueItem {
   objective?: string;
   recentHistory?: HistoryEvent[];
 }
+
+/**
+ * Tipos do Copiloto de Prospecção (Gemini)
+ */
+export type CopilotActionType =
+  | 'PERSONALIZAR'
+  | 'GERAR_FOLLOWUP'
+  | 'ANALISAR_RESPOSTA'
+  | 'SUGERIR_SERVICO'
+  | 'MELHORAR'
+  | 'RESUMIR'
+  | 'PROXIMA_ACAO';
+
+export type CopilotTone = 'consultivo' | 'direto' | 'persuasivo' | 'conciso' | 'amigavel' | 'urgente';
+
+export interface CopilotLeadContext {
+  companyName: string;
+  niche?: string;
+  city?: string;
+  country?: string;
+  website?: string;
+  websiteQuality?: string;
+  unitsCount?: number;
+  apparentNeed?: string;
+  notes?: string;
+  contactName?: string;
+  contactRole?: string;
+  contactPhone?: string;
+  contactWhatsapp?: string;
+  contactEmail?: string;
+  stage?: LeadStage;
+  temperature?: LeadTemperature;
+  priority?: LeadPriority;
+  score?: number;
+  serviceName?: string;
+  serviceDescription?: string;
+  serviceBenefits?: string[];
+  serviceProblemsSolved?: string[];
+  campaignName?: string;
+  campaignObjective?: string;
+  recentInteractions?: Array<{
+    type: string;
+    title: string;
+    description?: string;
+    timestamp: string;
+  }>;
+}
+
+export interface CopilotResult {
+  resultText: string;
+  alternatives?: string[];
+  factsUsed: string[];
+  inferences: string[];
+  missingData: string[];
+  intentClassification?: string;
+  sentiment?: string;
+  identifiedProblems?: string[];
+  recommendedService?: string;
+  nextActionSuggestion?: string;
+  recommendedChannel?: string;
+  isOfflineFallback?: boolean;
+}
+
+export interface CopilotRequest {
+  actionType: CopilotActionType;
+  leadContext: CopilotLeadContext;
+  inputMessage?: string;
+  tone?: string;
+  options?: {
+    instructions?: string;
+    lastContactInfo?: string;
+    prospectResponse?: string;
+    availableServices?: Array<{ id: string; name: string; description: string; benefits?: string[]; problemsSolved?: string[] }>;
+  };
+}
+
+/**
+ * ============================================================================
+ * SALES ENGINE — Biblioteca de Vendas & Motor de Abordagem
+ * ============================================================================
+ */
+
+export interface ObjectionItem {
+  id: string;
+  name: string; // ex: "caro", "vou pensar", "já tenho alguém", "não preciso", "mande orçamento", "sem dinheiro", "fale depois", "preciso consultar sócio"
+  context: string; // contexto e gatilho da objeção
+  response: string; // script principal de resposta
+  alternativas: string[]; // respostas alternativas
+  serviceId?: string; // serviço associado
+  serviceName?: string;
+  stage?: LeadStage; // etapa do funil (ex: QUALIFICADO, PROPOSTA, OBJEÇÃO)
+  observacoes: string; // observações e notas táticas
+  category?: 'preco' | 'timing' | 'concorrencia' | 'necessidade' | 'decisor' | 'orcamento' | 'outros';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PricingItem {
+  id: string;
+  name: string; // ex: "Landing Page de Alta Conversão", "Website Corporativo", "Consultoria Mensal"
+  serviceId?: string;
+  serviceName?: string;
+  regularPrice: number; // preço normal
+  anchorPrice?: number; // preço âncora
+  specialOffer?: string; // oferta especial / condição
+  packageDetails?: string; // detalhes do pacote / escopo incluso
+  alternativeOption?: string; // alternativa / plano B (ex: parcelamento, escopo reduzido)
+  currency: string; // BRL, EUR, USD, AOA, etc.
+  notes?: string;
+  autoDiscountApplied?: boolean; // sempre false por padrão (Não aplicar desconto automaticamente)
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProofItem {
+  id: string;
+  title: string; // ex: "Aumento de 240% em agendamentos"
+  description: string;
+  imageUrl?: string; // imagem / print / mockup
+  url?: string; // link do case ou projeto
+  serviceId?: string; // serviço associado
+  serviceName?: string;
+  niche: string; // nicho associado
+  result: string; // métrica de resultado (ex: "ROAS 6.2x e +85 clientes")
+  beforeAfter?: {
+    beforeText?: string;
+    afterText?: string;
+    beforeImage?: string;
+    afterImage?: string;
+  };
+  clientName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PainPointItem {
+  id: string;
+  title: string;
+  description?: string;
+  type: 'problema' | 'dor';
+  niche?: string;
+  serviceId?: string;
+  severity?: 'alta' | 'media' | 'baixa';
+}
+
+export interface ValueArgumentItem {
+  id: string;
+  title: string;
+  argumentText: string;
+  benefit: string;
+  niche?: string;
+  serviceId?: string;
+  category?: 'diferencial' | 'roi' | 'velocidade' | 'seguranca' | 'autoridade';
+}
+
+export interface CtaItem {
+  id: string;
+  title: string;
+  ctaText: string;
+  category: 'ligacao' | 'reuniao' | 'whatsapp' | 'diagnostico' | 'proposta';
+  serviceId?: string;
+  funnelStage?: LeadStage;
+}
+
+export interface FollowUpStrategyItem {
+  id: string;
+  name: string;
+  dayOffset: number; // ex: 2, 5, 10, 20, 45 dias
+  objective: string;
+  angle: string;
+  script: string;
+  serviceId?: string;
+}
+
+/**
+ * Recomendação de Abordagem Estruturada
+ * Contém os 7 pilares fundamentais de vendas
+ */
+export interface SalesApproachRecommendation {
+  serviceId?: string;
+  serviceName: string; // SERVIÇO RECOMENDADO
+  identifiedProblem: string; // PROBLEMA IDENTIFICADO
+  argument: string; // ARGUMENTO
+  recommendedProof: string; // PROVA RECOMENDADA
+  message: string; // MENSAGEM
+  cta: string; // CTA
+  nextAction: string; // PRÓXIMA AÇÃO
+  proofItem?: ProofItem;
+  objectionMatch?: ObjectionItem;
+  pricingItem?: PricingItem;
+  isAiGenerated?: boolean;
+}
+
+/**
+ * =========================================================
+ * TIPOS DE ANALYTICS, FUNIL, TESTES A/B E RELATÓRIO MENSAL
+ * =========================================================
+ */
+
+export type AnalyticsPeriod =
+  | 'today'
+  | '7days'
+  | '30days'
+  | 'this_month'
+  | 'last_month'
+  | 'all'
+  | 'custom';
+
+export interface AnalyticsFilterState {
+  period: AnalyticsPeriod;
+  customStartDate?: string;
+  customEndDate?: string;
+  serviceId: string; // 'all' ou ID específico
+  niche: string; // 'all' ou nicho específico
+  country: string; // 'all' ou país específico
+  campaignId: string; // 'all' ou ID específico
+  stage: string; // 'all' ou LeadStage específico
+}
+
+export interface AnalyticsMetrics {
+  // Contadores Brutos
+  prospectsAdicionados: number;
+  prospectsContactados: number;
+  mensagensEnviadas: number;
+  respostas: number;
+  respostasPositivas: number;
+  interessados: number;
+  reunioes: number;
+  propostas: number;
+  clientes: number;
+  perdidos: number;
+  reativacoes: number;
+
+  // Taxas Calculadas (%)
+  taxaContacto: number; // contactados / adicionados
+  taxaResposta: number; // respostas / contactados
+  taxaRespostaPositiva: number; // respostas positivas / respostas
+  taxaReuniao: number; // reunioes / interessados (e vs contactados)
+  taxaReuniaoSobreContactados: number;
+  taxaProposta: number; // propostas / reunioes (e vs contactados)
+  taxaPropostaSobreContactados: number;
+  taxaConversao: number; // clientes / adicionados
+  taxaConversaoSobreContactados: number; // clientes / contactados
+
+  // Métricas de Tempo
+  tempoMedioAteRespostaHoras: number; // em horas
+  tempoMedioAteRespostaFormatado: string; // ex: "4.2h" ou "1.8 dias"
+  tempoMedioAteConversaoDias: number; // em dias
+  tempoMedioAteConversaoFormatado: string; // ex: "5.4 dias"
+}
+
+export interface FunnelStepData {
+  id: 'leads' | 'contacted' | 'responses' | 'interested' | 'meetings' | 'proposals' | 'clients';
+  label: string;
+  count: number;
+  conversionFromPrev: number; // % sobre o degrau imediatamente anterior
+  conversionFromTop: number; // % sobre o topo do funil (Leads adicionados)
+  dropOffCount: number; // quantos caíram neste degrau
+  color: string;
+  subDescription?: string;
+}
+
+export interface ABTestVariant {
+  id: string; // 'A' ou 'B'
+  label: string; // ex: "Mensagem A (Abordagem Direta)"
+  templateId?: string;
+  content: string;
+  sentCount: number;
+  replyCount: number;
+  positiveReplyCount: number;
+  conversionCount: number;
+  // Taxas calculadas
+  replyRate: number; // %
+  positiveReplyRate: number; // %
+  conversionRate: number; // %
+}
+
+export interface ABTestExperiment {
+  id: string;
+  title: string;
+  description?: string;
+  channel: ContactChannel;
+  status: 'active' | 'completed' | 'draft';
+  serviceId?: string;
+  niche?: string;
+  variantA: ABTestVariant;
+  variantB: ABTestVariant;
+  winnerVariant?: 'A' | 'B' | 'empate' | 'dados_insuficientes';
+  winnerMetric?: 'replyRate' | 'positiveReplyRate' | 'conversionRate';
+  insightSummary?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MetricDelta {
+  currentValue: number;
+  previousValue: number;
+  absoluteChange: number;
+  percentChange: number; // % de variação
+  status: 'improved' | 'worsened' | 'neutral';
+  isPercentage?: boolean;
+}
+
+export interface DataFactRecommendation {
+  id: string;
+  title: string;
+  description: string;
+  category: 'message' | 'channel' | 'niche' | 'timing' | 'conversion' | 'service';
+  badgeLabel: string;
+  dataFact: string; // Fato objetivo comprovado pelos dados (sem alucinações nem falsas causalidades)
+  impactLevel: 'alto' | 'medio' | 'informativo';
+}
+
+export interface PeriodComparisonReport {
+  currentPeriodLabel: string;
+  previousPeriodLabel: string;
+  metricsCurrent: AnalyticsMetrics;
+  metricsPrevious: AnalyticsMetrics;
+  deltas: {
+    prospectsAdicionados: MetricDelta;
+    prospectsContactados: MetricDelta;
+    mensagensEnviadas: MetricDelta;
+    respostas: MetricDelta;
+    respostasPositivas: MetricDelta;
+    interessados: MetricDelta;
+    reunioes: MetricDelta;
+    propostas: MetricDelta;
+    clientes: MetricDelta;
+    perdidos: MetricDelta;
+    reativacoes: MetricDelta;
+    taxaContacto: MetricDelta;
+    taxaResposta: MetricDelta;
+    taxaRespostaPositiva: MetricDelta;
+    taxaReuniao: MetricDelta;
+    taxaProposta: MetricDelta;
+    taxaConversao: MetricDelta;
+  };
+  improvementsList: { metric: string; detail: string; percent: number }[];
+  worsenedList: { metric: string; detail: string; percent: number }[];
+  recommendations: DataFactRecommendation[];
+}
+
+

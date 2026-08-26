@@ -14,13 +14,16 @@ import {
   seedDemoData,
 } from '../db/indexedDB';
 import {
+  ABTestExperiment,
   AppSettings,
   Campaign,
   Client,
   Company,
   Contact,
   ContactChannel,
+  CtaItem,
   DuplicateMatch,
+  FollowUpStrategyItem,
   HistoryEvent,
   IdealCustomerProfile,
   Lead,
@@ -28,10 +31,15 @@ import {
   LeadStage,
   LeadTemperature,
   MessageTemplate,
+  ObjectionItem,
+  PainPointItem,
   PipelineStage,
+  PricingItem,
+  ProofItem,
   ProspectAction,
   RouteId,
   Service,
+  ValueArgumentItem,
 } from '../types';
 import { DEFAULT_PIPELINE_STAGES } from '../utils/constants';
 import { CreateCompanyPayload, leadService } from '../services/leadService';
@@ -113,6 +121,7 @@ interface AppContextType {
   // Template operations
   upsertTemplate: (template: MessageTemplate) => Promise<void>;
   deleteTemplate: (id: string) => Promise<void>;
+  updateLead: (lead: Lead) => Promise<void>;
 
   // Action / Execution operations
   upsertAction: (action: ProspectAction) => Promise<void>;
@@ -121,6 +130,39 @@ interface AppContextType {
   rescheduleAction: (actionId: string, newDate: string) => Promise<void>;
   deleteAction: (id: string) => Promise<void>;
   createActionBatchForCampaign: (campaignId: string, clientIds: string[], templateId: string, scheduledDate?: string) => Promise<number>;
+
+  // Sales Engine Operations
+  objections: ObjectionItem[];
+  pricing: PricingItem[];
+  proofs: ProofItem[];
+  painPoints: PainPointItem[];
+  arguments: ValueArgumentItem[];
+  ctas: CtaItem[];
+  followups: FollowUpStrategyItem[];
+  upsertObjection: (objection: ObjectionItem) => Promise<void>;
+  deleteObjection: (id: string) => Promise<void>;
+  upsertPricing: (pricing: PricingItem) => Promise<void>;
+  deletePricing: (id: string) => Promise<void>;
+  upsertProof: (proof: ProofItem) => Promise<void>;
+  deleteProof: (id: string) => Promise<void>;
+  upsertPainPoint: (painPoint: PainPointItem) => Promise<void>;
+  deletePainPoint: (id: string) => Promise<void>;
+  upsertArgument: (arg: ValueArgumentItem) => Promise<void>;
+  deleteArgument: (id: string) => Promise<void>;
+  upsertCta: (cta: CtaItem) => Promise<void>;
+  deleteCta: (id: string) => Promise<void>;
+  upsertFollowUp: (followUp: FollowUpStrategyItem) => Promise<void>;
+  deleteFollowUp: (id: string) => Promise<void>;
+
+  // A/B Testing Operations
+  abTests: ABTestExperiment[];
+  upsertAbTest: (test: ABTestExperiment) => Promise<void>;
+  deleteAbTest: (id: string) => Promise<void>;
+  logAbTestEvent: (params: {
+    testId: string;
+    variant: 'A' | 'B';
+    eventType: 'send' | 'reply' | 'positive_reply' | 'conversion';
+  }) => Promise<void>;
 
   // Settings & DB Management
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
@@ -147,6 +189,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [actions, setActions] = useState<ProspectAction[]>([]);
   const [stages, setStages] = useState<PipelineStage[]>(DEFAULT_PIPELINE_STAGES);
+  const [objections, setObjections] = useState<ObjectionItem[]>([]);
+  const [pricing, setPricing] = useState<PricingItem[]>([]);
+  const [proofs, setProofs] = useState<ProofItem[]>([]);
+  const [painPoints, setPainPoints] = useState<PainPointItem[]>([]);
+  const [argumentsList, setArgumentsList] = useState<ValueArgumentItem[]>([]);
+  const [ctas, setCtas] = useState<CtaItem[]>([]);
+  const [followups, setFollowups] = useState<FollowUpStrategyItem[]>([]);
+  const [abTests, setAbTests] = useState<ABTestExperiment[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
     theme: 'dark',
     dailyGoal: 15,
@@ -206,6 +256,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fetchedTemplates,
         fetchedActions,
         fetchedStages,
+        fetchedObjections,
+        fetchedPricing,
+        fetchedProofs,
+        fetchedPainPoints,
+        fetchedArguments,
+        fetchedCtas,
+        fetchedFollowups,
+        fetchedAbTests,
         fetchedSettings,
       ] = await Promise.all([
         getAllFromStore<Company>('companies'),
@@ -219,6 +277,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getAllFromStore<MessageTemplate>('templates'),
         getAllFromStore<ProspectAction>('actions'),
         getAllFromStore<PipelineStage>('stages'),
+        getAllFromStore<ObjectionItem>('objections'),
+        getAllFromStore<PricingItem>('pricing'),
+        getAllFromStore<ProofItem>('proofs'),
+        getAllFromStore<PainPointItem>('painPoints'),
+        getAllFromStore<ValueArgumentItem>('arguments'),
+        getAllFromStore<CtaItem>('ctas'),
+        getAllFromStore<FollowUpStrategyItem>('followups'),
+        getAllFromStore<ABTestExperiment>('abTests'),
         getStoredSettings(),
       ]);
 
@@ -235,6 +301,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (fetchedStages.length > 0) {
         setStages(fetchedStages.sort((a, b) => a.order - b.order));
       }
+      setObjections(fetchedObjections);
+      setPricing(fetchedPricing);
+      setProofs(fetchedProofs);
+      setPainPoints(fetchedPainPoints);
+      setArgumentsList(fetchedArguments);
+      setCtas(fetchedCtas);
+      setFollowups(fetchedFollowups);
+      setAbTests(fetchedAbTests);
       setSettings(fetchedSettings);
 
       const demoLoaded = await isDemoDataLoaded();
@@ -371,6 +445,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     },
     [error, refreshData, success]
+  );
+
+  const updateLead = useCallback(
+    async (lead: Lead) => {
+      try {
+        await leadService.updateLead(lead);
+        await refreshData();
+      } catch (err) {
+        error('Erro ao atualizar lead', (err as Error).message);
+      }
+    },
+    [error, refreshData]
   );
 
   const scheduleNextAction = useCallback(
@@ -620,10 +706,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await putInStore('clients', updatedClient);
       }
 
+      // Se a ação pertencia a uma campanha com sequência, calcular a próxima ação automaticamente
+      if (action.campaignId) {
+        const campaign = campaigns.find((c) => c.id === action.campaignId);
+        if (campaign && campaign.sequence && campaign.sequence.length > 0) {
+          const currentStepIndex = campaign.sequence.findIndex(
+            (s) => s.title.toLowerCase() === (action.customMessage || '').toLowerCase()
+          );
+          const nextStepIndex = currentStepIndex >= 0 ? currentStepIndex + 1 : 1;
+          if (nextStepIndex < campaign.sequence.length) {
+            const nextStep = campaign.sequence[nextStepIndex];
+            const currentOffset = currentStepIndex >= 0 ? campaign.sequence[currentStepIndex].dayOffset : 0;
+            const deltaDays = nextStep.dayOffset - currentOffset;
+
+            const nextDate = new Date();
+            nextDate.setDate(nextDate.getDate() + (deltaDays > 0 ? deltaDays : 2));
+            const nextDateStr = nextDate.toISOString().slice(0, 10);
+
+            const nextAction: ProspectAction = {
+              id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              clientId: action.clientId,
+              campaignId: campaign.id,
+              templateId: nextStep.templateId,
+              channel: nextStep.channel || campaign.channel,
+              scheduledDate: nextDateStr,
+              status: 'pending',
+              priority: 'medium',
+              estMinutes: 2,
+              customMessage: nextStep.title,
+              createdAt: now,
+              updatedAt: now,
+            };
+            await putInStore('actions', nextAction);
+          }
+        }
+      }
+
       await refreshData();
-      success('Ação concluída com sucesso!');
+      success('Ação concluída e próxima etapa calculada com sucesso!');
     },
-    [actions, clients, refreshData, success]
+    [actions, clients, campaigns, refreshData, success]
   );
 
   const skipAction = useCallback(
@@ -708,6 +830,223 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [campaigns, refreshData, settings.estMinutesPerAction, success]
   );
 
+  // Sales Engine operations
+  const upsertObjection = useCallback(
+    async (objection: ObjectionItem) => {
+      await putInStore('objections', objection);
+      await refreshData();
+      success('Objeção salva na biblioteca!');
+    },
+    [refreshData, success]
+  );
+
+  const deleteObjection = useCallback(
+    async (id: string) => {
+      await deleteFromStore('objections', id);
+      await refreshData();
+      success('Objeção removida.');
+    },
+    [refreshData, success]
+  );
+
+  const upsertPricing = useCallback(
+    async (priceItem: PricingItem) => {
+      await putInStore('pricing', priceItem);
+      await refreshData();
+      success('Tabela de preços salva com sucesso!');
+    },
+    [refreshData, success]
+  );
+
+  const deletePricing = useCallback(
+    async (id: string) => {
+      await deleteFromStore('pricing', id);
+      await refreshData();
+      success('Configuração de preço removida.');
+    },
+    [refreshData, success]
+  );
+
+  const upsertProof = useCallback(
+    async (proof: ProofItem) => {
+      await putInStore('proofs', proof);
+      await refreshData();
+      success('Prova social salva na biblioteca!');
+    },
+    [refreshData, success]
+  );
+
+  const deleteProof = useCallback(
+    async (id: string) => {
+      await deleteFromStore('proofs', id);
+      await refreshData();
+      success('Prova social removida.');
+    },
+    [refreshData, success]
+  );
+
+  const upsertPainPoint = useCallback(
+    async (painPoint: PainPointItem) => {
+      await putInStore('painPoints', painPoint);
+      await refreshData();
+      success('Problema / Dor salvo na biblioteca!');
+    },
+    [refreshData, success]
+  );
+
+  const deletePainPoint = useCallback(
+    async (id: string) => {
+      await deleteFromStore('painPoints', id);
+      await refreshData();
+      success('Item de dor removido.');
+    },
+    [refreshData, success]
+  );
+
+  const upsertArgument = useCallback(
+    async (arg: ValueArgumentItem) => {
+      await putInStore('arguments', arg);
+      await refreshData();
+      success('Argumento de valor salvo!');
+    },
+    [refreshData, success]
+  );
+
+  const deleteArgument = useCallback(
+    async (id: string) => {
+      await deleteFromStore('arguments', id);
+      await refreshData();
+      success('Argumento removido.');
+    },
+    [refreshData, success]
+  );
+
+  const upsertCta = useCallback(
+    async (cta: CtaItem) => {
+      await putInStore('ctas', cta);
+      await refreshData();
+      success('CTA salvo na biblioteca!');
+    },
+    [refreshData, success]
+  );
+
+  const deleteCta = useCallback(
+    async (id: string) => {
+      await deleteFromStore('ctas', id);
+      await refreshData();
+      success('CTA removido.');
+    },
+    [refreshData, success]
+  );
+
+  const upsertFollowUp = useCallback(
+    async (followUp: FollowUpStrategyItem) => {
+      await putInStore('followups', followUp);
+      await refreshData();
+      success('Estratégia de Follow-up salva!');
+    },
+    [refreshData, success]
+  );
+
+  const deleteFollowUp = useCallback(
+    async (id: string) => {
+      await deleteFromStore('followups', id);
+      await refreshData();
+      success('Estratégia removida.');
+    },
+    [refreshData, success]
+  );
+
+  // A/B Testing Operations
+  const upsertAbTest = useCallback(
+    async (test: ABTestExperiment) => {
+      // Re-calculate rates and winner automatically based on empirical numbers
+      const varA = { ...test.variantA };
+      const varB = { ...test.variantB };
+
+      varA.replyRate = varA.sentCount > 0 ? Math.round((varA.replyCount / varA.sentCount) * 1000) / 10 : 0;
+      varA.positiveReplyRate = varA.sentCount > 0 ? Math.round((varA.positiveReplyCount / varA.sentCount) * 1000) / 10 : 0;
+      varA.conversionRate = varA.sentCount > 0 ? Math.round((varA.conversionCount / varA.sentCount) * 1000) / 10 : 0;
+
+      varB.replyRate = varB.sentCount > 0 ? Math.round((varB.replyCount / varB.sentCount) * 1000) / 10 : 0;
+      varB.positiveReplyRate = varB.sentCount > 0 ? Math.round((varB.positiveReplyCount / varB.sentCount) * 1000) / 10 : 0;
+      varB.conversionRate = varB.sentCount > 0 ? Math.round((varB.conversionCount / varB.sentCount) * 1000) / 10 : 0;
+
+      let winnerVariant: 'A' | 'B' | 'empate' | 'dados_insuficientes' = 'dados_insuficientes';
+      let insightSummary = 'Aguardando mais envios para consolidar comparação estatística.';
+
+      if (varA.sentCount >= 10 && varB.sentCount >= 10) {
+        if (varA.replyRate > varB.replyRate) {
+          winnerVariant = 'A';
+          insightSummary = `Variante A obteve maior taxa de resposta (${varA.replyRate}% vs ${varB.replyRate}%).`;
+        } else if (varB.replyRate > varA.replyRate) {
+          winnerVariant = 'B';
+          insightSummary = `Variante B obteve maior taxa de resposta (${varB.replyRate}% vs ${varA.replyRate}%).`;
+        } else {
+          winnerVariant = 'empate';
+          insightSummary = `Ambas as variantes registraram a mesma taxa de resposta (${varA.replyRate}%).`;
+        }
+      }
+
+      const updatedTest: ABTestExperiment = {
+        ...test,
+        variantA: varA,
+        variantB: varB,
+        winnerVariant,
+        insightSummary,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await putInStore('abTests', updatedTest);
+      await refreshData();
+      success('Teste A/B salvo!');
+    },
+    [refreshData, success]
+  );
+
+  const deleteAbTest = useCallback(
+    async (id: string) => {
+      await deleteFromStore('abTests', id);
+      await refreshData();
+      success('Teste A/B removido.');
+    },
+    [refreshData, success]
+  );
+
+  const logAbTestEvent = useCallback(
+    async (params: {
+      testId: string;
+      variant: 'A' | 'B';
+      eventType: 'send' | 'reply' | 'positive_reply' | 'conversion';
+    }) => {
+      const existing = abTests.find((t) => t.id === params.testId);
+      if (!existing) return;
+
+      const target = params.variant === 'A' ? { ...existing.variantA } : { ...existing.variantB };
+
+      if (params.eventType === 'send') target.sentCount += 1;
+      if (params.eventType === 'reply') target.replyCount += 1;
+      if (params.eventType === 'positive_reply') {
+        target.positiveReplyCount += 1;
+        target.replyCount = Math.max(target.replyCount, target.positiveReplyCount);
+      }
+      if (params.eventType === 'conversion') {
+        target.conversionCount += 1;
+        target.positiveReplyCount = Math.max(target.positiveReplyCount, target.conversionCount);
+        target.replyCount = Math.max(target.replyCount, target.positiveReplyCount);
+      }
+
+      const updated: ABTestExperiment = {
+        ...existing,
+        variantA: params.variant === 'A' ? target : existing.variantA,
+        variantB: params.variant === 'B' ? target : existing.variantB,
+      };
+
+      await upsertAbTest(updated);
+    },
+    [abTests, upsertAbTest]
+  );
+
   // Settings & DB Management
   const updateSettings = useCallback(
     async (newSettings: Partial<AppSettings>) => {
@@ -774,6 +1113,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         actions,
         stages,
         settings,
+        objections,
+        pricing,
+        proofs,
+        painPoints,
+        arguments: argumentsList,
+        ctas,
+        followups,
         isLoading,
         isDemoMode,
         isOnline,
@@ -787,6 +1133,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateContact,
         deleteContact,
         advanceLeadStage,
+        updateLead,
         scheduleNextAction,
         addHistoryEvent,
         logInteractionAndAdvance,
@@ -807,6 +1154,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         rescheduleAction,
         deleteAction,
         createActionBatchForCampaign,
+        upsertObjection,
+        deleteObjection,
+        upsertPricing,
+        deletePricing,
+        upsertProof,
+        deleteProof,
+        upsertPainPoint,
+        deletePainPoint,
+        upsertArgument,
+        deleteArgument,
+        upsertCta,
+        deleteCta,
+        upsertFollowUp,
+        deleteFollowUp,
+        abTests,
+        upsertAbTest,
+        deleteAbTest,
+        logAbTestEvent,
         updateSettings,
         loadDemoData,
         clearAllData,

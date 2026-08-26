@@ -39,8 +39,11 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { generateWhatsAppLink, getChannelBadgeDetails, formatPhoneNumber, formatRelativeDate } from '../utils/formatting';
 import { ALL_LEAD_STAGES, STAGES_CONFIG } from '../utils/constants';
-import { ContactChannel, HistoryEventType, LeadStage } from '../types';
+import { ContactChannel, HistoryEventType, LeadStage, CopilotActionType } from '../types';
 import { CompanyDetailsDrawer } from '../components/clients/CompanyDetailsDrawer';
+import { CopilotActionButtons } from '../components/copilot/CopilotActionButtons';
+import { CopilotAssistantModal } from '../components/copilot/CopilotAssistantModal';
+import { ApproachRecommendationCard } from '../components/sales/ApproachRecommendationCard';
 
 export const ProspectingView: React.FC = () => {
   const {
@@ -83,6 +86,11 @@ export const ProspectingView: React.FC = () => {
 
   // Drawer de Detalhes da Empresa
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Copiloto Gemini de Prospecção
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [copilotInitialAction, setCopilotInitialAction] = useState<CopilotActionType>('PERSONALIZAR');
+  const [showSalesApproach, setShowSalesApproach] = useState(false);
 
   // Seleção do item atual na fila
   const currentItem = queueItems[0] || null;
@@ -460,7 +468,43 @@ export const ProspectingView: React.FC = () => {
 
           {/* Card: Script / Mensagem Preparada com Edição Inline */}
           <Card padding="md" className="bg-neutral-900 border-neutral-800 space-y-3">
-            <div className="flex items-center justify-between">
+            {/* Faixa de Ações do Copiloto Gemini & Sales Engine */}
+            <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between flex-wrap gap-2">
+              <CopilotActionButtons
+                size="xs"
+                onSelectAction={(act) => {
+                  setCopilotInitialAction(act);
+                  setIsCopilotOpen(true);
+                }}
+              />
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => setShowSalesApproach(!showSalesApproach)}
+                className="text-xs text-indigo-400 border-indigo-500/40 hover:bg-indigo-950/40"
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1" />
+                {showSalesApproach ? 'Ocultar Sales Engine' : 'Recomendação Sales Engine'}
+              </Button>
+            </div>
+
+            {/* Sales Engine: Recomendação dos 7 Pilares */}
+            {showSalesApproach && company && (
+              <div className="animate-fadeIn">
+                <ApproachRecommendationCard
+                  company={company}
+                  contact={contact}
+                  lead={lead}
+                  onApplyMessage={(msg) => {
+                    setCustomMessage(msg);
+                    setIsEditingMessage(true);
+                    success('Mensagem do Sales Engine aplicada!');
+                  }}
+                />
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2 text-xs font-bold text-neutral-200 uppercase tracking-wider">
                 <MessageSquare className="w-4 h-4 text-emerald-400" />
                 <span>Mensagem Preparada</span>
@@ -732,6 +776,23 @@ export const ProspectingView: React.FC = () => {
           }}
         />
       )}
+
+      {/* Modal do Copiloto de Prospecção Gemini */}
+      <CopilotAssistantModal
+        isOpen={isCopilotOpen}
+        onClose={() => setIsCopilotOpen(false)}
+        company={company}
+        contact={contact}
+        lead={lead}
+        service={targetService}
+        campaign={currentItem?.campaign}
+        initialMessage={activeMessage}
+        initialActionType={copilotInitialAction}
+        onApplyMessage={(newMsg) => {
+          setCustomMessage(newMsg);
+          setIsEditingMessage(true);
+        }}
+      />
     </div>
   );
 };

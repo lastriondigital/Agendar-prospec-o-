@@ -483,9 +483,10 @@ export const DashboardView: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {priorityLeads.map((lead) => {
-            const comp = companies.find((c) => c.id === lead.companyId);
-            const cont = contacts.find((c) => c.id === lead.contactId) || contacts.find((c) => c.companyId === lead.companyId);
+          {priorityLeads.map((item) => {
+            const lead = item.lead;
+            const comp = item.company || companies.find((c) => c.id === lead.companyId);
+            const cont = item.contact || contacts.find((c) => c.id === lead.contactId) || contacts.find((c) => c.companyId === lead.companyId);
             const stageDef = STAGES_CONFIG[lead.stage] || STAGES_CONFIG['NOVO'];
             const hasNextAction = Boolean(lead.nextActionTitle && lead.nextActionDate);
 
@@ -502,10 +503,10 @@ export const DashboardView: React.FC = () => {
                         {stageDef.label}
                       </Badge>
                       <ScoreBadge
-                        score={lead.score || 50}
+                        score={lead.score || item.scoreResult?.score || 50}
                         size="xs"
                         interactive
-                        scoreResult={(lead as any).scoreResult}
+                        scoreResult={item.scoreResult}
                         companyName={comp?.name}
                       />
                     </div>

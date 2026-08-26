@@ -8,6 +8,7 @@ import {
   Menu,
   MessageSquareText,
   Settings,
+  ShieldAlert,
   Target,
   Users,
   Zap,
@@ -28,6 +29,18 @@ export const BottomNav: React.FC = () => {
   };
 
   const moreItems: { id: RouteId; label: string; icon: React.ReactNode; desc: string }[] = [
+    {
+      id: 'pipeline',
+      label: 'Pipeline (Funil)',
+      icon: <Kanban className="w-5 h-5 text-indigo-400" />,
+      desc: 'Quadro visual de estágios de negociação',
+    },
+    {
+      id: 'sales-engine',
+      label: 'Sales Engine (Vendas)',
+      icon: <ShieldAlert className="w-5 h-5 text-amber-400" />,
+      desc: 'Objeções, Provas, Preços, Argumentos e CTAs',
+    },
     {
       id: 'planner',
       label: 'Planejador',

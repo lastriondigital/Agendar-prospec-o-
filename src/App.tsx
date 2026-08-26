@@ -16,6 +16,7 @@ import { PlannerView } from './views/PlannerView';
 import { MessagesView } from './views/MessagesView';
 import { CampaignsView } from './views/CampaignsView';
 import { ServicesView } from './views/ServicesView';
+import { SalesEngineView } from './views/SalesEngineView';
 import { AnalyticsView } from './views/AnalyticsView';
 import { SettingsView } from './views/SettingsView';
 
@@ -45,6 +46,8 @@ const MainContent: React.FC = () => {
       return <ClientsView />;
     case 'pipeline':
       return <PipelineView />;
+    case 'sales-engine':
+      return <SalesEngineView />;
     case 'planner':
       return <PlannerView />;
     case 'messages':

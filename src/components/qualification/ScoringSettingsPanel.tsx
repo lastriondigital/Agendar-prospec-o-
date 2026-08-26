@@ -139,7 +139,7 @@ export const ScoringSettingsPanel: React.FC<ScoringSettingsPanelProps> = ({
             <h4 className="text-xs font-black uppercase tracking-wider text-neutral-300">
               1. Presença Digital & Website
             </h4>
-            <span className="text-[10px] text-neutral-500">Website & Qualidade</span>
+            <span className="text-[10px] text-neutral-500">Website & Oportunidades</span>
           </div>
 
           <div className="space-y-3 text-xs">
@@ -161,32 +161,32 @@ export const ScoringSettingsPanel: React.FC<ScoringSettingsPanelProps> = ({
 
             <div>
               <div className="flex justify-between font-medium text-neutral-200 mb-1">
-                <span>Qualidade do Website: Boa / Moderna</span>
-                <span className="font-mono font-bold text-emerald-400">+{config.websiteQualityGood} pts</span>
+                <span>Website Oportunidade / Desatualizado</span>
+                <span className="font-mono font-bold text-emerald-400">+{config.outdatedWebsite} pts</span>
               </div>
               <input
                 type="range"
                 min="0"
-                max="20"
+                max="25"
                 step="1"
-                value={config.websiteQualityGood}
-                onChange={(e) => handleUpdate('websiteQualityGood', Number(e.target.value))}
+                value={config.outdatedWebsite}
+                onChange={(e) => handleUpdate('outdatedWebsite', Number(e.target.value))}
                 className="w-full accent-emerald-500 cursor-pointer"
               />
             </div>
 
             <div>
               <div className="flex justify-between font-medium text-neutral-200 mb-1">
-                <span>Website Lento ou com Problemas (Oportunidade)</span>
-                <span className="font-mono font-bold text-amber-400">+{config.websiteQualityPoor} pts</span>
+                <span>Sem Website (Penalidade/Ajuste)</span>
+                <span className="font-mono font-bold text-amber-400">{config.noWebsite} pts</span>
               </div>
               <input
                 type="range"
-                min="0"
-                max="20"
+                min="-20"
+                max="10"
                 step="1"
-                value={config.websiteQualityPoor}
-                onChange={(e) => handleUpdate('websiteQualityPoor', Number(e.target.value))}
+                value={config.noWebsite}
+                onChange={(e) => handleUpdate('noWebsite', Number(e.target.value))}
                 className="w-full accent-amber-500 cursor-pointer"
               />
             </div>
@@ -199,55 +199,55 @@ export const ScoringSettingsPanel: React.FC<ScoringSettingsPanelProps> = ({
             <h4 className="text-xs font-black uppercase tracking-wider text-neutral-300">
               2. Google & Redes Sociais
             </h4>
-            <span className="text-[10px] text-neutral-500">Google Business & Instagram</span>
+            <span className="text-[10px] text-neutral-500">Google Business & Decisor</span>
           </div>
 
           <div className="space-y-3 text-xs">
             <div>
               <div className="flex justify-between font-medium text-neutral-200 mb-1">
-                <span>Presença Forte no Google (Avaliações / GBP)</span>
-                <span className="font-mono font-bold text-emerald-400">+{config.googlePresenceStrong} pts</span>
+                <span>Presença no Google (GBP / Maps)</span>
+                <span className="font-mono font-bold text-emerald-400">+{config.hasGoogleBusiness} pts</span>
               </div>
               <input
                 type="range"
                 min="0"
                 max="25"
                 step="1"
-                value={config.googlePresenceStrong}
-                onChange={(e) => handleUpdate('googlePresenceStrong', Number(e.target.value))}
+                value={config.hasGoogleBusiness}
+                onChange={(e) => handleUpdate('hasGoogleBusiness', Number(e.target.value))}
                 className="w-full accent-emerald-500 cursor-pointer"
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between font-medium text-neutral-200 mb-1">
-                <span>Presença Média ou Básica no Google</span>
-                <span className="font-mono font-bold text-sky-400">+{config.googlePresenceMedium} pts</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="15"
-                step="1"
-                value={config.googlePresenceMedium}
-                onChange={(e) => handleUpdate('googlePresenceMedium', Number(e.target.value))}
-                className="w-full accent-sky-500 cursor-pointer"
               />
             </div>
 
             <div>
               <div className="flex justify-between font-medium text-neutral-200 mb-1">
                 <span>Instagram Ativo & Atualizado</span>
-                <span className="font-mono font-bold text-emerald-400">+{config.instagramActive} pts</span>
+                <span className="font-mono font-bold text-emerald-400">+{config.hasInstagram} pts</span>
               </div>
               <input
                 type="range"
                 min="0"
                 max="20"
                 step="1"
-                value={config.instagramActive}
-                onChange={(e) => handleUpdate('instagramActive', Number(e.target.value))}
+                value={config.hasInstagram}
+                onChange={(e) => handleUpdate('hasInstagram', Number(e.target.value))}
                 className="w-full accent-emerald-500 cursor-pointer"
+              />
+            </div>
+
+            <div>
+              <div className="flex justify-between font-medium text-neutral-200 mb-1">
+                <span>Cargo de Decisor Mapeado</span>
+                <span className="font-mono font-bold text-sky-400">+{config.hasDecisionMakerRole} pts</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="20"
+                step="1"
+                value={config.hasDecisionMakerRole}
+                onChange={(e) => handleUpdate('hasDecisionMakerRole', Number(e.target.value))}
+                className="w-full accent-sky-500 cursor-pointer"
               />
             </div>
           </div>
@@ -265,39 +265,39 @@ export const ScoringSettingsPanel: React.FC<ScoringSettingsPanelProps> = ({
           <div className="space-y-3 text-xs">
             <div>
               <div className="flex justify-between font-medium text-neutral-200 mb-1">
-                <span>WhatsApp Comercial Disponível</span>
-                <span className="font-mono font-bold text-emerald-400">+{config.hasWhatsApp} pts</span>
+                <span>WhatsApp Comercial Direto</span>
+                <span className="font-mono font-bold text-emerald-400">+{config.hasDirectWhatsapp} pts</span>
               </div>
               <input
                 type="range"
                 min="0"
                 max="25"
                 step="1"
-                value={config.hasWhatsApp}
-                onChange={(e) => handleUpdate('hasWhatsApp', Number(e.target.value))}
+                value={config.hasDirectWhatsapp}
+                onChange={(e) => handleUpdate('hasDirectWhatsapp', Number(e.target.value))}
                 className="w-full accent-emerald-500 cursor-pointer"
               />
             </div>
 
             <div>
               <div className="flex justify-between font-medium text-neutral-200 mb-1">
-                <span>E-mail Corporativo ou do Decisor</span>
-                <span className="font-mono font-bold text-emerald-400">+{config.hasEmail} pts</span>
+                <span>Telefone Cadastrado</span>
+                <span className="font-mono font-bold text-emerald-400">+{config.hasPhone} pts</span>
               </div>
               <input
                 type="range"
                 min="0"
                 max="20"
                 step="1"
-                value={config.hasEmail}
-                onChange={(e) => handleUpdate('hasEmail', Number(e.target.value))}
+                value={config.hasPhone}
+                onChange={(e) => handleUpdate('hasPhone', Number(e.target.value))}
                 className="w-full accent-emerald-500 cursor-pointer"
               />
             </div>
 
             <div>
               <div className="flex justify-between font-medium text-neutral-200 mb-1">
-                <span>Múltiplas Unidades / Filiais (Escala)</span>
+                <span>Múltiplas Unidades / Filiais (2 a 5)</span>
                 <span className="font-mono font-bold text-sky-400">+{config.multipleUnits} pts</span>
               </div>
               <input
@@ -325,48 +325,48 @@ export const ScoringSettingsPanel: React.FC<ScoringSettingsPanelProps> = ({
           <div className="space-y-3 text-xs">
             <div>
               <div className="flex justify-between font-medium text-neutral-200 mb-1">
-                <span>Encaixe Perfeito no ICP Alvo</span>
-                <span className="font-mono font-bold text-emerald-400">+{config.fitIcpHigh} pts</span>
+                <span>Nicho Compatível com ICP</span>
+                <span className="font-mono font-bold text-emerald-400">+{config.matchesIcpNiche} pts</span>
               </div>
               <input
                 type="range"
                 min="0"
                 max="30"
                 step="1"
-                value={config.fitIcpHigh}
-                onChange={(e) => handleUpdate('fitIcpHigh', Number(e.target.value))}
+                value={config.matchesIcpNiche}
+                onChange={(e) => handleUpdate('matchesIcpNiche', Number(e.target.value))}
                 className="w-full accent-emerald-500 cursor-pointer"
               />
             </div>
 
             <div>
               <div className="flex justify-between font-medium text-neutral-200 mb-1">
-                <span>Necessidade Comercial Aparente Cadastrada</span>
-                <span className="font-mono font-bold text-amber-400">+{config.hasApparentNeed} pts</span>
+                <span>Necessidade Comercial Aparente Registrada</span>
+                <span className="font-mono font-bold text-amber-400">+{config.apparentNeedIdentified} pts</span>
               </div>
               <input
                 type="range"
                 min="0"
                 max="25"
                 step="1"
-                value={config.hasApparentNeed}
-                onChange={(e) => handleUpdate('hasApparentNeed', Number(e.target.value))}
+                value={config.apparentNeedIdentified}
+                onChange={(e) => handleUpdate('apparentNeedIdentified', Number(e.target.value))}
                 className="w-full accent-amber-500 cursor-pointer"
               />
             </div>
 
             <div>
               <div className="flex justify-between font-medium text-neutral-200 mb-1">
-                <span>Engajamento Recente (Lead Respondeu Mensagem)</span>
-                <span className="font-mono font-bold text-emerald-400">+{config.recentActivityResponded} pts</span>
+                <span>Engajamento Recente (&lt; 7 dias)</span>
+                <span className="font-mono font-bold text-emerald-400">+{config.recentActivityBonus} pts</span>
               </div>
               <input
                 type="range"
                 min="0"
                 max="30"
                 step="1"
-                value={config.recentActivityResponded}
-                onChange={(e) => handleUpdate('recentActivityResponded', Number(e.target.value))}
+                value={config.recentActivityBonus}
+                onChange={(e) => handleUpdate('recentActivityBonus', Number(e.target.value))}
                 className="w-full accent-emerald-500 cursor-pointer"
               />
             </div>

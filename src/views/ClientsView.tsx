@@ -37,9 +37,11 @@ import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
 import { CompanyDetailsDrawer } from '../components/clients/CompanyDetailsDrawer';
 import { CompanyModal } from '../components/clients/CompanyModal';
+import { ScoreBadge } from '../components/qualification/ScoreBadge';
+import { calculateLeadScore } from '../utils/leadScoring';
 
 export const ClientsView: React.FC = () => {
-  const { companies, contacts, leads, deleteCompany } = useApp();
+  const { companies, contacts, leads, services, icps, history, settings, deleteCompany } = useApp();
   const confirm = useConfirm();
 
   // Estados de busca e filtros
@@ -393,6 +395,11 @@ export const ClientsView: React.FC = () => {
             const stageDef = STAGES_CONFIG[stageKey] || STAGES_CONFIG['NOVO'];
             const cleanWa = cleanPhone(primary?.whatsapp || primary?.phone);
 
+            const leadScoreResult = compLead
+              ? calculateLeadScore(comp, primary, compLead, icps, services, history, settings.scoringWeights)
+              : null;
+            const finalScore = leadScoreResult ? leadScoreResult.score : (compLead?.score || 50);
+
             return (
               <Card
                 key={comp.id}
@@ -434,9 +441,17 @@ export const ClientsView: React.FC = () => {
                         <Flame className="w-3 h-3 fill-amber-400" /> Quente
                       </span>
                     )}
-                    {compLead?.score !== undefined && (
+                    {leadScoreResult ? (
+                      <ScoreBadge
+                        score={finalScore}
+                        size="xs"
+                        interactive
+                        scoreResult={leadScoreResult}
+                        companyName={comp.name}
+                      />
+                    ) : compLead?.score !== undefined ? (
                       <span className="font-mono text-slate-300 font-semibold">{compLead.score} pts</span>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Informações do Contato Principal */}
@@ -551,6 +566,11 @@ export const ClientsView: React.FC = () => {
                 const stageDef = STAGES_CONFIG[stageKey] || STAGES_CONFIG['NOVO'];
                 const cleanWa = cleanPhone(primary?.whatsapp || primary?.phone);
 
+                const tableLeadScoreResult = compLead
+                  ? calculateLeadScore(comp, primary, compLead, icps, services, history, settings.scoringWeights)
+                  : null;
+                const tableFinalScore = tableLeadScoreResult ? tableLeadScoreResult.score : (compLead?.score || 50);
+
                 return (
                   <tr key={comp.id} className="hover:bg-slate-900/50 transition-colors group">
                     <td className="py-3.5 px-4">
@@ -594,8 +614,20 @@ export const ClientsView: React.FC = () => {
                       )}
                     </td>
 
-                    <td className="py-3.5 px-4 font-mono font-semibold text-slate-300">
-                      {compLead?.score ? `${compLead.score} pts` : '—'}
+                    <td className="py-3.5 px-4 font-mono font-semibold">
+                      {tableLeadScoreResult ? (
+                        <ScoreBadge
+                          score={tableFinalScore}
+                          size="xs"
+                          interactive
+                          scoreResult={tableLeadScoreResult}
+                          companyName={comp.name}
+                        />
+                      ) : compLead?.score ? (
+                        <span className="text-slate-300">{compLead.score} pts</span>
+                      ) : (
+                        <span className="text-slate-500">—</span>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4 text-right">

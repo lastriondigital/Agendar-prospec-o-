@@ -37,6 +37,13 @@ import { Button } from '../ui/Button';
 import { AddContactModal } from './AddContactModal';
 import { ScheduleActionModal } from './ScheduleActionModal';
 import { LogInteractionModal } from './LogInteractionModal';
+import { ScoreBadge } from '../qualification/ScoreBadge';
+import { calculateLeadScore } from '../../utils/leadScoring';
+import { LeadMessageModal } from '../qualification/LeadMessageModal';
+import { CopilotActionButtons } from '../copilot/CopilotActionButtons';
+import { CopilotAssistantModal } from '../copilot/CopilotAssistantModal';
+import { CopilotActionType } from '../../types';
+import { ApproachRecommendationCard } from '../sales/ApproachRecommendationCard';
 
 interface CompanyDetailsDrawerProps {
   company: Company | null;
@@ -52,6 +59,9 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
   const {
     contacts,
     leads,
+    services,
+    icps,
+    settings,
     history,
     advanceLeadStage,
     scheduleNextAction,
@@ -68,11 +78,14 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
   const confirm = useConfirm();
   const { success } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'contacts' | 'history'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'approach' | 'contacts' | 'history'>('overview');
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [isLogInteractionOpen, setIsLogInteractionOpen] = useState(false);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [copilotInitialAction, setCopilotInitialAction] = useState<CopilotActionType>('PERSONALIZAR');
   const [quickNote, setQuickNote] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
 
@@ -82,6 +95,11 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
   const primaryContact = companyContacts.find((c) => c.isPrimary) || companyContacts[0];
   const companyLead = leads.find((l) => l.companyId === company.id);
   const companyHistory = history.filter((h) => h.companyId === company.id);
+
+  // Calcula pontuação real e explicável
+  const leadScoreResult = companyLead
+    ? calculateLeadScore(company, primaryContact, companyLead, icps, services, companyHistory, settings.scoringWeights)
+    : null;
 
   const stageKey: LeadStage = companyLead?.stage || 'NOVO';
   const stageDef = STAGES_CONFIG[stageKey] || STAGES_CONFIG['NOVO'];
@@ -221,6 +239,18 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                   </option>
                 ))}
               </select>
+
+              {companyLead && (
+                <Button
+                  variant="primary"
+                  size="xs"
+                  onClick={() => setIsMessageModalOpen(true)}
+                  leftIcon={<MessageSquare className="w-3.5 h-3.5" />}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white ml-2"
+                >
+                  Preparar Mensagem
+                </Button>
+              )}
             </div>
 
             <div className="flex items-center gap-4 text-xs">
@@ -242,21 +272,30 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                 </div>
               )}
 
-              {companyLead?.score !== undefined && (
+              {leadScoreResult ? (
+                <ScoreBadge
+                  score={leadScoreResult.score}
+                  size="sm"
+                  interactive
+                  scoreResult={leadScoreResult}
+                  companyName={company.name}
+                  showLabel
+                />
+              ) : companyLead?.score !== undefined ? (
                 <div className="flex items-center gap-1.5 font-mono text-slate-300">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                   <span className="font-bold">{companyLead.score} pts</span>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="px-5 border-b border-slate-800 bg-slate-950/50 flex gap-4 shrink-0">
+        <div className="px-5 border-b border-slate-800 bg-slate-950/50 flex gap-4 shrink-0 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`py-3 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+            className={`py-3 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'border-slate-200 text-slate-100 font-semibold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -267,8 +306,20 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('approach')}
+            className={`py-3 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+              activeTab === 'approach'
+                ? 'border-indigo-400 text-indigo-300 font-semibold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            Recomendação de Abordagem (7 Pilares)
+          </button>
+
+          <button
             onClick={() => setActiveTab('contacts')}
-            className={`py-3 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+            className={`py-3 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap ${
               activeTab === 'contacts'
                 ? 'border-slate-200 text-slate-100 font-semibold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -280,7 +331,7 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
 
           <button
             onClick={() => setActiveTab('history')}
-            className={`py-3 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors ${
+            className={`py-3 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap ${
               activeTab === 'history'
                 ? 'border-slate-200 text-slate-100 font-semibold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -293,9 +344,47 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
 
         {/* Tab Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* TAB: RECOMENDAÇÃO DE ABORDAGEM (7 PILARES) */}
+          {activeTab === 'approach' && (
+            <div className="space-y-4 animate-fadeIn">
+              <ApproachRecommendationCard
+                company={company}
+                contact={primaryContact}
+                lead={companyLead}
+              />
+            </div>
+          )}
+
           {/* TAB 1: VISÃO GERAL */}
           {activeTab === 'overview' && (
             <div className="space-y-4">
+              {/* Sales Engine: Recomendação de Abordagem Direta */}
+              <ApproachRecommendationCard
+                company={company}
+                contact={primaryContact}
+                lead={companyLead}
+              />
+
+              {/* Copiloto de Prospecção Gemini */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-2.5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    Copiloto Gemini de Prospecção
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    Análise e Estratégia sem Disparo Automático
+                  </span>
+                </div>
+                <CopilotActionButtons
+                  size="xs"
+                  onSelectAction={(action) => {
+                    setCopilotInitialAction(action);
+                    setIsCopilotOpen(true);
+                  }}
+                />
+              </div>
+
               {/* Próxima Ação em Destaque */}
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80">
                 <div className="flex items-center justify-between mb-2">
@@ -782,6 +871,27 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
           }}
         />
       )}
+
+      {/* Modal de Mensagens e Preparação */}
+      {companyLead && (
+        <LeadMessageModal
+          isOpen={isMessageModalOpen}
+          onClose={() => setIsMessageModalOpen(false)}
+          lead={companyLead}
+          company={company}
+        />
+      )}
+
+      {/* Modal do Copiloto Gemini */}
+      <CopilotAssistantModal
+        isOpen={isCopilotOpen}
+        onClose={() => setIsCopilotOpen(false)}
+        company={company}
+        contact={primaryContact}
+        lead={companyLead}
+        service={services.find((s) => s.id === companyLead?.serviceId)}
+        initialActionType={copilotInitialAction}
+      />
     </div>
   );
 };

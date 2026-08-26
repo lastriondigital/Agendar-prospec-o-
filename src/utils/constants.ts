@@ -239,6 +239,13 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     iconName: 'Kanban',
   },
   {
+    id: 'sales-engine',
+    label: 'Sales Engine (Vendas)',
+    shortLabel: 'Sales Engine',
+    description: 'Objeções, Provas, Preços, Argumentos, CTAs e Abordagens',
+    iconName: 'ShieldAlert',
+  },
+  {
     id: 'planner',
     label: 'Planejador',
     shortLabel: 'Agenda',
@@ -291,4 +298,4 @@ export const MOBILE_PRIMARY_NAV: RouteId[] = [
 
 export const APP_STORAGE_KEY_PREFIX = 'prospect_os_';
 export const DB_NAME = 'ProspectOS_DB';
-export const DB_VERSION = 3;
+export const DB_VERSION = 5;

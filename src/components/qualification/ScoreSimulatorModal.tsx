@@ -89,10 +89,11 @@ export const ScoreSimulatorModal: React.FC<ScoreSimulatorModalProps> = ({
       contactId: 'mock-cont',
       stage: leadStage as any,
       status: 'active',
-      priority: 'media',
+      priority: 'média',
       score: 50,
       serviceId: selectedServiceId || undefined,
       temperature: 'morno',
+      entryDate: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
