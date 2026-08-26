@@ -1,159 +1,218 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   BarChart3,
-  CheckCircle2,
-  Clock,
-  PieChart,
-  Target,
-  TrendingUp,
-  Users,
-  Zap,
+  TrendingDown,
+  SplitSquareVertical,
+  FileText,
+  Layers,
+  Sparkles,
+  Download,
+  Share2,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { Card } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
-import { formatDurationMinutes } from '../utils/formatting';
+import { AnalyticsFilterState, AnalyticsPeriod, LeadStage } from '../types';
+import {
+  calculateAnalyticsMetrics,
+  buildFunnelSteps,
+  generatePeriodComparisonReport,
+} from '../services/analyticsService';
+import { AnalyticsFilterBar } from '../components/analytics/AnalyticsFilterBar';
+import { MetricsSummaryGrid } from '../components/analytics/MetricsSummaryGrid';
+import { FunnelView } from '../components/analytics/FunnelView';
+import { ABTestingSection } from '../components/analytics/ABTestingSection';
+import { MonthlyReportSection } from '../components/analytics/MonthlyReportSection';
+import { Button } from '../components/ui/Button';
+
+type AnalyticsTab = 'overview' | 'funnel' | 'ab-tests' | 'report';
+
+const INITIAL_FILTERS: AnalyticsFilterState = {
+  period: 'this_month',
+  serviceId: 'all',
+  niche: 'all',
+  country: 'all',
+  campaignId: 'all',
+  stage: 'all',
+};
 
 export const AnalyticsView: React.FC = () => {
-  const { actions, clients, stages, settings } = useApp();
+  const {
+    companies,
+    contacts,
+    leads,
+    history,
+    actions,
+    services,
+    campaigns,
+    abTests,
+    upsertAbTest,
+    deleteAbTest,
+    logAbTestEvent,
+  } = useApp();
 
-  const totalActions = actions.length;
-  const completedActions = actions.filter((a) => a.status === 'completed').length;
-  const pendingActions = actions.filter((a) => a.status === 'pending').length;
-  const executionRate = totalActions > 0 ? Math.round((completedActions / totalActions) * 100) : 0;
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
+  const [filters, setFilters] = useState<AnalyticsFilterState>(INITIAL_FILTERS);
 
-  // Channel breakdown
-  const channelCounts = {
-    whatsapp: actions.filter((a) => a.channel === 'whatsapp').length,
-    linkedin: actions.filter((a) => a.channel === 'linkedin').length,
-    email: actions.filter((a) => a.channel === 'email').length,
-    call: actions.filter((a) => a.channel === 'call').length,
+  // Extract distinct niches and countries from existing companies for filter dropdowns
+  const availableNiches = useMemo(() => {
+    const set = new Set<string>();
+    companies.forEach((c) => c.niche && set.add(c.niche));
+    return Array.from(set).sort();
+  }, [companies]);
+
+  const availableCountries = useMemo(() => {
+    const set = new Set<string>();
+    companies.forEach((c) => c.country && set.add(c.country));
+    return Array.from(set).sort();
+  }, [companies]);
+
+  // Compute calculated metrics according to active filters
+  const currentMetrics = useMemo(() => {
+    return calculateAnalyticsMetrics({
+      companies,
+      contacts,
+      leads,
+      history,
+      actions,
+      services,
+      filters,
+    });
+  }, [companies, contacts, leads, history, actions, services, filters]);
+
+  // Compute 7-step visual funnel
+  const funnelSteps = useMemo(() => {
+    return buildFunnelSteps(currentMetrics);
+  }, [currentMetrics]);
+
+  // Compute comparative report ("Este Mês" vs previous period & empirical recommendations)
+  const comparisonReport = useMemo(() => {
+    return generatePeriodComparisonReport({
+      companies,
+      contacts,
+      leads,
+      history,
+      actions,
+      services,
+      abTests,
+      filters,
+    });
+  }, [companies, contacts, leads, history, actions, services, abTests, filters]);
+
+  const handleResetFilters = () => {
+    setFilters(INITIAL_FILTERS);
   };
-
-  // Won clients
-  const wonClients = clients.filter((c) => c.stageId === 'stage-won' || c.status === 'won').length;
-  const conversionRate = clients.length > 0 ? Math.round((wonClients / clients.length) * 100) : 0;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold text-neutral-100">Analytics de Prospecção</h2>
-        <p className="text-xs text-neutral-400">
-          Métricas objetivas de execução, cadência de disparos e conversão comercial.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-neutral-100 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-emerald-400" />
+            Analytics & Inteligência de Vendas
+          </h2>
+          <p className="text-xs text-neutral-400 mt-0.5">
+            Métricas de prospecção, taxas de conversão, funil de 7 etapas, testes A/B e relatório comparativo.
+          </p>
+        </div>
+
+        {/* Tab Navigation Chips */}
+        <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 p-1 rounded-xl">
+          <button
+            id="tab-analytics-overview"
+            onClick={() => setActiveTab('overview')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              activeTab === 'overview'
+                ? 'bg-emerald-500 text-neutral-950 shadow-sm'
+                : 'text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>Métricas</span>
+          </button>
+
+          <button
+            id="tab-analytics-funnel"
+            onClick={() => setActiveTab('funnel')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              activeTab === 'funnel'
+                ? 'bg-emerald-500 text-neutral-950 shadow-sm'
+                : 'text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <TrendingDown className="w-3.5 h-3.5" />
+            <span>Funil (7 Estágios)</span>
+          </button>
+
+          <button
+            id="tab-analytics-abtests"
+            onClick={() => setActiveTab('ab-tests')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              activeTab === 'ab-tests'
+                ? 'bg-emerald-500 text-neutral-950 shadow-sm'
+                : 'text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <SplitSquareVertical className="w-3.5 h-3.5" />
+            <span>Testes A/B</span>
+          </button>
+
+          <button
+            id="tab-analytics-report"
+            onClick={() => setActiveTab('report')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              activeTab === 'report'
+                ? 'bg-emerald-500 text-neutral-950 shadow-sm'
+                : 'text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Relatório & Recomendações</span>
+          </button>
+        </div>
       </div>
 
-      {/* Main KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card padding="md" className="bg-neutral-900 border-neutral-800 space-y-1">
-          <span className="text-xs font-medium text-neutral-400">Taxa de Execução</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-emerald-400">{executionRate}%</span>
-            <span className="text-xs text-neutral-500">das ações</span>
-          </div>
-          <p className="text-[11px] text-neutral-400 mt-1">
-            {completedActions} executadas de {totalActions} totais
-          </p>
-        </Card>
+      {/* Global Multi-Dimension Filter Bar */}
+      <AnalyticsFilterBar
+        filters={filters}
+        onChange={setFilters}
+        services={services}
+        campaigns={campaigns}
+        availableNiches={availableNiches}
+        availableCountries={availableCountries}
+        onReset={handleResetFilters}
+      />
 
-        <Card padding="md" className="bg-neutral-900 border-neutral-800 space-y-1">
-          <span className="text-xs font-medium text-neutral-400">Conversão em Clientes</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-teal-400">{conversionRate}%</span>
-            <span className="text-xs text-neutral-500">do funil</span>
-          </div>
-          <p className="text-[11px] text-neutral-400 mt-1">
-            {wonClients} clientes convertidos
-          </p>
-        </Card>
+      {/* Tab Content Rendering */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          <MetricsSummaryGrid metrics={currentMetrics} />
+        </div>
+      )}
 
-        <Card padding="md" className="bg-neutral-900 border-neutral-800 space-y-1">
-          <span className="text-xs font-medium text-neutral-400">Tempo Médio Estimado</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-sky-400">
-              {formatDurationMinutes(pendingActions * (settings.estMinutesPerAction || 2))}
-            </span>
-          </div>
-          <p className="text-[11px] text-neutral-400 mt-1">
-            para zerar a fila atual
-          </p>
-        </Card>
+      {activeTab === 'funnel' && (
+        <div className="space-y-6">
+          <FunnelView funnelSteps={funnelSteps} />
+        </div>
+      )}
 
-        <Card padding="md" className="bg-neutral-900 border-neutral-800 space-y-1">
-          <span className="text-xs font-medium text-neutral-400">Base Ativa Total</span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-indigo-400">{clients.length}</span>
-            <span className="text-xs text-neutral-500">leads</span>
-          </div>
-          <p className="text-[11px] text-neutral-400 mt-1">
-            distribuídos no pipeline
-          </p>
-        </Card>
-      </div>
+      {activeTab === 'ab-tests' && (
+        <div className="space-y-6">
+          <ABTestingSection
+            abTests={abTests}
+            services={services}
+            availableNiches={availableNiches}
+            onSaveTest={upsertAbTest}
+            onDeleteTest={deleteAbTest}
+            onLogEvent={logAbTestEvent}
+          />
+        </div>
+      )}
 
-      {/* Breakdown Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Channel Distribution */}
-        <Card padding="md" className="bg-neutral-900 border-neutral-800 space-y-4">
-          <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
-            <Target className="w-4 h-4 text-emerald-400" />
-            Distribuição por Canal de Contato
-          </h3>
-
-          <div className="space-y-3">
-            {[
-              { label: 'WhatsApp', count: channelCounts.whatsapp, color: 'bg-emerald-500' },
-              { label: 'LinkedIn', count: channelCounts.linkedin, color: 'bg-sky-500' },
-              { label: 'E-mail', count: channelCounts.email, color: 'bg-blue-500' },
-              { label: 'Ligação', count: channelCounts.call, color: 'bg-amber-500' },
-            ].map((item) => {
-              const pct = totalActions > 0 ? Math.round((item.count / totalActions) * 100) : 0;
-              return (
-                <div key={item.label} className="space-y-1 text-xs">
-                  <div className="flex items-center justify-between text-neutral-300">
-                    <span className="font-medium">{item.label}</span>
-                    <span className="font-mono text-neutral-400">
-                      {item.count} ações ({pct}%)
-                    </span>
-                  </div>
-                  <div className="w-full h-2 bg-neutral-800 rounded-full overflow-hidden">
-                    <div className={`h-full ${item.color} rounded-full`} style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-
-        {/* Pipeline Stage Distribution */}
-        <Card padding="md" className="bg-neutral-900 border-neutral-800 space-y-4">
-          <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-teal-400" />
-            Distribuição por Estágio do Funil
-          </h3>
-
-          <div className="space-y-3">
-            {stages.map((stage) => {
-              const count = clients.filter((c) => c.stageId === stage.id).length;
-              const pct = clients.length > 0 ? Math.round((count / clients.length) * 100) : 0;
-              return (
-                <div key={stage.id} className="space-y-1 text-xs">
-                  <div className="flex items-center justify-between text-neutral-300">
-                    <span className="font-medium">{stage.name}</span>
-                    <span className="font-mono text-neutral-400">
-                      {count} contatos ({pct}%)
-                    </span>
-                  </div>
-                  <div className="w-full h-2 bg-neutral-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-teal-500 rounded-full" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      </div>
+      {activeTab === 'report' && (
+        <div className="space-y-6">
+          <MonthlyReportSection report={comparisonReport} />
+        </div>
+      )}
     </div>
   );
 };

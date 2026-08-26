@@ -1,48 +1,74 @@
 import React, { useRef, useState } from 'react';
 import {
+  AlertTriangle,
+  CheckCircle2,
   Cloud,
   Database,
   Download,
+  FileSpreadsheet,
   Flame,
   HardDrive,
+  Laptop,
   Moon,
   RefreshCw,
   RotateCcw,
+  ShieldCheck,
+  Smartphone,
   Sparkles,
   Sun,
   Trash2,
   Upload,
+  User,
+  Wifi,
+  WifiOff,
   Zap,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
+import { useSync } from '../context/SyncContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { usePWA } from '../hooks/usePWA';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
+import { ImportBackupModal } from '../components/settings/ImportBackupModal';
+import { ProductionAuditModal } from '../components/audit/ProductionAuditModal';
+import {
+  exportCompaniesCSV,
+  exportActionsCSV,
+  exportHistoryCSV,
+} from '../services/backupService';
 
 export const SettingsView: React.FC = () => {
   const {
     settings,
     updateSettings,
-    clients,
     campaigns,
     services,
     templates,
     actions,
+    companies,
+    contacts,
+    leads,
+    history,
     loadDemoData,
     clearAllData,
     exportJSON,
     importJSON,
     isDemoMode,
   } = useApp();
+  const { user, openAuthModal, logout } = useAuth();
+  const { syncState, conflicts, openConflictModal, syncNow } = useSync();
   const { theme, setTheme } = useTheme();
   const confirm = useConfirm();
   const { success, error } = useToast();
+  const { isInstallable, isInstalled, hasUpdate, isOffline, promptInstall, applyUpdate } = usePWA();
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [dailyGoal, setDailyGoal] = useState(settings.dailyGoal || 15);
   const [estMinutes, setEstMinutes] = useState(settings.estMinutesPerAction || 2);
 
@@ -53,7 +79,7 @@ export const SettingsView: React.FC = () => {
     });
   };
 
-  const handleExportBackup = async () => {
+  const handleExportBackupJSON = async () => {
     try {
       const jsonStr = await exportJSON();
       const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -63,38 +89,52 @@ export const SettingsView: React.FC = () => {
       link.download = `prospect-os-backup-${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       URL.revokeObjectURL(url);
-      success('Backup JSON baixado com sucesso!');
+      success('Backup JSON completo baixado com sucesso!');
     } catch (err) {
       error('Falha ao exportar backup', (err as Error).message);
     }
   };
 
-  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleExportCompaniesCSV = () => {
+    try {
+      exportCompaniesCSV(companies, contacts, leads);
+      success('Planilha CSV de Empresas e Leads exportada com sucesso!');
+    } catch (err) {
+      error('Erro ao exportar CSV', (err as Error).message);
+    }
+  };
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        confirm({
-          title: 'Restaurar Backup JSON',
-          message: 'Deseja sobrescrever os dados locais pelos dados contidos neste arquivo de backup?',
-          isDestructive: false,
-          confirmText: 'Restaurar Dados',
-          onConfirm: async () => {
-            await importJSON(content);
-          },
-        });
-      }
-    };
-    reader.readAsText(file);
+  const handleExportActionsCSV = () => {
+    try {
+      exportActionsCSV(actions, companies, contacts);
+      success('Planilha CSV da Fila de Ações exportada com sucesso!');
+    } catch (err) {
+      error('Erro ao exportar CSV', (err as Error).message);
+    }
+  };
+
+  const handleExportHistoryCSV = () => {
+    try {
+      exportHistoryCSV(history, companies, contacts);
+      success('Planilha CSV do Histórico exportada com sucesso!');
+    } catch (err) {
+      error('Erro ao exportar CSV', (err as Error).message);
+    }
+  };
+
+  const handleConfirmImport = async (
+    jsonStr: string,
+    mode: 'overwrite' | 'merge'
+  ): Promise<boolean> => {
+    const res = await importJSON(jsonStr, { mode });
+    return res.success;
   };
 
   const handleLoadDemo = () => {
     confirm({
       title: 'Carregar Dados de Demonstração',
-      message: 'Isso irá carregar uma base de demonstração (clientes, serviços, scripts e ações) para você testar todas as funcionalidades do PROSPECT OS.',
+      message:
+        'Isso irá carregar uma base de demonstração (empresas, leads, serviços, scripts e ações) para você testar todas as funcionalidades do PROSPECT OS.',
       isDestructive: false,
       confirmText: 'Carregar Demonstração',
       onConfirm: async () => {
@@ -105,8 +145,9 @@ export const SettingsView: React.FC = () => {
 
   const handleClearAll = () => {
     confirm({
-      title: 'Limpar Todos os Dados',
-      message: 'Atenção: Esta ação apagará todos os clientes, campanhas, mensagens e ações salvas localmente no seu navegador para você começar do zero absoluto. Deseja prosseguir?',
+      title: 'Limpar Todos os Dados Locais',
+      message:
+        'Atenção: Esta ação apagará todas as empresas, leads, campanhas e ações salvas localmente no navegador. Deseja prosseguir?',
       isDestructive: true,
       confirmText: 'Sim, Apagar Tudo',
       onConfirm: async () => {
@@ -119,15 +160,317 @@ export const SettingsView: React.FC = () => {
     <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-neutral-100">Configurações & Banco Local</h2>
-        <p className="text-xs text-neutral-400">
-          Gerencie persistência IndexedDB, backup de dados, preferências de foco e arquitetura offline.
+        <h2 className="text-xl font-bold text-slate-900 dark:text-neutral-100">
+          Configurações & Hardening de Produção
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-neutral-400">
+          Gerencie PWA, backups em múltiplos formatos, persistência IndexedDB, Cloud Sync e segurança.
         </p>
       </div>
 
-      {/* Theme and Execution Preferences */}
-      <Card padding="md" className="bg-neutral-900 border-neutral-800 space-y-4">
-        <h3 className="text-sm font-bold text-neutral-100">Aparência & Tema</h3>
+      {/* PWA & Offline Readiness Card */}
+      <Card padding="md" className="bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 border border-emerald-600/20">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100 flex items-center gap-2">
+                <span>Progressive Web App (PWA) & Offline Shell</span>
+                {isInstalled ? (
+                  <Badge variant="emerald" size="sm">App Instalado</Badge>
+                ) : (
+                  <Badge variant="blue" size="sm">Pronto para Instalação</Badge>
+                )}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-neutral-400">
+                Service Worker ativo com cache de ativos estáticos, navegação rápida e operação offline resiliente.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {hasUpdate && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={applyUpdate}
+                leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+              >
+                Atualizar App
+              </Button>
+            )}
+
+            {isInstallable && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={promptInstall}
+                leftIcon={<Download className="w-3.5 h-3.5" />}
+              >
+                Instalar no Dispositivo
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-neutral-950/60 border border-slate-200 dark:border-neutral-800 text-xs">
+          <div>
+            <span className="text-slate-400 dark:text-neutral-500">Service Worker:</span>
+            <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-neutral-200 mt-1">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span>Ativo (Cache v5.0.0)</span>
+            </div>
+          </div>
+
+          <div>
+            <span className="text-slate-400 dark:text-neutral-500">Modo de Operação:</span>
+            <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-neutral-200 mt-1">
+              {isOffline ? (
+                <>
+                  <WifiOff className="w-4 h-4 text-amber-500" />
+                  <span>Offline (Dados locais seguros)</span>
+                </>
+              ) : (
+                <>
+                  <Wifi className="w-4 h-4 text-emerald-500" />
+                  <span>Online & Conectado</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <span className="text-slate-400 dark:text-neutral-500">Modo de Exibição:</span>
+            <p className="font-semibold text-slate-800 dark:text-neutral-200 mt-1">
+              {isInstalled ? 'Standalone (Janela Nativa)' : 'Navegador Web / PWA Host'}
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Cloud Sync & Firebase Card */}
+      <Card padding="md" className="bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-600/20">
+              <Cloud className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100 flex items-center gap-2">
+                <span>Camada Cloud & Sincronização Firestore</span>
+                {syncState.isAuthenticated ? (
+                  <Badge variant="emerald" size="sm">Conectado</Badge>
+                ) : (
+                  <Badge variant="amber" size="sm">Desconectado</Badge>
+                )}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-neutral-400">
+                Arquitetura Offline-first: seus dados funcionam offline e sincronizam automaticamente na nuvem.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {syncState.isAuthenticated ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={syncNow}
+                disabled={syncState.status === 'syncing' || !syncState.isOnline}
+                leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${syncState.status === 'syncing' ? 'animate-spin' : ''}`} />}
+              >
+                Sincronizar Agora
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => openAuthModal('login')}
+                leftIcon={<User className="w-3.5 h-3.5" />}
+              >
+                Conectar Conta Cloud
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Sync Details Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-neutral-950/60 border border-slate-200 dark:border-neutral-800 text-xs">
+          <div>
+            <span className="text-slate-400 dark:text-neutral-500">Status de Rede:</span>
+            <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-neutral-200 mt-1">
+              {syncState.isOnline ? (
+                <>
+                  <Wifi className="w-4 h-4 text-emerald-500" />
+                  <span>Online (Conectado à internet)</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-4 h-4 text-amber-500" />
+                  <span>Offline — dados salvos neste dispositivo</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <span className="text-slate-400 dark:text-neutral-500">Última Sincronização:</span>
+            <p className="font-semibold text-slate-800 dark:text-neutral-200 mt-1">
+              {syncState.lastSyncedAt
+                ? new Date(syncState.lastSyncedAt).toLocaleString('pt-BR')
+                : 'Pendente de primeira sincronização'}
+            </p>
+          </div>
+
+          <div>
+            <span className="text-slate-400 dark:text-neutral-500">Fila Pendente:</span>
+            <p className="font-semibold text-slate-800 dark:text-neutral-200 mt-1">
+              {syncState.pendingCount} {syncState.pendingCount === 1 ? 'mutação' : 'mutações'}
+            </p>
+          </div>
+        </div>
+
+        {/* Conflict Alert Banner if any */}
+        {conflicts.length > 0 && (
+          <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+              <span>
+                <strong>{conflicts.length} conflito(s)</strong> precisam da sua revisão para consolidar as versões local e nuvem.
+              </span>
+            </div>
+            <Button variant="secondary" size="xs" onClick={openConflictModal}>
+              Revisar Conflitos
+            </Button>
+          </div>
+        )}
+
+        {/* User Account Info */}
+        {syncState.isAuthenticated && user && (
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-neutral-800/80 text-xs">
+            <div className="flex items-center gap-2 text-slate-600 dark:text-neutral-300">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              <span>Autenticado como: <strong>{user.email}</strong> ({user.displayName})</span>
+            </div>
+            <button
+              onClick={logout}
+              className="text-xs text-red-500 hover:text-red-600 hover:underline font-medium cursor-pointer"
+            >
+              Desconectar
+            </button>
+          </div>
+        )}
+      </Card>
+
+      {/* Backup, Validation & Multi-Format Exports */}
+      <Card padding="md" className="bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+              <HardDrive className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100">
+                Central de Backup & Exportações
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-neutral-400">
+                Exporte relatórios CSV para planilhas ou faça backup integral com validação de esquema.
+              </p>
+            </div>
+          </div>
+          <Badge variant="purple" size="sm">
+            Integridade Protegida
+          </Badge>
+        </div>
+
+        {/* DB Volume Counters */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-neutral-950/60 border border-slate-200 dark:border-neutral-800 text-center text-xs">
+          <div>
+            <span className="text-slate-400 dark:text-neutral-500">Empresas:</span>
+            <p className="font-mono font-bold text-slate-800 dark:text-neutral-200 mt-0.5">{companies.length}</p>
+          </div>
+          <div>
+            <span className="text-slate-400 dark:text-neutral-500">Contatos:</span>
+            <p className="font-mono font-bold text-slate-800 dark:text-neutral-200 mt-0.5">{contacts.length}</p>
+          </div>
+          <div>
+            <span className="text-slate-400 dark:text-neutral-500">Leads:</span>
+            <p className="font-mono font-bold text-slate-800 dark:text-neutral-200 mt-0.5">{leads.length}</p>
+          </div>
+          <div>
+            <span className="text-slate-400 dark:text-neutral-500">Ações:</span>
+            <p className="font-mono font-bold text-slate-800 dark:text-neutral-200 mt-0.5">{actions.length}</p>
+          </div>
+          <div>
+            <span className="text-slate-400 dark:text-neutral-500">Campanhas:</span>
+            <p className="font-mono font-bold text-slate-800 dark:text-neutral-200 mt-0.5">{campaigns.length}</p>
+          </div>
+        </div>
+
+        {/* Action Buttons Grid */}
+        <div className="space-y-3 pt-2">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Exportações em CSV (Compatível com Excel & Google Sheets)
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCompaniesCSV}
+              leftIcon={<FileSpreadsheet className="w-4 h-4 text-emerald-500" />}
+            >
+              CSV Empresas & Leads
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportActionsCSV}
+              leftIcon={<FileSpreadsheet className="w-4 h-4 text-amber-500" />}
+            >
+              CSV Fila de Ações
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportHistoryCSV}
+              leftIcon={<FileSpreadsheet className="w-4 h-4 text-blue-500" />}
+            >
+              CSV Histórico Interações
+            </Button>
+          </div>
+
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-3 border-t border-slate-100 dark:border-neutral-800/80">
+            Backup Estruturado JSON & Restauração
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleExportBackupJSON}
+              leftIcon={<Download className="w-4 h-4" />}
+            >
+              Baixar Backup JSON Completo
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsImportModalOpen(true)}
+              leftIcon={<Upload className="w-4 h-4" />}
+            >
+              Restaurar com Validação
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* Theme and Preferences */}
+      <Card padding="md" className="bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100">Aparência & Metas de Execução</h3>
         <div className="grid grid-cols-3 gap-3">
           {[
             { id: 'dark', label: 'Escuro (Pro Focus)', icon: <Moon className="w-4 h-4" /> },
@@ -139,8 +482,8 @@ export const SettingsView: React.FC = () => {
               onClick={() => setTheme(opt.id as any)}
               className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
                 theme === opt.id
-                  ? 'bg-neutral-800 border-emerald-500 text-emerald-400 font-bold'
-                  : 'bg-neutral-950/60 border-neutral-800 text-neutral-400 hover:text-neutral-200'
+                  ? 'bg-slate-100 dark:bg-neutral-800 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
+                  : 'bg-slate-50 dark:bg-neutral-950/60 border-slate-200 dark:border-neutral-800 text-slate-600 dark:text-neutral-400 hover:text-slate-900'
               }`}
             >
               {opt.icon}
@@ -149,7 +492,7 @@ export const SettingsView: React.FC = () => {
           ))}
         </div>
 
-        <div className="pt-4 border-t border-neutral-800/80 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="pt-4 border-t border-slate-100 dark:border-neutral-800/80 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Meta Diária de Prospecções Padrão"
             type="number"
@@ -171,87 +514,14 @@ export const SettingsView: React.FC = () => {
         </div>
       </Card>
 
-      {/* Database & Persistence Status */}
-      <Card padding="md" className="bg-neutral-900 border-neutral-800 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <HardDrive className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-neutral-100">Armazenamento Local (IndexedDB)</h3>
-              <p className="text-xs text-neutral-400">
-                Os dados residem 100% no seu dispositivo com suporte total offline e PWA.
-              </p>
-            </div>
-          </div>
-          <Badge variant="emerald" size="sm">
-            Ativo & Seguro
-          </Badge>
-        </div>
-
-        {/* DB Volume Counters */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 text-center text-xs">
-          <div>
-            <span className="text-neutral-500">Clientes:</span>
-            <p className="font-mono font-bold text-neutral-200 mt-0.5">{clients.length}</p>
-          </div>
-          <div>
-            <span className="text-neutral-500">Ações na Fila:</span>
-            <p className="font-mono font-bold text-neutral-200 mt-0.5">{actions.length}</p>
-          </div>
-          <div>
-            <span className="text-neutral-500">Scripts:</span>
-            <p className="font-mono font-bold text-neutral-200 mt-0.5">{templates.length}</p>
-          </div>
-          <div>
-            <span className="text-neutral-500">Campanhas:</span>
-            <p className="font-mono font-bold text-neutral-200 mt-0.5">{campaigns.length}</p>
-          </div>
-          <div>
-            <span className="text-neutral-500">Serviços:</span>
-            <p className="font-mono font-bold text-neutral-200 mt-0.5">{services.length}</p>
-          </div>
-        </div>
-
-        {/* Backup Export / Import */}
-        <div className="pt-2 flex flex-wrap items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportBackup}
-            leftIcon={<Download className="w-4 h-4" />}
-          >
-            Exportar Backup JSON
-          </Button>
-
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileImport}
-            accept=".json"
-            className="hidden"
-          />
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            leftIcon={<Upload className="w-4 h-4" />}
-          >
-            Restaurar Backup JSON
-          </Button>
-        </div>
-      </Card>
-
       {/* Demo Data Management */}
-      <Card padding="md" className="bg-neutral-900 border-neutral-800 space-y-4">
-        <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400" />
+      <Card padding="md" className="bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
+        <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-amber-500" />
           Gerenciamento de Base de Dados
         </h3>
-        <p className="text-xs text-neutral-400 leading-relaxed">
-          O PROSPECT OS separa claramente dados de demonstração para exploração de novos usuários e a base de dados real.
+        <p className="text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
+          O PROSPECT OS separa dados de teste para exploração de novos usuários e a base de prospecção real.
         </p>
 
         <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -261,7 +531,7 @@ export const SettingsView: React.FC = () => {
             onClick={handleLoadDemo}
             leftIcon={<RotateCcw className="w-4 h-4" />}
           >
-            Recarregar Dados de Demonstração
+            Carregar Dados de Demonstração
           </Button>
 
           <Button
@@ -270,39 +540,54 @@ export const SettingsView: React.FC = () => {
             onClick={handleClearAll}
             leftIcon={<Trash2 className="w-4 h-4" />}
           >
-            Limpar Base para Iniciar em Branco
+            Limpar Base Local
           </Button>
         </div>
       </Card>
 
-      {/* Future Roadmap / Architecture Readiness Badge */}
-      <Card padding="md" className="bg-neutral-900/60 border-neutral-800/80 space-y-3">
-        <h3 className="text-sm font-bold text-neutral-300 flex items-center gap-2">
-          <Cloud className="w-4 h-4 text-indigo-400" />
-          Prontidão de Arquitetura para Futuras Fases
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-neutral-400">
-          <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 space-y-1">
-            <div className="flex items-center gap-2 font-semibold text-neutral-200">
-              <Flame className="w-4 h-4 text-amber-500" />
-              <span>Firebase / Cloud Sync</span>
+      {/* Production Audit & Diagnostics Card */}
+      <Card padding="md" className="bg-gradient-to-br from-neutral-900 to-neutral-950 border-emerald-500/30 space-y-4 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <ShieldCheck className="w-6 h-6" />
             </div>
-            <p className="text-[11px] leading-relaxed">
-              Camada de abstração <code className="text-neutral-300">IStorageAdapter</code> pronta para acoplar sincronização em nuvem e autenticação sem reescrever telas.
-            </p>
+            <div>
+              <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
+                <span>Auditoria Completa de Produção & Verificação de 24 Passos</span>
+                <Badge variant="emerald" size="sm">
+                  READY
+                </Badge>
+              </h3>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Executa a suíte de testes de ponta a ponta: 24 passos operacionais, resiliência offline, anti-duplicação, segurança do Gemini e integridade de dados.
+              </p>
+            </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-neutral-950/60 border border-neutral-800 space-y-1">
-            <div className="flex items-center gap-2 font-semibold text-neutral-200">
-              <Zap className="w-4 h-4 text-emerald-400" />
-              <span>Gemini AI Copilot</span>
-            </div>
-            <p className="text-[11px] leading-relaxed">
-              Modelos de dados preparados com campos semânticos para geração de scripts personalizados e qualificação inteligente de leads.
-            </p>
-          </div>
+          <Button
+            variant="execution"
+            size="sm"
+            onClick={() => setIsAuditModalOpen(true)}
+            leftIcon={<Zap className="w-4 h-4 fill-white" />}
+          >
+            Ver Relatório de Auditoria
+          </Button>
         </div>
       </Card>
+
+      {/* Import Modal */}
+      <ImportBackupModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onConfirmImport={handleConfirmImport}
+      />
+
+      {/* Production Audit Modal */}
+      <ProductionAuditModal
+        isOpen={isAuditModalOpen}
+        onClose={() => setIsAuditModalOpen(false)}
+      />
     </div>
   );
 };

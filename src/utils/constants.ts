@@ -298,4 +298,13 @@ export const MOBILE_PRIMARY_NAV: RouteId[] = [
 
 export const APP_STORAGE_KEY_PREFIX = 'prospect_os_';
 export const DB_NAME = 'ProspectOS_DB';
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
+
+export const CHANNEL_LABELS: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  email: 'E-mail',
+  instagram: 'Instagram Direct',
+  linkedin: 'LinkedIn InMail / DM',
+  phone: 'Ligação Telefônica',
+  other: 'Outro Canal',
+};

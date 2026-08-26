@@ -1,0 +1,214 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Perfil do usuário autenticado no Prospect OS",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "email"]
+    },
+    "Company": {
+      "title": "Company",
+      "description": "Empresa cadastrada para prospecção",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "tradeName": { "type": "string" },
+        "niche": { "type": "string" },
+        "category": { "type": "string" },
+        "country": { "type": "string" },
+        "city": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "Contato / Decisor vinculado a uma empresa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "companyId", "name"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "Oportunidade e lead no funil de vendas",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "contactId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "stage": { "type": "string" },
+        "priority": { "type": "string" },
+        "temperature": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "companyId", "stage"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Serviço oferecido na prospecção",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "basePrice": { "type": "number" },
+        "targetNiche": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Campaign": {
+      "title": "Campaign",
+      "description": "Campanha estruturada de prospecção",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "channel": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "channel"]
+    },
+    "MessageTemplate": {
+      "title": "MessageTemplate",
+      "description": "Template de mensagem ou copy de prospecção",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "channel": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "content", "channel"]
+    },
+    "Sequence": {
+      "title": "Sequence",
+      "description": "Sequência ou estratégia de follow-up",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Tarefa ou ação operacional de prospecção",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string" },
+        "scheduledDate": { "type": "string" },
+        "channel": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "status"]
+    },
+    "Interaction": {
+      "title": "Interaction",
+      "description": "Registro de interação comercial e histórico",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "type": { "type": "string" },
+        "channel": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "companyId", "type", "timestamp"]
+    },
+    "ABTest": {
+      "title": "ABTest",
+      "description": "Experimento A/B de copy comercial",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "channel": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "channel", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "Perfil do usuário proprietário dos dados comerciais"
+    },
+    "/users/{userId}/companies/{companyId}": {
+      "schema": { "$ref": "Company" },
+      "description": "Empresas prospectadas pelo usuário"
+    },
+    "/users/{userId}/contacts/{contactId}": {
+      "schema": { "$ref": "Contact" },
+      "description": "Contatos e decisores vinculados às empresas"
+    },
+    "/users/{userId}/leads/{leadId}": {
+      "schema": { "$ref": "Lead" },
+      "description": "Oportunidades e leads no pipeline comercial"
+    },
+    "/users/{userId}/services/{serviceId}": {
+      "schema": { "$ref": "Service" },
+      "description": "Catálogo de serviços e ofertas do usuário"
+    },
+    "/users/{userId}/campaigns/{campaignId}": {
+      "schema": { "$ref": "Campaign" },
+      "description": "Campanhas de prospecção ativas e históricas"
+    },
+    "/users/{userId}/messages/{messageId}": {
+      "schema": { "$ref": "MessageTemplate" },
+      "description": "Templates de mensagens e abordagens"
+    },
+    "/users/{userId}/sequences/{sequenceId}": {
+      "schema": { "$ref": "Sequence" },
+      "description": "Estratégias e sequências de follow-up cadastradas"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": { "$ref": "Task" },
+      "description": "Fila diária de tarefas e ações de prospecção"
+    },
+    "/users/{userId}/interactions/{interactionId}": {
+      "schema": { "$ref": "Interaction" },
+      "description": "Histórico de interações e eventos comerciais"
+    },
+    "/users/{userId}/ab_tests/{abTestId}": {
+      "schema": { "$ref": "ABTest" },
+      "description": "Experimentos e testes A/B de copy e abordagem"
+    }
+  }
+}

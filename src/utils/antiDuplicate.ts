@@ -9,7 +9,7 @@ export function normalizePhone(raw?: string): string {
 }
 
 /**
- * Normaliza strings para comparação (remove acentos, caixa baixa, espaços extras).
+ * Normaliza strings para comparação (remove acentos, caixa baixa, espaços extras, pontuação e sufixos societários comuns).
  */
 export function normalizeText(text?: string): string {
   if (!text) return '';
@@ -17,6 +17,18 @@ export function normalizeText(text?: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Remove sufixos jurídicos comuns para comparar a raiz do nome da empresa
+ */
+export function cleanCompanyCorporateSuffixes(name?: string): string {
+  const norm = normalizeText(name);
+  return norm
+    .replace(/\b(ltda|eireli|s\/a|sa|me|epp|inc|llc|gmbh|co|limitada|tecnologia|tech|solucoes|servicos|grupo)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -30,7 +42,7 @@ export function normalizeEmail(email?: string): string {
 }
 
 /**
- * Compara dois números de telefone ignorando DDI/DDD se forem equivalentes nos últimos 8-9 dígitos.
+ * Compara dois números de telefone considerando DDI (+55, +351, etc), DDD e formato local.
  */
 export function arePhonesMatching(phoneA?: string, phoneB?: string): boolean {
   const normA = normalizePhone(phoneA);
@@ -38,15 +50,62 @@ export function arePhonesMatching(phoneA?: string, phoneB?: string): boolean {
   if (!normA || !normB) return false;
   if (normA === normB) return true;
 
-  // Comparar os últimos 8 ou 9 dígitos para tolerar ausência/presença de código de país (55, 351, etc)
-  const minLen = Math.min(normA.length, normB.length);
-  if (minLen >= 8) {
-    const endA = normA.slice(-8);
-    const endB = normB.slice(-8);
-    return endA === endB;
+  // Se um número termina com o outro (ex: +5511999998888 termina com 11999998888 ou 999998888)
+  if (normA.endsWith(normB) && normB.length >= 8) return true;
+  if (normB.endsWith(normA) && normA.length >= 8) return true;
+
+  // Comparar os últimos 9 dígitos (padrão celular BR) ou 8 dígitos
+  if (normA.length >= 9 && normB.length >= 9) {
+    if (normA.slice(-9) === normB.slice(-9)) return true;
+  }
+  if (normA.length >= 8 && normB.length >= 8) {
+    if (normA.slice(-8) === normB.slice(-8)) return true;
   }
 
   return false;
+}
+
+/**
+ * Calcula similaridade de Jaccard e substring entre dois nomes de empresas
+ */
+export function areCompanyNamesSimilar(nameA?: string, nameB?: string): { similar: boolean; reason?: string } {
+  if (!nameA || !nameB) return { similar: false };
+
+  const normA = normalizeText(nameA);
+  const normB = normalizeText(nameB);
+  if (normA === normB) return { similar: true, reason: 'Nome idêntico' };
+
+  const cleanA = cleanCompanyCorporateSuffixes(nameA);
+  const cleanB = cleanCompanyCorporateSuffixes(nameB);
+  if (cleanA && cleanB && cleanA === cleanB) {
+    return { similar: true, reason: 'Nome raiz da empresa idêntico (ignorando sufixos corporativos)' };
+  }
+
+  // Substring direta se o nome raiz tiver pelo menos 4 caracteres
+  if (cleanA.length >= 4 && cleanB.length >= 4) {
+    if (cleanA.includes(cleanB) || cleanB.includes(cleanA)) {
+      return { similar: true, reason: `Nome muito semelhante ("${cleanA}" / "${cleanB}")` };
+    }
+  }
+
+  // Comparação de tokens (palavras)
+  const wordsA = new Set(cleanA.split(' ').filter((w) => w.length > 2));
+  const wordsB = new Set(cleanB.split(' ').filter((w) => w.length > 2));
+
+  if (wordsA.size > 0 && wordsB.size > 0) {
+    let intersection = 0;
+    wordsA.forEach((w) => {
+      if (wordsB.has(w)) intersection++;
+    });
+    const union = new Set([...wordsA, ...wordsB]).size;
+    const similarity = intersection / union;
+
+    if (similarity >= 0.6) {
+      return { similar: true, reason: `Alta similaridade de termos (${Math.round(similarity * 100)}%)` };
+    }
+  }
+
+  return { similar: false };
 }
 
 export interface AntiDuplicateParams {
@@ -167,26 +226,30 @@ export function findPotentialDuplicates(
     }
   }
 
-  // 2. Verificar duplicação direta de Empresa por Nome ou Nome Fantasia
-  if (normCompanyName) {
+  // 2. Verificar duplicação de Empresa por Nome, Nome Fantasia e Similaridade
+  if (params.companyName || params.tradeName) {
     for (const comp of companies) {
       if (params.excludeCompanyId && comp.id === params.excludeCompanyId) continue;
 
-      const existingCompName = normalizeText(comp.name);
-      const existingCompTrade = normalizeText(comp.tradeName);
+      const compSimilarity = areCompanyNamesSimilar(params.companyName, comp.name);
+      const tradeSimilarity = params.tradeName ? areCompanyNamesSimilar(params.tradeName, comp.tradeName || comp.name) : { similar: false };
+      const crossSimilarity = areCompanyNamesSimilar(params.companyName, comp.tradeName);
 
-      if (
-        existingCompName === normCompanyName ||
-        (normTradeName && existingCompTrade && existingCompTrade === normTradeName)
-      ) {
+      if (compSimilarity.similar || tradeSimilarity.similar || crossSimilarity.similar) {
         // Se já não estiver nos matches
         const alreadyMatched = matches.some((m) => m.company.id === comp.id);
         if (!alreadyMatched) {
           const compContacts = contactsByCompany.get(comp.id) || [];
           const lead = leadByCompany.get(comp.id);
+          const reasonText =
+            compSimilarity.reason ||
+            tradeSimilarity.reason ||
+            crossSimilarity.reason ||
+            'Empresa com nome ou razão social muito semelhante já existente.';
+
           matches.push({
             type: 'name_company',
-            reason: 'Empresa com nome ou razão social já existente.',
+            reason: reasonText,
             company: comp,
             contact: compContacts[0],
             lead,

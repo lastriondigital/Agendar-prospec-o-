@@ -851,7 +851,7 @@ export function generatePeriodComparisonReport(params: {
   });
 
   const recommendations = generateEmpiricalRecommendations({
-    currentMetrics,
+    currentMetrics: metricsCurrent,
     prevMetrics: metricsPrevious,
     companies,
     leads,

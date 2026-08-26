@@ -1,5 +1,6 @@
 import { HistoryEvent } from '../../types';
 import { deleteFromStore, getAllFromStore, putInStore } from '../indexedDB';
+import { syncEngine } from '../../services/syncEngine';
 
 export class HistoryRepository {
   async getAll(): Promise<HistoryEvent[]> {
@@ -30,11 +31,13 @@ export class HistoryRepository {
       timestamp: event.timestamp || new Date().toISOString(),
     };
     await putInStore('history', fullEvent);
+    await syncEngine.enqueueChange('history', fullEvent.id, 'create', fullEvent);
     return fullEvent;
   }
 
   async delete(id: string): Promise<void> {
     await deleteFromStore('history', id);
+    await syncEngine.enqueueChange('history', id, 'delete', { id });
   }
 
   async deleteByCompanyId(companyId: string): Promise<void> {
@@ -46,3 +49,4 @@ export class HistoryRepository {
 }
 
 export const historyRepository = new HistoryRepository();
+

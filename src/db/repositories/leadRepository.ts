@@ -1,5 +1,6 @@
 import { Lead, LeadStage } from '../../types';
 import { deleteFromStore, getAllFromStore, getFromStore, putInStore } from '../indexedDB';
+import { syncEngine } from '../../services/syncEngine';
 
 export class LeadRepository {
   async getAll(): Promise<Lead[]> {
@@ -23,6 +24,7 @@ export class LeadRepository {
       updatedAt: now,
     };
     await putInStore('leads', toSave);
+    await syncEngine.enqueueChange('leads', toSave.id, 'update', toSave);
     return toSave;
   }
 
@@ -35,11 +37,13 @@ export class LeadRepository {
       updatedAt: new Date().toISOString(),
     };
     await putInStore('leads', updated);
+    await syncEngine.enqueueChange('leads', updated.id, 'update', updated);
     return updated;
   }
 
   async delete(id: string): Promise<void> {
     await deleteFromStore('leads', id);
+    await syncEngine.enqueueChange('leads', id, 'delete', { id });
   }
 
   async deleteByCompanyId(companyId: string): Promise<void> {
@@ -51,3 +55,4 @@ export class LeadRepository {
 }
 
 export const leadRepository = new LeadRepository();
+

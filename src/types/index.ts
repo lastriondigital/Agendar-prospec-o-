@@ -787,4 +787,73 @@ export interface PeriodComparisonReport {
   recommendations: DataFactRecommendation[];
 }
 
+// ----------------------------------------------------
+// CLOUD & SYNC TYPES (Offline-First Architecture)
+// ----------------------------------------------------
+
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline';
+
+export type SyncOperationType = 'create' | 'update' | 'delete';
+
+export type SyncEntityType =
+  | 'companies'
+  | 'contacts'
+  | 'leads'
+  | 'services'
+  | 'campaigns'
+  | 'templates'
+  | 'sequences'
+  | 'actions'
+  | 'history'
+  | 'abTests'
+  | 'salesEngine'
+  | 'settings'
+  | 'followups';
+
+export interface SyncQueueItem {
+  id: string;
+  entityType: SyncEntityType;
+  entityId: string;
+  operation: SyncOperationType;
+  payload: any;
+  createdAt: string;
+  updatedAt?: string;
+  status: 'pending' | 'syncing' | 'synced' | 'error';
+  retryCount: number;
+  lastError?: string;
+}
+
+export interface SyncConflict {
+  id: string;
+  entityType: SyncEntityType;
+  entityId: string;
+  entityTitle?: string;
+  localData: any;
+  remoteData: any;
+  detectedAt: string;
+  resolved: boolean;
+  resolutionChoice?: 'keep_local' | 'keep_remote' | 'keep_both';
+  resolvedAt?: string;
+}
+
+export interface AuthUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL?: string | null;
+  isAnonymous?: boolean;
+}
+
+export interface SyncStateSummary {
+  status: SyncStatus;
+  isOnline: boolean;
+  isAuthenticated: boolean;
+  lastSyncedAt: string | null;
+  pendingCount: number;
+  errorCount: number;
+  conflictCount: number;
+  lastError: string | null;
+}
+
+
 

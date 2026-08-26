@@ -18,6 +18,10 @@ import {
   ProofItem,
   ProspectAction,
   Service,
+  SyncConflict,
+  SyncEntityType,
+  SyncOperationType,
+  SyncQueueItem,
   ValueArgumentItem,
 } from '../types';
 import { DB_NAME, DB_VERSION, DEFAULT_PIPELINE_STAGES } from '../utils/constants';
@@ -65,7 +69,10 @@ export type StoreName =
   | 'arguments'
   | 'ctas'
   | 'followups'
-  | 'abTests';
+  | 'abTests'
+  | 'sync_queue'
+  | 'sync_conflicts'
+  | 'sync_meta';
 
 let dbInstance: IDBDatabase | null = null;
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -224,6 +231,26 @@ export async function getDB(): Promise<IDBDatabase> {
         const abStore = db.createObjectStore('abTests', { keyPath: 'id' });
         abStore.createIndex('channel', 'channel', { unique: false });
         abStore.createIndex('status', 'status', { unique: false });
+      }
+
+      // Offline-First Sync Queue Store
+      if (!db.objectStoreNames.contains('sync_queue')) {
+        const queueStore = db.createObjectStore('sync_queue', { keyPath: 'id' });
+        queueStore.createIndex('status', 'status', { unique: false });
+        queueStore.createIndex('createdAt', 'createdAt', { unique: false });
+        queueStore.createIndex('entityType', 'entityType', { unique: false });
+      }
+
+      // Conflict Resolution Store
+      if (!db.objectStoreNames.contains('sync_conflicts')) {
+        const conflictStore = db.createObjectStore('sync_conflicts', { keyPath: 'id' });
+        conflictStore.createIndex('resolved', 'resolved', { unique: false });
+        conflictStore.createIndex('detectedAt', 'detectedAt', { unique: false });
+      }
+
+      // Sync Metadata Store (lastSyncedAt, user state)
+      if (!db.objectStoreNames.contains('sync_meta')) {
+        db.createObjectStore('sync_meta');
       }
     };
 
@@ -547,13 +574,22 @@ export async function exportDatabaseToJSON(): Promise<string> {
 }
 
 /**
- * Imports JSON string backup into IndexedDB
+ * Imports JSON string backup into IndexedDB with validation, sanitization, and merge/overwrite modes
  */
-export async function importDatabaseFromJSON(jsonStr: string): Promise<{ success: boolean; message: string }> {
+export async function importDatabaseFromJSON(
+  jsonStr: string,
+  options: { mode?: 'overwrite' | 'merge' } = { mode: 'overwrite' }
+): Promise<{ success: boolean; message: string; details?: string }> {
   try {
-    const parsed = JSON.parse(jsonStr);
-    if (!parsed.data) {
-      return { success: false, message: 'Arquivo de backup inválido.' };
+    const { validateBackupJSON } = await import('../services/backupService');
+    const validation = validateBackupJSON(jsonStr);
+
+    if (!validation.valid || !validation.sanitizedPayload) {
+      return {
+        success: false,
+        message: 'Arquivo de backup inválido ou corrompido.',
+        details: validation.errors.join(' | '),
+      };
     }
 
     const {
@@ -577,31 +613,219 @@ export async function importDatabaseFromJSON(jsonStr: string): Promise<{ success
       followups,
       abTests,
       settings,
-    } = parsed.data;
+    } = validation.sanitizedPayload.data;
 
-    if (Array.isArray(companies)) await putManyInStore('companies', companies);
-    if (Array.isArray(contacts)) await putManyInStore('contacts', contacts);
-    if (Array.isArray(leads)) await putManyInStore('leads', leads);
-    if (Array.isArray(history)) await putManyInStore('history', history);
-    if (Array.isArray(clients)) await putManyInStore('clients', clients);
-    if (Array.isArray(campaigns)) await putManyInStore('campaigns', campaigns);
-    if (Array.isArray(services)) await putManyInStore('services', services);
-    if (Array.isArray(icps)) await putManyInStore('icps', icps);
-    if (Array.isArray(templates)) await putManyInStore('templates', templates);
-    if (Array.isArray(actions)) await putManyInStore('actions', actions);
-    if (Array.isArray(stages)) await putManyInStore('stages', stages);
-    if (Array.isArray(objections)) await putManyInStore('objections', objections);
-    if (Array.isArray(pricing)) await putManyInStore('pricing', pricing);
-    if (Array.isArray(proofs)) await putManyInStore('proofs', proofs);
-    if (Array.isArray(painPoints)) await putManyInStore('painPoints', painPoints);
-    if (Array.isArray(args)) await putManyInStore('arguments', args);
-    if (Array.isArray(ctas)) await putManyInStore('ctas', ctas);
-    if (Array.isArray(followups)) await putManyInStore('followups', followups);
-    if (Array.isArray(abTests)) await putManyInStore('abTests', abTests);
+    // In overwrite mode, clean stores first
+    if (options.mode === 'overwrite') {
+      const storesToClear: StoreName[] = [
+        'companies',
+        'contacts',
+        'leads',
+        'history',
+        'clients',
+        'campaigns',
+        'services',
+        'icps',
+        'templates',
+        'actions',
+        'objections',
+        'pricing',
+        'proofs',
+        'painPoints',
+        'arguments',
+        'ctas',
+        'followups',
+        'abTests',
+      ];
+      for (const s of storesToClear) {
+        await clearStore(s);
+      }
+    }
+
+    if (Array.isArray(companies) && companies.length > 0) await putManyInStore('companies', companies);
+    if (Array.isArray(contacts) && contacts.length > 0) await putManyInStore('contacts', contacts);
+    if (Array.isArray(leads) && leads.length > 0) await putManyInStore('leads', leads);
+    if (Array.isArray(history) && history.length > 0) await putManyInStore('history', history);
+    if (Array.isArray(clients) && clients.length > 0) await putManyInStore('clients', clients);
+    if (Array.isArray(campaigns) && campaigns.length > 0) await putManyInStore('campaigns', campaigns);
+    if (Array.isArray(services) && services.length > 0) await putManyInStore('services', services);
+    if (Array.isArray(icps) && icps.length > 0) await putManyInStore('icps', icps);
+    if (Array.isArray(templates) && templates.length > 0) await putManyInStore('templates', templates);
+    if (Array.isArray(actions) && actions.length > 0) await putManyInStore('actions', actions);
+    if (Array.isArray(stages) && stages.length > 0) await putManyInStore('stages', stages);
+    if (Array.isArray(objections) && objections.length > 0) await putManyInStore('objections', objections);
+    if (Array.isArray(pricing) && pricing.length > 0) await putManyInStore('pricing', pricing);
+    if (Array.isArray(proofs) && proofs.length > 0) await putManyInStore('proofs', proofs);
+    if (Array.isArray(painPoints) && painPoints.length > 0) await putManyInStore('painPoints', painPoints);
+    if (Array.isArray(args) && args.length > 0) await putManyInStore('arguments', args);
+    if (Array.isArray(ctas) && ctas.length > 0) await putManyInStore('ctas', ctas);
+    if (Array.isArray(followups) && followups.length > 0) await putManyInStore('followups', followups);
+    if (Array.isArray(abTests) && abTests.length > 0) await putManyInStore('abTests', abTests);
     if (settings) await saveStoredSettings(settings);
 
-    return { success: true, message: 'Dados restaurados com sucesso!' };
+    const totalImported =
+      (companies?.length || 0) +
+      (leads?.length || 0) +
+      (contacts?.length || 0) +
+      (actions?.length || 0) +
+      (templates?.length || 0);
+
+    return {
+      success: true,
+      message: `Backup restaurado com sucesso (${totalImported} registros importados)!`,
+    };
   } catch (err) {
-    return { success: false, message: `Erro ao importar: ${(err as Error).message}` };
+    return {
+      success: false,
+      message: `Erro ao importar: ${(err as Error).message}`,
+    };
   }
 }
+
+// ----------------------------------------------------
+// SYNC ENGINE LOCAL QUEUE & CONFLICT STORAGE HELPERS
+// ----------------------------------------------------
+
+/**
+ * Adds an operation to the persistent local sync queue
+ */
+export async function addToSyncQueue(
+  item: Omit<SyncQueueItem, 'id' | 'createdAt' | 'status' | 'retryCount'> & { id?: string }
+): Promise<SyncQueueItem> {
+  const queueItem: SyncQueueItem = {
+    id: item.id || `sync_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    entityType: item.entityType,
+    entityId: item.entityId,
+    operation: item.operation,
+    payload: item.payload,
+    createdAt: new Date().toISOString(),
+    status: 'pending',
+    retryCount: 0,
+  };
+
+  await putInStore('sync_queue', queueItem);
+  return queueItem;
+}
+
+/**
+ * Gets all pending or failed items from the sync queue
+ */
+export async function getPendingSyncQueue(): Promise<SyncQueueItem[]> {
+  const all = await getAllFromStore<SyncQueueItem>('sync_queue');
+  return all.filter((item) => item.status === 'pending' || item.status === 'error');
+}
+
+/**
+ * Gets all sync queue items
+ */
+export async function getAllSyncQueue(): Promise<SyncQueueItem[]> {
+  return getAllFromStore<SyncQueueItem>('sync_queue');
+}
+
+/**
+ * Updates a sync queue item
+ */
+export async function updateSyncQueueItem(item: SyncQueueItem): Promise<void> {
+  await putInStore('sync_queue', item);
+}
+
+/**
+ * Removes an item from the sync queue
+ */
+export async function removeSyncQueueItem(id: string): Promise<void> {
+  await deleteFromStore('sync_queue', id);
+}
+
+/**
+ * Clears items from the sync queue (all or only synced)
+ */
+export async function clearSyncQueue(onlySynced = false): Promise<void> {
+  if (!onlySynced) {
+    await clearStore('sync_queue');
+    return;
+  }
+  const all = await getAllFromStore<SyncQueueItem>('sync_queue');
+  const toDelete = all.filter((item) => item.status === 'synced');
+  for (const item of toDelete) {
+    await deleteFromStore('sync_queue', item.id);
+  }
+}
+
+/**
+ * Saves a sync conflict for user review
+ */
+export async function saveSyncConflict(conflict: SyncConflict): Promise<void> {
+  await putInStore('sync_conflicts', conflict);
+}
+
+/**
+ * Retrieves sync conflicts
+ */
+export async function getSyncConflicts(unresolvedOnly = false): Promise<SyncConflict[]> {
+  const all = await getAllFromStore<SyncConflict>('sync_conflicts');
+  if (unresolvedOnly) {
+    return all.filter((c) => !c.resolved);
+  }
+  return all;
+}
+
+/**
+ * Resolves a sync conflict in IndexedDB
+ */
+export async function resolveSyncConflictInDB(
+  id: string,
+  resolution: 'keep_local' | 'keep_remote' | 'keep_both'
+): Promise<void> {
+  const all = await getAllFromStore<SyncConflict>('sync_conflicts');
+  const conflict = all.find((c) => c.id === id);
+  if (!conflict) return;
+
+  conflict.resolved = true;
+  conflict.resolutionChoice = resolution;
+  conflict.resolvedAt = new Date().toISOString();
+  await putInStore('sync_conflicts', conflict);
+}
+
+/**
+ * Deletes a sync conflict
+ */
+export async function deleteSyncConflict(id: string): Promise<void> {
+  await deleteFromStore('sync_conflicts', id);
+}
+
+/**
+ * Gets the last synced timestamp
+ */
+export async function getLastSyncedAt(): Promise<string | null> {
+  const db = await getDB();
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction('sync_meta', 'readonly');
+      const store = tx.objectStore('sync_meta');
+      const req = store.get('lastSyncedAt');
+      req.onsuccess = () => resolve((req.result as string) || null);
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * Sets the last synced timestamp
+ */
+export async function setLastSyncedAt(timestamp: string): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction('sync_meta', 'readwrite');
+      const store = tx.objectStore('sync_meta');
+      const req = store.put(timestamp, 'lastSyncedAt');
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+

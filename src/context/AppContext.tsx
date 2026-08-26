@@ -43,6 +43,7 @@ import {
 } from '../types';
 import { DEFAULT_PIPELINE_STAGES } from '../utils/constants';
 import { CreateCompanyPayload, leadService } from '../services/leadService';
+import { syncEngine } from '../services/syncEngine';
 import { useToast } from './ToastContext';
 
 interface AppContextType {
@@ -169,7 +170,10 @@ interface AppContextType {
   loadDemoData: (force?: boolean) => Promise<void>;
   clearAllData: () => Promise<void>;
   exportJSON: () => Promise<string>;
-  importJSON: (jsonStr: string) => Promise<{ success: boolean; message: string }>;
+  importJSON: (
+    jsonStr: string,
+    options?: { mode?: 'overwrite' | 'merge' }
+  ) => Promise<{ success: boolean; message: string; details?: string }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -568,6 +572,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       await putInStore('campaigns', updated);
+      await syncEngine.enqueueChange('campaigns', updated.id, 'update', updated);
       await refreshData();
       success('Campanha salva');
     },
@@ -577,6 +582,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteCampaign = useCallback(
     async (id: string) => {
       await deleteFromStore('campaigns', id);
+      await syncEngine.enqueueChange('campaigns', id, 'delete', { id });
       await refreshData();
       success('Campanha removida');
     },
@@ -594,6 +600,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       await putInStore('services', updated);
+      await syncEngine.enqueueChange('services', updated.id, 'update', updated);
       await refreshData();
       success('Serviço salvo');
     },
@@ -603,6 +610,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteService = useCallback(
     async (id: string) => {
       await deleteFromStore('services', id);
+      await syncEngine.enqueueChange('services', id, 'delete', { id });
       await refreshData();
       success('Serviço removido');
     },
@@ -646,6 +654,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       await putInStore('templates', updated);
+      await syncEngine.enqueueChange('templates', updated.id, 'update', updated);
       await refreshData();
       success('Modelo de mensagem salvo');
     },
@@ -655,6 +664,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteTemplate = useCallback(
     async (id: string) => {
       await deleteFromStore('templates', id);
+      await syncEngine.enqueueChange('templates', id, 'delete', { id });
       await refreshData();
       success('Modelo removido');
     },
@@ -672,6 +682,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       await putInStore('actions', updated);
+      await syncEngine.enqueueChange('actions', updated.id, 'update', updated);
       await refreshData();
       success('Ação atualizada');
     },
@@ -693,6 +704,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       await putInStore('actions', updatedAction);
+      await syncEngine.enqueueChange('actions', updatedAction.id, 'update', updatedAction);
 
       // Update client last contacted date and stage if requested
       const client = clients.find((c) => c.id === action.clientId);
@@ -738,6 +750,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               updatedAt: now,
             };
             await putInStore('actions', nextAction);
+            await syncEngine.enqueueChange('actions', nextAction.id, 'create', nextAction);
           }
         }
       }
@@ -762,6 +775,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       await putInStore('actions', updatedAction);
+      await syncEngine.enqueueChange('actions', updatedAction.id, 'update', updatedAction);
       await refreshData();
       info('Ação ignorada');
     },
@@ -782,6 +796,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       await putInStore('actions', updatedAction);
+      await syncEngine.enqueueChange('actions', updatedAction.id, 'update', updatedAction);
       await refreshData();
       success(`Reagendada para ${newDate}`);
     },
@@ -791,6 +806,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteAction = useCallback(
     async (id: string) => {
       await deleteFromStore('actions', id);
+      await syncEngine.enqueueChange('actions', id, 'delete', { id });
       await refreshData();
       success('Ação removida da fila');
     },
@@ -942,6 +958,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const upsertFollowUp = useCallback(
     async (followUp: FollowUpStrategyItem) => {
       await putInStore('followups', followUp);
+      await syncEngine.enqueueChange('followups', followUp.id, 'update', followUp);
       await refreshData();
       success('Estratégia de Follow-up salva!');
     },
@@ -951,6 +968,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteFollowUp = useCallback(
     async (id: string) => {
       await deleteFromStore('followups', id);
+      await syncEngine.enqueueChange('followups', id, 'delete', { id });
       await refreshData();
       success('Estratégia removida.');
     },
@@ -998,6 +1016,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       await putInStore('abTests', updatedTest);
+      await syncEngine.enqueueChange('abTests', updatedTest.id, 'update', updatedTest);
       await refreshData();
       success('Teste A/B salvo!');
     },
@@ -1007,6 +1026,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteAbTest = useCallback(
     async (id: string) => {
       await deleteFromStore('abTests', id);
+      await syncEngine.enqueueChange('abTests', id, 'delete', { id });
       await refreshData();
       success('Teste A/B removido.');
     },
@@ -1082,14 +1102,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const importJSON = useCallback(
-    async (jsonStr: string) => {
+    async (jsonStr: string, options?: { mode?: 'overwrite' | 'merge' }) => {
       setIsLoading(true);
-      const res = await importDatabaseFromJSON(jsonStr);
+      const res = await importDatabaseFromJSON(jsonStr, options);
       await refreshData();
       if (res.success) {
         success(res.message);
       } else {
-        error(res.message);
+        error(res.message, res.details);
       }
       return res;
     },

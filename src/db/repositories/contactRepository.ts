@@ -1,5 +1,6 @@
 import { Contact } from '../../types';
 import { deleteFromStore, getAllFromStore, getFromStore, putInStore } from '../indexedDB';
+import { syncEngine } from '../../services/syncEngine';
 
 export class ContactRepository {
   async getAll(): Promise<Contact[]> {
@@ -23,11 +24,13 @@ export class ContactRepository {
       updatedAt: now,
     };
     await putInStore('contacts', toSave);
+    await syncEngine.enqueueChange('contacts', toSave.id, 'update', toSave);
     return toSave;
   }
 
   async delete(id: string): Promise<void> {
     await deleteFromStore('contacts', id);
+    await syncEngine.enqueueChange('contacts', id, 'delete', { id });
   }
 
   async deleteByCompanyId(companyId: string): Promise<void> {
@@ -39,3 +42,4 @@ export class ContactRepository {
 }
 
 export const contactRepository = new ContactRepository();
+

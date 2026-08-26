@@ -1,5 +1,6 @@
 import { Company } from '../../types';
 import { deleteFromStore, getAllFromStore, getFromStore, putInStore } from '../indexedDB';
+import { syncEngine } from '../../services/syncEngine';
 
 export class CompanyRepository {
   async getAll(): Promise<Company[]> {
@@ -19,6 +20,7 @@ export class CompanyRepository {
       updatedAt: now,
     };
     await putInStore('companies', toSave);
+    await syncEngine.enqueueChange('companies', toSave.id, 'update', toSave);
     return toSave;
   }
 
@@ -31,6 +33,7 @@ export class CompanyRepository {
       updatedAt: new Date().toISOString(),
     };
     await putInStore('companies', updated);
+    await syncEngine.enqueueChange('companies', updated.id, 'update', updated);
     return updated;
   }
 
@@ -43,12 +46,15 @@ export class CompanyRepository {
       updatedAt: new Date().toISOString(),
     };
     await putInStore('companies', updated);
+    await syncEngine.enqueueChange('companies', updated.id, 'update', updated);
     return updated;
   }
 
   async delete(id: string): Promise<void> {
     await deleteFromStore('companies', id);
+    await syncEngine.enqueueChange('companies', id, 'delete', { id });
   }
 }
 
 export const companyRepository = new CompanyRepository();
+

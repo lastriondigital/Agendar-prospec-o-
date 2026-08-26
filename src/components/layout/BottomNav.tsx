@@ -141,8 +141,8 @@ export const BottomNav: React.FC = () => {
         {/* Mais */}
         <button
           onClick={() => setIsMoreOpen(true)}
-          className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer min-w-[56px] ${
-            ['planner', 'messages', 'campaigns', 'services', 'analytics', 'settings'].includes(
+          className={`flex flex-col items-center justify-center py-2 px-2.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer min-w-[56px] min-h-[44px] ${
+            ['sales-engine', 'planner', 'messages', 'campaigns', 'services', 'analytics', 'settings'].includes(
               activeRoute
             )
               ? 'text-emerald-400 font-bold'

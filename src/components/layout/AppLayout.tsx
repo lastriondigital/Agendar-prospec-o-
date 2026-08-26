@@ -4,6 +4,8 @@ import { ToastContainer } from '../ui/ToastContainer';
 import { BottomNav } from './BottomNav';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { AuthModal } from '../auth/AuthModal';
+import { ConflictResolutionModal } from '../sync/ConflictResolutionModal';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
@@ -26,6 +28,9 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
       {/* Global Overlays */}
       <ToastContainer />
       <ConfirmDialog />
+      <AuthModal />
+      <ConflictResolutionModal />
     </div>
   );
 };
+
