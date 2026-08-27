@@ -55,8 +55,9 @@ export function useExecutionQueue() {
   // Filter actions for today or overdue pending
   const todayActions = useMemo(() => {
     return actions.filter((a) => {
+      const isPending = a.status === 'pending' || a.status === 'agendada' || a.status === 'rescheduled';
       // Include pending from today or overdue past dates
-      if (a.status === 'pending') {
+      if (isPending) {
         return a.scheduledDate <= todayStr;
       }
       // Include completed today
@@ -66,7 +67,7 @@ export function useExecutionQueue() {
 
   const pendingActions = useMemo(() => {
     return todayActions
-      .filter((a) => a.status === 'pending')
+      .filter((a) => a.status === 'pending' || a.status === 'agendada' || a.status === 'rescheduled')
       .sort((a, b) => {
         // 1. Overdue first
         const aOverdue = a.scheduledDate < todayStr ? 1 : 0;
@@ -79,8 +80,8 @@ export function useExecutionQueue() {
         if (pDiff !== 0) return pDiff;
 
         // 3. Lead score calculado em tempo real
-        const aScore = scoresMap.get(a.clientId)?.score ?? 50;
-        const bScore = scoresMap.get(b.clientId)?.score ?? 50;
+        const aScore = scoresMap.get(a.companyId || a.clientId)?.score ?? 50;
+        const bScore = scoresMap.get(b.companyId || b.clientId)?.score ?? 50;
         if (bScore !== aScore) return bScore - aScore;
 
         return a.scheduledDate.localeCompare(b.scheduledDate);
@@ -88,7 +89,9 @@ export function useExecutionQueue() {
   }, [todayActions, todayStr, scoresMap]);
 
   const overdueActions = useMemo(() => {
-    return actions.filter((a) => a.status === 'pending' && a.scheduledDate < todayStr);
+    return actions.filter(
+      (a) => (a.status === 'pending' || a.status === 'agendada' || a.status === 'rescheduled') && a.scheduledDate < todayStr
+    );
   }, [actions, todayStr]);
 
   const completedToday = useMemo(() => {
@@ -224,10 +227,10 @@ export function useExecutionQueue() {
   const queueItems: ExecutionQueueItem[] = useMemo(() => {
     return pendingActions
       .map((action) => {
-        const client = clients.find((c) => c.id === action.clientId);
-        const company = companies.find((c) => c.id === action.clientId);
-        const contact = contacts.find((c) => c.companyId === action.clientId && c.isPrimary) || contacts.find((c) => c.companyId === action.clientId);
-        const lead = leads.find((l) => l.companyId === action.clientId);
+        const lead = leads.find((l) => l.id === action.leadId || l.id === action.clientId || l.companyId === action.clientId || (action.companyId && l.companyId === action.companyId));
+        const company = companies.find((c) => c.id === action.companyId || c.id === action.clientId || (lead && c.id === lead.companyId));
+        const contact = contacts.find((c) => c.id === action.contactId || (company && c.companyId === company.id && c.isPrimary) || (company && c.companyId === company.id));
+        const client = clients.find((c) => c.id === action.clientId || (company && c.id === company.id));
 
         if (!client && !company) return null;
 

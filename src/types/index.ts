@@ -11,11 +11,41 @@ export type RouteId =
   | 'analytics'
   | 'settings';
 
-export type ContactChannel = 'whatsapp' | 'linkedin' | 'email' | 'call' | 'instagram';
+export type ContactChannel =
+  | 'whatsapp'
+  | 'whatsapp_business'
+  | 'linkedin'
+  | 'email'
+  | 'call'
+  | 'instagram'
+  | string;
+
+export type CampaignType =
+  | 'prospeccao'
+  | 'follow_up'
+  | 'reativacao'
+  | 'pos_venda'
+  | 'nutricao'
+  | 'oferta'
+  | 'personalizada'
+  | string;
 
 export type LeadStatus = 'new' | 'in_contact' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost' | 'archived';
 
 export type ActionStatus = 'pending' | 'completed' | 'skipped' | 'rescheduled';
+
+export type ScheduledMessageStatus =
+  | 'agendada'
+  | 'pendente'
+  | 'enviada'
+  | 'concluida'
+  | 'adiada'
+  | 'cancelada'
+  | 'falhou'
+  | 'pending'
+  | 'completed'
+  | 'skipped'
+  | 'rescheduled';
 
 export type ActionPriority = 'high' | 'medium' | 'low';
 
@@ -29,7 +59,8 @@ export type TemplateCategory =
   | 'fechamento'
   | 'pós_venda'
   | 'reativação'
-  | 'custom';
+  | 'custom'
+  | string;
 
 export type TemplateType = TemplateCategory;
 
@@ -352,15 +383,24 @@ export interface Client {
 
 export interface CampaignSequenceStep {
   id: string;
-  dayOffset: number; // e.g. 0, 2, 5, 9, 20, 45
-  title: string; // e.g. "Primeiro contacto", "Follow-up", "Prova", "Reativação"
+  order?: number;
+  actionType?: string; // Tipo de Ação (e.g. "Primeiro contato", "Follow-up 1", "Apresentação", etc.)
+  title: string; // Título da etapa
   templateId?: string;
   channel?: ContactChannel;
+  waitDays?: number; // Dias (0, 1, 2, 3...)
+  waitHours?: number; // Horas (0, 4, 6, 12...)
+  waitMinutes?: number; // Minutos (0, 30...)
+  totalWaitMinutes?: number;
+  customNotes?: string;
+  dayOffset: number; // retrocompatibilidade (e.g. 0, 2, 5, 9, 20, 45)
 }
 
 export interface Campaign {
   id: string;
   name: string;
+  campaignType?: CampaignType;
+  type?: CampaignType; // alias
   description?: string;
   targetAudience?: string; // ICP
   icpId?: string;
@@ -372,9 +412,11 @@ export interface Campaign {
   dailyGoal: number; // limite diário
   totalTarget: number; // meta total
   startDate?: string;
+  startTime?: string;
   endDate?: string;
   criteria?: string;
   sequence?: CampaignSequenceStep[];
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -495,18 +537,22 @@ export interface ScoringWeightConfig {
 
 export interface MessageTemplate {
   id: string;
-  title: string;
+  title: string; // Nome do Script
+  name?: string; // alias
+  actionType?: string; // Tipo de Ação (e.g. "Primeiro contato", "Follow-up 1", "Apresentação", etc.)
   channel: ContactChannel;
-  category: TemplateCategory;
-  type: TemplateType;
+  channels?: ContactChannel[]; // canais compatíveis
+  category?: TemplateCategory;
+  type?: TemplateType;
   content: string;
   variables: string[];
-  version: string; // e.g. "v1.0"
+  version?: string; // e.g. "v1.0"
   serviceId?: string; // mensagens por serviço
   niche?: string; // mensagens por nicho
   pipelineStage?: LeadStage; // mensagens por etapa do pipeline
   isFavorite?: boolean;
   isArchived?: boolean;
+  status?: 'active' | 'archived' | string;
   notes?: string;
   isDefault?: boolean;
   createdAt: string;
@@ -516,17 +562,29 @@ export interface MessageTemplate {
 export interface ProspectAction {
   id: string;
   clientId: string;
+  companyId?: string;
+  contactId?: string;
+  leadId?: string;
   campaignId?: string;
+  campaignType?: CampaignType;
+  cadenceId?: string;
+  cadenceStepId?: string;
   templateId?: string;
+  scriptName?: string;
+  actionType?: string;
   channel: ContactChannel;
   scheduledDate: string; // YYYY-MM-DD
   scheduledTime?: string; // HH:mm
-  status: ActionStatus;
+  status: ActionStatus | ScheduledMessageStatus;
   priority: ActionPriority;
   estMinutes: number; // default 1-3 min per quick execution
   customMessage?: string;
+  originalScriptContent?: string;
   outcomeNotes?: string;
+  notes?: string;
   executedAt?: string;
+  postponedTo?: string;
+  cancelReason?: string;
   createdAt: string;
   updatedAt: string;
 }

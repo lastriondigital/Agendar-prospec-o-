@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   CheckCircle2,
   Edit2,
@@ -11,38 +11,128 @@ import {
   Calendar,
   Layers,
   Sparkles,
+  Clock,
+  Send,
+  ArrowRight,
+  Filter,
+  Check,
+  AlertCircle,
+  MessageSquare,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
-import { Campaign, CampaignSequenceStep, ContactChannel } from '../types';
+import {
+  Campaign,
+  CampaignSequenceStep,
+  CampaignType,
+  ContactChannel,
+  Lead,
+  ProspectAction,
+} from '../types';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ScheduleMessageModal } from '../components/messaging/ScheduleMessageModal';
 import { getChannelBadgeDetails } from '../utils/formatting';
+import {
+  CAMPAIGN_TYPE_LABELS,
+  CHANNEL_OPTIONS,
+  DEFAULT_ACTION_TYPES,
+  DEFAULT_CAMPAIGN_TYPES,
+  calculateCadenceTimeline,
+  generateScheduledMessagesFromCadence,
+  getActionTypes,
+  getCompatibleScripts,
+} from '../utils/cadenceUtils';
 
-const DEFAULT_SEQUENCE_PRESET: CampaignSequenceStep[] = [
-  { id: 'seq-0', dayOffset: 0, title: 'Primeiro contacto' },
-  { id: 'seq-1', dayOffset: 2, title: 'Follow-up' },
-  { id: 'seq-2', dayOffset: 5, title: 'Prova' },
-  { id: 'seq-3', dayOffset: 9, title: 'Follow-up' },
-  { id: 'seq-4', dayOffset: 20, title: 'Reativação' },
-  { id: 'seq-5', dayOffset: 45, title: 'Nova tentativa' },
+const DEFAULT_CADENCE_STEPS: CampaignSequenceStep[] = [
+  {
+    id: 'seq-1',
+    order: 1,
+    title: 'Primeiro Contato Direto',
+    actionType: 'Primeiro contato',
+    channel: 'whatsapp',
+    waitDays: 0,
+    waitHours: 0,
+    waitMinutes: 0,
+    dayOffset: 0,
+  },
+  {
+    id: 'seq-2',
+    order: 2,
+    title: 'Follow-up 1 (48h após)',
+    actionType: 'Follow-up 1',
+    channel: 'whatsapp',
+    waitDays: 2,
+    waitHours: 0,
+    waitMinutes: 0,
+    dayOffset: 2,
+  },
+  {
+    id: 'seq-3',
+    order: 3,
+    title: 'Follow-up 2 com Prova Social',
+    actionType: 'Follow-up 2',
+    channel: 'whatsapp',
+    waitDays: 3,
+    waitHours: 0,
+    waitMinutes: 0,
+    dayOffset: 5,
+  },
+  {
+    id: 'seq-4',
+    order: 4,
+    title: 'Reativação Final',
+    actionType: 'Reativação',
+    channel: 'whatsapp',
+    waitDays: 7,
+    waitHours: 0,
+    waitMinutes: 0,
+    dayOffset: 12,
+  },
 ];
 
 export const CampaignsView: React.FC = () => {
-  const { campaigns, clients, services, templates, upsertCampaign, deleteCampaign, createActionBatchForCampaign, setActiveRoute } = useApp();
+  const {
+    campaigns,
+    leads,
+    companies,
+    contacts,
+    services,
+    templates,
+    actions,
+    upsertCampaign,
+    deleteCampaign,
+    upsertAction,
+    setActiveRoute,
+  } = useApp();
+
   const confirm = useConfirm();
-  const { success, error } = useToast();
+  const { success, error, warning } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
 
-  // Form State
+  // Modal para disparar cadência em lote
+  const [isCadenceModalOpen, setIsCadenceModalOpen] = useState(false);
+  const [cadenceCampaign, setCadenceCampaign] = useState<Campaign | null>(null);
+  const [cadenceStartDate, setCadenceStartDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [cadenceStartTime, setCadenceStartTime] = useState('09:30');
+  const [selectedLeadIdsForCadence, setSelectedLeadIdsForCadence] = useState<string[]>([]);
+  const [isGeneratingCadence, setIsGeneratingCadence] = useState(false);
+
+  // Modal para agendar mensagem avulsa na campanha
+  const [scheduleCampaignId, setScheduleCampaignId] = useState<string | null>(null);
+
+  // Form State da Campanha
   const [name, setName] = useState('');
+  const [campaignType, setCampaignType] = useState<CampaignType>('prospeccao');
   const [description, setDescription] = useState('');
   const [targetAudience, setTargetAudience] = useState('');
   const [objective, setObjective] = useState('');
@@ -53,17 +143,23 @@ export const CampaignsView: React.FC = () => {
   const [totalTarget, setTotalTarget] = useState(50);
   const [criteria, setCriteria] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [startTime, setStartTime] = useState('09:30');
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 1);
     return d.toISOString().slice(0, 10);
   });
   const [status, setStatus] = useState<'active' | 'inactive' | 'paused' | 'draft'>('active');
-  const [sequence, setSequence] = useState<CampaignSequenceStep[]>(DEFAULT_SEQUENCE_PRESET);
+  const [sequence, setSequence] = useState<CampaignSequenceStep[]>(DEFAULT_CADENCE_STEPS);
+
+  const availableActionTypes = useMemo(() => {
+    return getActionTypes(templates);
+  }, [templates]);
 
   const handleOpenAdd = () => {
     setEditingCampaign(null);
     setName('');
+    setCampaignType('prospeccao');
     setDescription('');
     setTargetAudience('');
     setObjective('Gerar Reuniões & Qualificação');
@@ -72,19 +168,21 @@ export const CampaignsView: React.FC = () => {
     setDefaultTemplateId(templates[0]?.id || '');
     setDailyGoal(15);
     setTotalTarget(50);
-    setCriteria('Empresas sem site ou com site desatualizado');
+    setCriteria('Empresas no perfil ideal sem contato nos últimos 30 dias');
     setStartDate(new Date().toISOString().slice(0, 10));
+    setStartTime('09:30');
     const d = new Date();
     d.setMonth(d.getMonth() + 1);
     setEndDate(d.toISOString().slice(0, 10));
     setStatus('active');
-    setSequence(DEFAULT_SEQUENCE_PRESET);
+    setSequence(DEFAULT_CADENCE_STEPS);
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (c: Campaign) => {
     setEditingCampaign(c);
     setName(c.name);
+    setCampaignType(c.campaignType || c.type || 'prospeccao');
     setDescription(c.description || '');
     setTargetAudience(c.targetAudience || '');
     setObjective(c.objective || '');
@@ -95,29 +193,44 @@ export const CampaignsView: React.FC = () => {
     setTotalTarget(c.totalTarget || 50);
     setCriteria(c.criteria || '');
     setStartDate(c.startDate || new Date().toISOString().slice(0, 10));
+    setStartTime(c.startTime || '09:30');
     setEndDate(c.endDate || new Date().toISOString().slice(0, 10));
     setStatus(c.status === 'completed' ? 'active' : c.status);
-    setSequence(c.sequence && c.sequence.length > 0 ? c.sequence : DEFAULT_SEQUENCE_PRESET);
+    setSequence(c.sequence && c.sequence.length > 0 ? c.sequence : DEFAULT_CADENCE_STEPS);
     setIsModalOpen(true);
   };
 
   const handleAddSequenceStep = () => {
-    const lastOffset = sequence.length > 0 ? sequence[sequence.length - 1].dayOffset + 10 : 0;
+    const nextOrder = sequence.length + 1;
+    const defaultWait = sequence.length === 0 ? 0 : 2;
     setSequence([
       ...sequence,
       {
-        id: `seq-${Date.now()}`,
-        dayOffset: lastOffset,
-        title: 'Novo Follow-up',
+        id: `seq-${Date.now()}-${nextOrder}`,
+        order: nextOrder,
+        title: `Follow-up ${nextOrder - 1}`,
+        actionType: `Follow-up ${nextOrder - 1}`,
+        channel,
+        waitDays: defaultWait,
+        waitHours: 0,
+        waitMinutes: 0,
+        dayOffset: sequence.length > 0 ? (sequence[sequence.length - 1].dayOffset || 0) + defaultWait : 0,
       },
     ]);
   };
 
   const handleRemoveSequenceStep = (index: number) => {
-    setSequence(sequence.filter((_, idx) => idx !== index));
+    const updated = sequence
+      .filter((_, idx) => idx !== index)
+      .map((step, idx) => ({ ...step, order: idx + 1 }));
+    setSequence(updated);
   };
 
-  const handleUpdateSequenceStep = (index: number, field: keyof CampaignSequenceStep, value: any) => {
+  const handleUpdateSequenceStep = (
+    index: number,
+    field: keyof CampaignSequenceStep,
+    value: any
+  ) => {
     const updated = [...sequence];
     updated[index] = { ...updated[index], [field]: value };
     setSequence(updated);
@@ -125,63 +238,133 @@ export const CampaignsView: React.FC = () => {
 
   const handleSaveCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name) {
+    if (!name.trim()) {
       error('Preencha o nome da campanha.');
       return;
     }
 
     const campaign: Campaign = {
       id: editingCampaign ? editingCampaign.id : `cmp-${Date.now()}`,
-      name,
-      description,
-      targetAudience,
-      objective,
+      name: name.trim(),
+      campaignType,
+      type: campaignType,
+      description: description.trim(),
+      targetAudience: targetAudience.trim(),
+      objective: objective.trim(),
       status,
       channel,
       serviceId: serviceId || undefined,
       defaultTemplateId: defaultTemplateId || undefined,
       dailyGoal: Number(dailyGoal) || 15,
       totalTarget: Number(totalTarget) || 50,
-      criteria,
+      criteria: criteria.trim(),
       startDate,
+      startTime,
       endDate,
-      sequence,
+      sequence: sequence.map((s, idx) => ({ ...s, order: idx + 1 })),
       createdAt: editingCampaign?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
     await upsertCampaign(campaign);
     setIsModalOpen(false);
-    success('Campanha salva com sucesso!');
+    success('Campanha e cadência salvas com sucesso!');
   };
 
-  const handleDeleteCampaign = (campaign: Campaign) => {
+  const handleDeleteCampaign = (camp: Campaign) => {
     confirm({
       title: 'Excluir Campanha',
-      message: `Tem certeza que deseja excluir a campanha "${campaign.name}"?`,
+      message: `Tem certeza que deseja remover a campanha "${camp.name}"? Todas as ações não executadas permanecerão no histórico.`,
       isDestructive: true,
       onConfirm: async () => {
-        await deleteCampaign(campaign.id);
-        success('Campanha excluída.');
+        await deleteCampaign(camp.id);
+        success('Campanha removida com sucesso.');
       },
     });
   };
 
-  const handleGenerateBatch = async (campaign: Campaign) => {
-    const candidateClients = clients.filter((c) => c.campaignId === campaign.id || !c.campaignId);
-    if (candidateClients.length === 0) {
-      success('Nenhum cliente disponível. Adicione novos contatos primeiro.');
+  // Abre modal para disparar cadência para leads
+  const handleOpenCadenceBatch = (camp: Campaign) => {
+    setCadenceCampaign(camp);
+    setCadenceStartDate(new Date().toISOString().slice(0, 10));
+    setCadenceStartTime('09:30');
+    // Pre-seleciona todos os leads ativos
+    setSelectedLeadIdsForCadence(leads.map((l) => l.id));
+    setIsCadenceModalOpen(true);
+  };
+
+  const handleExecuteCadenceBatch = async () => {
+    if (!cadenceCampaign) return;
+    if (selectedLeadIdsForCadence.length === 0) {
+      error('Selecione pelo menos 1 lead para aplicar a cadência.');
       return;
     }
 
-    const templateId = campaign.defaultTemplateId || templates[0]?.id || '';
-    await createActionBatchForCampaign(
-      campaign.id,
-      candidateClients.slice(0, campaign.dailyGoal).map((c) => c.id),
-      templateId
-    );
+    try {
+      setIsGeneratingCadence(true);
 
-    setActiveRoute('prospecting');
+      const allGeneratedActions: ProspectAction[] = [];
+
+      for (const leadId of selectedLeadIdsForCadence) {
+        const targetLead = leads.find((l) => l.id === leadId);
+        if (!targetLead) continue;
+
+        const targetCompany = companies.find((c) => c.id === targetLead.companyId);
+        const targetContact =
+          contacts.find((c) => c.id === targetLead.contactId) ||
+          contacts.find((c) => c.companyId === targetLead.companyId);
+        const targetService = services.find(
+          (s) => s.id === (cadenceCampaign.serviceId || targetLead.serviceId)
+        );
+
+        const actionsForLead = generateScheduledMessagesFromCadence({
+          campaign: cadenceCampaign,
+          lead: targetLead,
+          company: targetCompany,
+          contact: targetContact,
+          service: targetService,
+          templates,
+          startDate: cadenceStartDate,
+          startTime: cadenceStartTime,
+        });
+
+        allGeneratedActions.push(...actionsForLead);
+      }
+
+      if (allGeneratedActions.length === 0) {
+        warning('Nenhuma mensagem gerada. Verifique se a campanha possui etapas configuradas.');
+        return;
+      }
+
+      for (const act of allGeneratedActions) {
+        await upsertAction(act);
+      }
+
+      success(
+        `Cadência ativada com sucesso! ${allGeneratedActions.length} mensagens agendadas para ${selectedLeadIdsForCadence.length} prospects.`
+      );
+      setIsCadenceModalOpen(false);
+      setActiveRoute('planner');
+    } catch (err) {
+      console.error(err);
+      error('Erro ao gerar mensagens da cadência', (err as Error).message);
+    } finally {
+      setIsGeneratingCadence(false);
+    }
+  };
+
+  const toggleLeadForCadence = (leadId: string) => {
+    setSelectedLeadIdsForCadence((prev) =>
+      prev.includes(leadId) ? prev.filter((id) => id !== leadId) : [...prev, leadId]
+    );
+  };
+
+  const toggleAllLeads = () => {
+    if (selectedLeadIdsForCadence.length === leads.length) {
+      setSelectedLeadIdsForCadence([]);
+    } else {
+      setSelectedLeadIdsForCadence(leads.map((l) => l.id));
+    }
   };
 
   return (
@@ -189,110 +372,186 @@ export const CampaignsView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-100">Motor de Campanhas & Sequências</h2>
+          <h2 className="text-xl font-bold text-neutral-100 flex items-center gap-2">
+            <Target className="w-5 h-5 text-emerald-400" />
+            Campanhas & Cadências de Prospecção
+          </h2>
           <p className="text-xs text-neutral-400">
-            Estruture cadências automáticas por dias (Dia 0, Dia 2, Dia 5...) com metas de conversão e limites diários.
+            Defina cadências automatizadas por intervalos (dias, horas, minutos) e vincule scripts por tipo de ação.
           </p>
         </div>
 
-        <Button variant="primary" size="sm" onClick={handleOpenAdd} leftIcon={<Plus className="w-4 h-4" />}>
-          Criar Campanha
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={handleOpenAdd}
+          leftIcon={<Plus className="w-4 h-4" />}
+        >
+          Nova Campanha
         </Button>
       </div>
 
-      {/* Campaigns List */}
+      {/* Grid de Campanhas */}
       {campaigns.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {campaigns.map((camp) => {
             const channelBadge = getChannelBadgeDetails(camp.channel);
             const service = services.find((s) => s.id === camp.serviceId);
-            const linkedClientsCount = clients.filter((c) => c.campaignId === camp.id).length;
-            const seqSteps = camp.sequence || DEFAULT_SEQUENCE_PRESET;
+            const seqSteps = camp.sequence && camp.sequence.length > 0 ? camp.sequence : [];
+            const campaignActions = actions.filter((a) => a.campaignId === camp.id);
+            const pendingCount = campaignActions.filter(
+              (a) => a.status === 'pending' || a.status === 'agendada'
+            ).length;
+            const completedCount = campaignActions.filter((a) => a.status === 'completed').length;
+            const displayType = camp.campaignType || camp.type || 'prospeccao';
+
+            // Linha do tempo calculada
+            const timeline = calculateCadenceTimeline(seqSteps, camp.startDate, camp.startTime, templates);
 
             return (
-              <Card key={camp.id} padding="md" className="bg-neutral-900 border-neutral-800 space-y-4 flex flex-col justify-between">
+              <Card
+                key={camp.id}
+                padding="md"
+                className="bg-neutral-900 border-neutral-800 space-y-4 flex flex-col justify-between"
+              >
                 <div className="space-y-3">
+                  {/* Cabeçalho */}
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${channelBadge.bgClass} ${channelBadge.textClass}`}>
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded font-medium ${channelBadge.bgClass} ${channelBadge.textClass}`}
+                        >
                           {channelBadge.label}
                         </span>
-                        <Badge variant={camp.status === 'active' ? 'emerald' : camp.status === 'paused' ? 'amber' : 'neutral'} size="sm">
-                          {camp.status === 'active' ? 'Ativa' : camp.status === 'paused' ? 'Pausada' : 'Inativa'}
+
+                        <Badge variant="blue" size="sm">
+                          {CAMPAIGN_TYPE_LABELS[displayType] || displayType}
+                        </Badge>
+
+                        <Badge
+                          variant={camp.status === 'active' ? 'emerald' : 'neutral'}
+                          size="sm"
+                        >
+                          {camp.status === 'active' ? 'Ativa' : camp.status}
                         </Badge>
                       </div>
-                      <h3 className="text-base font-bold text-neutral-100 mt-1.5">
-                        {camp.name}
-                      </h3>
+
+                      <h3 className="text-base font-bold text-neutral-100">{camp.name}</h3>
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="xs" onClick={() => handleOpenEdit(camp)} title="Editar">
-                        <Edit2 className="w-3.5 h-3.5 text-neutral-300" />
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => handleOpenEdit(camp)}
+                        title="Editar Campanha"
+                      >
+                        <Edit2 className="w-3.5 h-3.5 text-neutral-400" />
                       </Button>
-                      <Button variant="ghost" size="xs" onClick={() => handleDeleteCampaign(camp)} title="Excluir">
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => handleDeleteCampaign(camp)}
+                        title="Excluir"
+                      >
                         <Trash2 className="w-3.5 h-3.5 text-rose-400" />
                       </Button>
                     </div>
                   </div>
 
-                  {camp.objective && (
-                    <p className="text-xs font-semibold text-emerald-400">
-                      🎯 Objetivo: {camp.objective}
-                    </p>
-                  )}
-
                   {camp.description && (
-                    <p className="text-xs text-neutral-400 leading-relaxed">
-                      {camp.description}
-                    </p>
+                    <p className="text-xs text-neutral-400 line-clamp-2">{camp.description}</p>
                   )}
 
-                  {/* Sequence Timeline Preview */}
-                  <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1.5">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-neutral-500 flex items-center gap-1">
-                      <Layers className="w-3 h-3 text-emerald-400" /> Sequência de Cadência ({seqSteps.length} passos):
-                    </span>
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {seqSteps.map((step, idx) => (
-                        <span key={step.id || idx} className="px-2 py-1 rounded bg-neutral-900 border border-neutral-800 text-[11px] text-neutral-300 flex items-center gap-1">
-                          <strong className="text-emerald-400">Dia {step.dayOffset}:</strong> {step.title}
-                        </span>
-                      ))}
+                  {/* Linha do Tempo da Cadência */}
+                  <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                    <div className="flex items-center justify-between text-[10px] uppercase font-bold tracking-wider text-neutral-400">
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        <Layers className="w-3 h-3" /> Sequência de Cadência ({seqSteps.length} etapas)
+                      </span>
+                      <span>Início: {camp.startDate || 'Imediato'}</span>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1">
+                      {timeline.map((item, idx) => {
+                        const stepScript = templates.find((t) => t.id === item.templateId);
+                        return (
+                          <div
+                            key={item.id || idx}
+                            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800/80 text-xs"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold flex items-center justify-center text-[10px]">
+                                {idx + 1}
+                              </span>
+                              <div>
+                                <span className="font-medium text-neutral-200 block">
+                                  {item.title}
+                                </span>
+                                <span className="text-[10px] text-neutral-400">
+                                  Tipo: <strong className="text-neutral-300">{item.actionType || 'Geral'}</strong>
+                                  {stepScript && ` • Script: ${stepScript.title}`}
+                                </span>
+                              </div>
+                            </div>
+
+                            <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                              {item.intervalLabel}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-neutral-800/80 text-xs">
+                  {/* Dados adicionais: ICP e Serviço */}
+                  <div className="grid grid-cols-2 gap-2 text-xs text-neutral-400">
                     <div>
-                      <span className="text-neutral-500">ICP / Público:</span>
-                      <p className="font-medium text-neutral-300 truncate">
+                      <span className="text-[10px] text-neutral-500 block">Público / ICP:</span>
+                      <strong className="text-neutral-200 truncate block">
                         {camp.targetAudience || 'Geral'}
-                      </p>
+                      </strong>
                     </div>
                     <div>
-                      <span className="text-neutral-500">Serviço:</span>
-                      <p className="font-medium text-neutral-300 truncate">
-                        {service?.name || 'Não vinculado'}
-                      </p>
+                      <span className="text-[10px] text-neutral-500 block">Serviço:</span>
+                      <strong className="text-neutral-200 truncate block">
+                        {service?.name || 'Geral'}
+                      </strong>
                     </div>
                   </div>
                 </div>
 
-                {/* Footer KPIs & Batch Generation */}
-                <div className="pt-3 border-t border-neutral-800 flex items-center justify-between gap-3">
-                  <div className="text-xs text-neutral-400">
-                    <span className="font-bold text-neutral-200">{linkedClientsCount}</span> leads • Limite/Dia: <span className="font-bold text-neutral-200">{camp.dailyGoal}</span>
+                {/* Rodapé: KPIs e Disparo da Cadência */}
+                <div className="pt-3 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs text-neutral-400 flex items-center gap-3">
+                    <span>
+                      Fila: <strong className="text-amber-400">{pendingCount}</strong>
+                    </span>
+                    <span>
+                      Concluídas: <strong className="text-emerald-400">{completedCount}</strong>
+                    </span>
                   </div>
 
-                  <Button
-                    variant="execution"
-                    size="xs"
-                    onClick={() => handleGenerateBatch(camp)}
-                    leftIcon={<Zap className="w-3.5 h-3.5 fill-white" />}
-                  >
-                    Gerar Fila do Dia
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => setScheduleCampaignId(camp.id)}
+                      leftIcon={<Calendar className="w-3.5 h-3.5 text-neutral-300" />}
+                    >
+                      + Mensagem
+                    </Button>
+
+                    <Button
+                      variant="execution"
+                      size="xs"
+                      onClick={() => handleOpenCadenceBatch(camp)}
+                      leftIcon={<Zap className="w-3.5 h-3.5 fill-white" />}
+                    >
+                      Disparar Cadência
+                    </Button>
+                  </div>
                 </div>
               </Card>
             );
@@ -302,77 +561,69 @@ export const CampaignsView: React.FC = () => {
         <EmptyState
           icon={<Target className="w-8 h-8 text-neutral-400" />}
           title="Nenhuma campanha configurada"
-          description="Crie sua primeira campanha para estructurar sequências de follow-ups automáticas."
+          description="Crie campanhas estruturadas com intervalos precisos de follow-up para sua equipe de prospecção."
           actionLabel="Criar Campanha"
           onAction={handleOpenAdd}
         />
       )}
 
-      {/* Modal Add / Edit Campaign */}
+      {/* Modal Criar / Editar Campanha */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingCampaign ? 'Editar Campanha' : 'Criar Nova Campanha & Sequência'}
+        title={editingCampaign ? 'Editar Campanha & Cadência' : 'Criar Nova Campanha & Cadência'}
         maxWidth="xl"
-        footer={
-          <>
-            <Button variant="ghost" size="sm" onClick={() => setIsModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button variant="primary" size="sm" onClick={handleSaveCampaign}>
-              Salvar Campanha
-            </Button>
-          </>
-        }
       >
-        <form onSubmit={handleSaveCampaign} className="space-y-4 max-h-[75vh] overflow-y-auto pr-2">
+        <form onSubmit={handleSaveCampaign} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
               <Input
                 label="Nome da Campanha *"
-                placeholder="Ex: Prospecção Q3 - Clínicas Médicas"
+                placeholder="Ex: Prospecção de Clínicas Médicas Q3"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
             </div>
+
             <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Status</label>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">Tipo de Campanha</label>
               <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                value={campaignType}
+                onChange={(e) => setCampaignType(e.target.value as CampaignType)}
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:border-emerald-500"
               >
-                <option value="active">Ativa</option>
-                <option value="paused">Pausada</option>
-                <option value="inactive">Inativa</option>
-                <option value="draft">Rascunho</option>
+                {DEFAULT_CAMPAIGN_TYPES.map((ct) => (
+                  <option key={ct.value} value={ct.value}>
+                    {ct.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Canal</label>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">Canal Principal</label>
               <select
                 value={channel}
                 onChange={(e) => setChannel(e.target.value as ContactChannel)}
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:border-emerald-500"
               >
-                <option value="whatsapp">WhatsApp</option>
-                <option value="linkedin">LinkedIn</option>
-                <option value="email">E-mail</option>
-                <option value="call">Ligação</option>
-                <option value="instagram">Instagram</option>
+                {CHANNEL_OPTIONS.map((ch) => (
+                  <option key={ch.value} value={ch.value}>
+                    {ch.icon} {ch.label}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Serviço Associado</label>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">Serviço Vinculado</label>
               <select
                 value={serviceId}
                 onChange={(e) => setServiceId(e.target.value)}
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:border-emerald-500"
               >
                 <option value="">Nenhum (Geral)</option>
                 {services.map((s) => (
@@ -384,39 +635,44 @@ export const CampaignsView: React.FC = () => {
             </div>
 
             <div>
-              <Input
-                label="Objetivo Principal"
-                placeholder="Ex: Gerar Reuniões"
-                value={objective}
-                onChange={(e) => setObjective(e.target.value)}
-              />
+              <label className="block text-xs font-medium text-neutral-300 mb-1">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as any)}
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:border-emerald-500"
+              >
+                <option value="active">Ativa</option>
+                <option value="paused">Pausada</option>
+                <option value="inactive">Inativa</option>
+                <option value="draft">Rascunho</option>
+              </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
-              label="ICP / Público Alvo"
-              placeholder="Ex: Sócios e Diretores Comerciais"
+              label="Público Alvo / ICP"
+              placeholder="Ex: Diretores Médicos e Sócios"
               value={targetAudience}
               onChange={(e) => setTargetAudience(e.target.value)}
             />
             <Input
-              label="Critérios de Seleção"
-              placeholder="Ex: Sem site ou Google Reviews < 4.0"
-              value={criteria}
-              onChange={(e) => setCriteria(e.target.value)}
+              label="Objetivo da Campanha"
+              placeholder="Ex: Agendar reuniões de demonstração"
+              value={objective}
+              onChange={(e) => setObjective(e.target.value)}
             />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Input
-              label="Meta Diária (Limite)"
+              label="Meta Diária"
               type="number"
               value={dailyGoal}
               onChange={(e) => setDailyGoal(Number(e.target.value))}
             />
             <Input
-              label="Meta Total (Leads)"
+              label="Meta Total"
               type="number"
               value={totalTarget}
               onChange={(e) => setTotalTarget(Number(e.target.value))}
@@ -428,73 +684,292 @@ export const CampaignsView: React.FC = () => {
               onChange={(e) => setStartDate(e.target.value)}
             />
             <Input
-              label="Data Final"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              label="Horário Padrão"
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
             />
           </div>
 
-          <div className="flex flex-col gap-1.5 text-left">
-            <label className="text-xs font-medium text-neutral-300">Descrição</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-neutral-300">Descrição e Critérios</label>
             <textarea
               rows={2}
-              placeholder="Detalhes adicionais da campanha..."
+              placeholder="Critérios de seleção e detalhes da campanha..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-neutral-900 border border-neutral-800 rounded-lg p-3 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2.5 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-emerald-500"
             />
           </div>
 
-          {/* Sequência Builder */}
-          <div className="space-y-2 pt-2 border-t border-neutral-800">
+          {/* Builder de Sequência de Cadência com Dias, Horas e Minutos */}
+          <div className="space-y-3 pt-3 border-t border-neutral-800">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-neutral-200 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                Sequência de Cadência por Dias (Ex: Dia 0, 2, 5...)
-              </label>
-              <Button variant="secondary" size="xs" onClick={handleAddSequenceStep} leftIcon={<Plus className="w-3 h-3" />}>
-                Adicionar Passo
+              <div>
+                <label className="text-xs font-bold text-neutral-200 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  Passos da Cadência (Intervalos & Scripts)
+                </label>
+                <span className="text-[11px] text-neutral-400">
+                  Configure o tempo de espera desde a etapa anterior e o script correspondente.
+                </span>
+              </div>
+
+              <Button
+                variant="secondary"
+                size="xs"
+                type="button"
+                onClick={handleAddSequenceStep}
+                leftIcon={<Plus className="w-3 h-3" />}
+              >
+                Adicionar Etapa
               </Button>
             </div>
 
-            <div className="space-y-2">
-              {sequence.map((step, idx) => (
-                <div key={step.id || idx} className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-950 border border-neutral-800">
-                  <div className="w-28 shrink-0 flex items-center gap-1">
-                    <span className="text-xs font-bold text-neutral-400">Dia</span>
-                    <input
-                      type="number"
-                      value={step.dayOffset}
-                      onChange={(e) => handleUpdateSequenceStep(idx, 'dayOffset', Number(e.target.value))}
-                      className="w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-xs text-emerald-400 font-mono text-center"
-                    />
-                  </div>
+            <div className="space-y-2.5">
+              {sequence.map((step, idx) => {
+                const stepActionType = step.actionType || 'Primeiro contato';
+                const compatible = getCompatibleScripts(templates, {
+                  channel: step.channel || channel,
+                  actionType: stepActionType,
+                });
 
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      value={step.title}
-                      onChange={(e) => handleUpdateSequenceStep(idx, 'title', e.target.value)}
-                      placeholder="Título da Ação (Ex: Primeiro contacto, Follow-up)"
-                      className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-1 text-xs text-neutral-100"
-                    />
-                  </div>
-
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={() => handleRemoveSequenceStep(idx)}
-                    title="Remover passo"
+                return (
+                  <div
+                    key={step.id || idx}
+                    className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2.5"
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-400 font-bold flex items-center justify-center text-xs">
+                          {idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={step.title}
+                          onChange={(e) => handleUpdateSequenceStep(idx, 'title', e.target.value)}
+                          placeholder="Título da Etapa (Ex: Follow-up 1)"
+                          className="bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-xs text-neutral-100 font-medium w-48 sm:w-64"
+                        />
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        type="button"
+                        onClick={() => handleRemoveSequenceStep(idx)}
+                        title="Remover etapa"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-1">
+                      {/* Intervalo: Dias, Horas, Minutos */}
+                      <div className="flex items-center gap-1.5 sm:col-span-2">
+                        <span className="text-[11px] text-neutral-400 shrink-0">Esperar:</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            value={step.waitDays ?? step.dayOffset ?? 0}
+                            onChange={(e) =>
+                              handleUpdateSequenceStep(idx, 'waitDays', Math.max(0, Number(e.target.value)))
+                            }
+                            className="w-12 bg-neutral-900 border border-neutral-700 rounded px-1.5 py-1 text-xs text-emerald-400 font-mono text-center"
+                          />
+                          <span className="text-[10px] text-neutral-500">dias</span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="23"
+                            value={step.waitHours ?? 0}
+                            onChange={(e) =>
+                              handleUpdateSequenceStep(idx, 'waitHours', Math.max(0, Number(e.target.value)))
+                            }
+                            className="w-12 bg-neutral-900 border border-neutral-700 rounded px-1.5 py-1 text-xs text-emerald-400 font-mono text-center"
+                          />
+                          <span className="text-[10px] text-neutral-500">horas</span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max="59"
+                            value={step.waitMinutes ?? 0}
+                            onChange={(e) =>
+                              handleUpdateSequenceStep(idx, 'waitMinutes', Math.max(0, Number(e.target.value)))
+                            }
+                            className="w-12 bg-neutral-900 border border-neutral-700 rounded px-1.5 py-1 text-xs text-emerald-400 font-mono text-center"
+                          />
+                          <span className="text-[10px] text-neutral-500">min</span>
+                        </div>
+                      </div>
+
+                      {/* Tipo de Ação */}
+                      <div>
+                        <select
+                          value={stepActionType}
+                          onChange={(e) => handleUpdateSequenceStep(idx, 'actionType', e.target.value)}
+                          className="w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-xs text-neutral-100"
+                        >
+                          {availableActionTypes.map((act) => (
+                            <option key={act} value={act}>
+                              {act}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Script Vinculado */}
+                      <div>
+                        <select
+                          value={step.templateId || ''}
+                          onChange={(e) => handleUpdateSequenceStep(idx, 'templateId', e.target.value)}
+                          className="w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-xs text-neutral-100"
+                        >
+                          <option value="">Selecione o script...</option>
+                          {compatible.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-800">
+            <Button variant="ghost" size="sm" type="button" onClick={() => setIsModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="primary" size="sm" type="submit">
+              Salvar Campanha
+            </Button>
           </div>
         </form>
       </Modal>
+
+      {/* Modal Disparar Cadência em Lote */}
+      {isCadenceModalOpen && cadenceCampaign && (
+        <Modal
+          isOpen={isCadenceModalOpen}
+          onClose={() => setIsCadenceModalOpen(false)}
+          title={`Disparar Cadência: ${cadenceCampaign.name}`}
+          maxWidth="xl"
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-neutral-300">
+              O sistema criará automaticamente as mensagens agendadas para todas as etapas da cadência,
+              calculando a linha do tempo exata para cada prospect selecionado.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-neutral-900/60 p-3 rounded-xl border border-neutral-800">
+              <Input
+                label="Data Inicial da Cadência *"
+                type="date"
+                value={cadenceStartDate}
+                onChange={(e) => setCadenceStartDate(e.target.value)}
+                required
+              />
+
+              <Input
+                label="Horário Inicial *"
+                type="time"
+                value={cadenceStartTime}
+                onChange={(e) => setCadenceStartTime(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Seleção de Prospects */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-neutral-200">
+                  Selecionar Prospects ({selectedLeadIdsForCadence.length} de {leads.length})
+                </span>
+                <Button variant="ghost" size="xs" onClick={toggleAllLeads}>
+                  {selectedLeadIdsForCadence.length === leads.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                </Button>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto space-y-1 bg-neutral-950 p-2 rounded-xl border border-neutral-800">
+                {leads.map((lead) => {
+                  const comp = companies.find((c) => c.id === lead.companyId);
+                  const cont = contacts.find((c) => c.id === lead.contactId);
+                  const isSelected = selectedLeadIdsForCadence.includes(lead.id);
+
+                  return (
+                    <div
+                      key={lead.id}
+                      onClick={() => toggleLeadForCadence(lead.id)}
+                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer text-xs transition-colors ${
+                        isSelected
+                          ? 'bg-emerald-500/10 border border-emerald-500/30 text-neutral-100'
+                          : 'bg-neutral-900 border border-neutral-800 text-neutral-400 hover:bg-neutral-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-4 h-4 rounded flex items-center justify-center ${
+                            isSelected ? 'bg-emerald-500 text-white' : 'border border-neutral-600'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3" />}
+                        </div>
+                        <span className="font-semibold text-neutral-200">{comp?.name || 'Empresa'}</span>
+                        <span className="text-neutral-400">({cont?.name || 'Sem contato'})</span>
+                      </div>
+
+                      <span className="text-[10px] text-neutral-500">
+                        {cont?.phone || cont?.whatsapp || 'Sem tel'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-800">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsCadenceModalOpen(false)}
+                disabled={isGeneratingCadence}
+              >
+                Cancelar
+              </Button>
+
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleExecuteCadenceBatch}
+                isLoading={isGeneratingCadence}
+                leftIcon={<Zap className="w-3.5 h-3.5 fill-white" />}
+              >
+                Gerar e Agendar Cadência
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal para agendar mensagem avulsa na campanha */}
+      {scheduleCampaignId && (
+        <ScheduleMessageModal
+          isOpen={!!scheduleCampaignId}
+          onClose={() => setScheduleCampaignId(null)}
+          initialCampaignId={scheduleCampaignId}
+        />
+      )}
     </div>
   );
 };
