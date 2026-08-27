@@ -2,15 +2,19 @@ import React, { useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
+  Building2,
   Calendar,
   CheckCircle2,
   Clock,
   ExternalLink,
   Flame,
+  Kanban,
   MessageCircle,
+  MessageSquareText,
   Phone,
   Plus,
   RotateCcw,
+  ShieldAlert,
   Sparkles,
   Target,
   TrendingUp,
@@ -23,6 +27,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ContextualTip } from '../components/common/ContextualTip';
 import { formatPhoneNumber, formatRelativeDate, getChannelBadgeDetails } from '../utils/formatting';
 import { Company, Lead } from '../types';
 import { STAGES_CONFIG } from '../utils/constants';
@@ -39,6 +44,8 @@ export const DashboardView: React.FC = () => {
     completeAction,
     rescheduleAction,
     scheduleNextAction,
+    openTutorial,
+    openAddCompanyModal,
   } = useApp();
 
   const {
@@ -83,6 +90,135 @@ export const DashboardView: React.FC = () => {
     d.setDate(d.getDate() + days);
     await rescheduleAction(actionId, d.toISOString().slice(0, 10));
   };
+
+  // ESTADO VAZIO / PRIMEIRO ACESSO: Sem empresas cadastradas
+  if (companies.length === 0) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-200">
+        {/* Dica Contextual Inicial */}
+        <ContextualTip
+          id="dashboard_first_access"
+          title="Bem-vindo ao PROSPECT OS"
+          message="Adicione sua primeira empresa para gerar a fila de execução diária, qualificar decisores e acompanhar o pipeline."
+          actionLabel="Ver Tutorial Rápido (7 Passos)"
+          onAction={openTutorial}
+        />
+
+        {/* Hero Card do Primeiro Acesso */}
+        <div className="rounded-2xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] p-8 sm:p-12 shadow-xs text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 text-[#3F6FB5] dark:text-blue-300 mx-auto flex items-center justify-center shadow-xs">
+            <Zap className="w-8 h-8 fill-[#3F6FB5] dark:fill-blue-300" />
+          </div>
+
+          <div className="space-y-2 max-w-lg mx-auto">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F7F8FA] dark:bg-[#20242A] border border-[#E6E8EB] dark:border-[#2D3139] text-xs font-semibold text-[#5F6368] dark:text-[#9AA0A6]">
+              <span>Base Pronta</span>
+              <span>•</span>
+              <span>0 contatos • 0 follow-ups • 0 tarefas</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#202124] dark:text-[#E8EAED] tracking-tight">
+              Olá! Vamos preparar sua prospecção.
+            </h1>
+            <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed">
+              Seu painel está pronto para operar. Cadastre sua primeira empresa e seus decisores para gerar sua fila diária de execução sem hesitação.
+            </p>
+          </div>
+
+          {/* Ação Principal: + ADICIONAR PRIMEIRA EMPRESA */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={openAddCompanyModal}
+              leftIcon={<Plus className="w-5 h-5" />}
+              className="w-full sm:w-auto px-8 py-3.5 text-sm font-bold shadow-xs"
+            >
+              + Adicionar Primeira Empresa
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={openTutorial}
+              leftIcon={<Sparkles className="w-4 h-4 text-amber-500" />}
+              className="w-full sm:w-auto"
+            >
+              Como Funciona (Tutorial)
+            </Button>
+          </div>
+        </div>
+
+        {/* Módulos de Inicialização (Você também pode:) */}
+        <div className="space-y-3 pt-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[#5F6368] dark:text-[#9AA0A6] px-1">
+            Você também pode:
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div
+              onClick={() => setActiveRoute('messages')}
+              className="p-5 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] hover:border-blue-300 dark:hover:border-blue-700/60 transition-colors flex flex-col justify-between space-y-4 cursor-pointer shadow-xs"
+            >
+              <div className="space-y-2">
+                <div className="p-2.5 w-fit rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
+                  <MessageSquareText className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-semibold text-[#202124] dark:text-[#E8EAED]">
+                  Explorar Scripts Base
+                </h4>
+                <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed">
+                  Consulte os modelos de 1º Contato, Follow-up e Quebra de Objeções prontos para uso.
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-[#3F6FB5] dark:text-blue-300 inline-flex items-center gap-1">
+                Ver Scripts <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+
+            <div
+              onClick={() => setActiveRoute('pipeline')}
+              className="p-5 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] hover:border-emerald-300 dark:hover:border-emerald-700/60 transition-colors flex flex-col justify-between space-y-4 cursor-pointer shadow-xs"
+            >
+              <div className="space-y-2">
+                <div className="p-2.5 w-fit rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+                  <Kanban className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-semibold text-[#202124] dark:text-[#E8EAED]">
+                  Visualizar o Funil Comercial
+                </h4>
+                <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed">
+                  Conheça os estágios do pipeline (Novo, Primeiro Contato, Respondeu, Reunião, Proposta).
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-[#3F6FB5] dark:text-blue-300 inline-flex items-center gap-1">
+                Ver Pipeline <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+
+            <div
+              onClick={() => setActiveRoute('sales-engine')}
+              className="p-5 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] hover:border-purple-300 dark:hover:border-purple-700/60 transition-colors flex flex-col justify-between space-y-4 cursor-pointer shadow-xs"
+            >
+              <div className="space-y-2">
+                <div className="p-2.5 w-fit rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-semibold text-[#202124] dark:text-[#E8EAED]">
+                  Sales Engine & Objeções
+                </h4>
+                <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed">
+                  Biblioteca de argumentos de valor, contorno de objeções de preço e chamadas de ação (CTAs).
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-[#3F6FB5] dark:text-blue-300 inline-flex items-center gap-1">
+                Ver Sales Engine <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">

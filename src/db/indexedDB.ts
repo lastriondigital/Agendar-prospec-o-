@@ -417,12 +417,12 @@ export async function saveStoredSettings(settings: AppSettings): Promise<void> {
 }
 
 /**
- * Seeds initial demo data if database is empty or upon user request
+ * Seeds initial base configuration (Pipeline stages, Base Scripts, Services, ICPs, Sales Engine, Settings)
+ * WITHOUT any companies, contacts, leads, history, or actions.
  */
-export async function seedDemoData(force = false): Promise<boolean> {
-  const existingCompanies = await getAllFromStore<Company>('companies');
-  const existingClients = await getAllFromStore<Client>('clients');
-  if ((existingCompanies.length > 0 || existingClients.length > 0) && !force) {
+export async function seedBaseConfiguration(force = false): Promise<boolean> {
+  const existingStages = await getAllFromStore<PipelineStage>('stages');
+  if (existingStages.length > 0 && !force) {
     return false;
   }
 
@@ -430,13 +430,6 @@ export async function seedDemoData(force = false): Promise<boolean> {
   await putManyInStore<Service>('services', SEED_SERVICES);
   await putManyInStore<IdealCustomerProfile>('icps', SEED_ICPS);
   await putManyInStore<MessageTemplate>('templates', SEED_TEMPLATES);
-  await putManyInStore<Campaign>('campaigns', SEED_CAMPAIGNS);
-  await putManyInStore<Company>('companies', SEED_COMPANIES);
-  await putManyInStore<Contact>('contacts', SEED_CONTACTS);
-  await putManyInStore<Lead>('leads', SEED_LEADS);
-  await putManyInStore<HistoryEvent>('history', SEED_HISTORY);
-  await putManyInStore<Client>('clients', SEED_CLIENTS);
-  await putManyInStore<ProspectAction>('actions', SEED_ACTIONS);
 
   // Seed Sales Engine libraries
   await putManyInStore<ObjectionItem>('objections', SEED_OBJECTIONS);
@@ -446,9 +439,37 @@ export async function seedDemoData(force = false): Promise<boolean> {
   await putManyInStore<ValueArgumentItem>('arguments', SEED_ARGUMENTS);
   await putManyInStore<CtaItem>('ctas', SEED_CTAS);
   await putManyInStore<FollowUpStrategyItem>('followups', SEED_FOLLOWUPS);
-  await putManyInStore<ABTestExperiment>('abTests', SEED_AB_TESTS);
 
-  await saveStoredSettings(INITIAL_SETTINGS);
+  const existingSettings = await getAllFromStore<AppSettings>('settings');
+  if (existingSettings.length === 0 || force) {
+    await saveStoredSettings(INITIAL_SETTINGS);
+  }
+
+  return true;
+}
+
+/**
+ * Seeds initial demo data (companies, contacts, leads, mock history) upon explicit user request
+ */
+export async function seedDemoData(force = false): Promise<boolean> {
+  const existingCompanies = await getAllFromStore<Company>('companies');
+  const existingClients = await getAllFromStore<Client>('clients');
+  if ((existingCompanies.length > 0 || existingClients.length > 0) && !force) {
+    return false;
+  }
+
+  // Ensure base configuration is present
+  await seedBaseConfiguration(force);
+
+  // Seed Mock Entities
+  await putManyInStore<Campaign>('campaigns', SEED_CAMPAIGNS);
+  await putManyInStore<Company>('companies', SEED_COMPANIES);
+  await putManyInStore<Contact>('contacts', SEED_CONTACTS);
+  await putManyInStore<Lead>('leads', SEED_LEADS);
+  await putManyInStore<HistoryEvent>('history', SEED_HISTORY);
+  await putManyInStore<Client>('clients', SEED_CLIENTS);
+  await putManyInStore<ProspectAction>('actions', SEED_ACTIONS);
+  await putManyInStore<ABTestExperiment>('abTests', SEED_AB_TESTS);
 
   return true;
 }
@@ -463,35 +484,24 @@ export async function isDemoDataLoaded(): Promise<boolean> {
 }
 
 /**
- * Clears all user database tables to start completely blank
+ * Clears all user database tables to start completely clean (keeps base configuration)
  */
 export async function resetAllDataToEmpty(): Promise<void> {
-  const stores: StoreName[] = [
+  const userStores: StoreName[] = [
     'companies',
     'contacts',
     'leads',
     'history',
     'clients',
     'campaigns',
-    'services',
-    'icps',
-    'templates',
     'actions',
-    'stages',
-    'objections',
-    'pricing',
-    'proofs',
-    'painPoints',
-    'arguments',
-    'ctas',
-    'followups',
     'abTests',
   ];
-  for (const s of stores) {
+  for (const s of userStores) {
     await clearStore(s);
   }
-  // Restore basic pipeline stages
-  await putManyInStore<PipelineStage>('stages', DEFAULT_PIPELINE_STAGES);
+  // Ensure base configuration is preserved and ready
+  await seedBaseConfiguration(false);
 }
 
 /**

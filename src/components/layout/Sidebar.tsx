@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   ChevronRight,
   HardDrive,
+  HelpCircle,
   Kanban,
   LayoutDashboard,
   MessageSquareText,
@@ -35,7 +36,7 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 };
 
 export const Sidebar: React.FC = () => {
-  const { activeRoute, setActiveRoute, clients, campaigns, isDemoMode, isOnline } = useApp();
+  const { activeRoute, setActiveRoute, clients, campaigns, isDemoMode, isOnline, openTutorial } = useApp();
   const { metrics } = useExecutionQueue();
 
   const getBadgeForRoute = (routeId: RouteId) => {
@@ -143,6 +144,17 @@ export const Sidebar: React.FC = () => {
             </button>
           );
         })}
+
+        {/* Tutorial Link */}
+        <div className="pt-2">
+          <button
+            onClick={openTutorial}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED] hover:bg-neutral-100 dark:hover:bg-[#20242A] transition-colors cursor-pointer text-left"
+          >
+            <HelpCircle className="w-4 h-4 text-[#3F6FB5]" />
+            <span>Tutorial do Sistema</span>
+          </button>
+        </div>
       </nav>
 
       {/* Footer System Status */}

@@ -206,20 +206,32 @@ export const CompanyModal: React.FC<CompanyModalProps> = ({
   useEffect(() => {
     if (!isOpen || editingCompany || ignoreDuplicates) return;
 
+    let isMounted = true;
+
     if (name.trim().length >= 3 || whatsapp.trim().length >= 8 || companyWhatsApp.trim().length >= 8 || email.trim().length >= 5) {
-      const matches = validateDuplicates({
-        name,
+      validateDuplicates({
+        companyName: name,
+        contactName: contactName,
         tradeName,
         phone: whatsapp || phone || companyWhatsApp || companyPhone,
+        whatsapp: whatsapp || companyWhatsApp,
         email,
         website,
-        instagram,
+        companyPhone,
+        companyWhatsApp,
+      }).then((matches) => {
+        if (isMounted) {
+          setDuplicateMatches(matches);
+        }
       });
-      setDuplicateMatches(matches);
     } else {
       setDuplicateMatches([]);
     }
-  }, [name, tradeName, whatsapp, phone, companyWhatsApp, companyPhone, email, website, instagram, isOpen, editingCompany, ignoreDuplicates, validateDuplicates]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [name, contactName, tradeName, whatsapp, phone, companyWhatsApp, companyPhone, email, website, instagram, isOpen, editingCompany, ignoreDuplicates, validateDuplicates]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

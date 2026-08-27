@@ -53,6 +53,7 @@ export const SettingsView: React.FC = () => {
     clearAllData,
     exportJSON,
     importJSON,
+    openTutorial,
   } = useApp();
   const { user, openAuthModal, logout } = useAuth();
   const { syncState, conflicts, openConflictModal, syncNow } = useSync();
@@ -513,13 +514,22 @@ export const SettingsView: React.FC = () => {
       <Card padding="md" className="space-y-4">
         <h3 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-amber-500" />
-          Gerenciamento de Base de Dados
+          Gerenciamento de Base de Dados & Onboarding
         </h3>
         <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed">
-          O PROSPECT OS separa dados de teste para exploração de novos usuários e a base de prospecção real.
+          O PROSPECT OS mantém sua base real limpa. Dados de demonstração servem apenas para testes, estudos de recursos e exploração temporária.
         </p>
 
         <div className="flex flex-wrap items-center gap-3 pt-1">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={openTutorial}
+            leftIcon={<Sparkles className="w-4 h-4 text-amber-500" />}
+          >
+            Reabrir Tutorial do Sistema (7 Passos)
+          </Button>
+
           <Button
             variant="secondary"
             size="sm"

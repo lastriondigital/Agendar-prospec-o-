@@ -30,6 +30,7 @@ import { formatPhoneNumber, formatRelativeDate } from '../utils/formatting';
 import { CompanyDetailsDrawer } from '../components/clients/CompanyDetailsDrawer';
 import { ScheduleActionModal } from '../components/clients/ScheduleActionModal';
 import { ScoreBadge } from '../components/qualification/ScoreBadge';
+import { ContextualTip } from '../components/common/ContextualTip';
 import { calculateLeadScore } from '../utils/leadScoring';
 
 type StageFilterGroup = 'all' | 'open' | 'active_funnel' | 'closed' | 'standby';
@@ -46,6 +47,7 @@ export const PipelineView: React.FC = () => {
     advanceLeadStage,
     scheduleNextAction,
     setActiveRoute,
+    openAddCompanyModal,
   } = useApp();
 
   const { success } = useToast();
@@ -144,6 +146,42 @@ export const PipelineView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
+      {/* Dica Contextual */}
+      <ContextualTip
+        id="pipeline_view_tip"
+        title="Funil de Oportunidades"
+        message="Mova os leads pelas etapas do funil conforme eles respondem e avançam em direção ao fechamento."
+      />
+
+      {/* Banner de Funil Pronto quando não há leads */}
+      {leads.length === 0 && (
+        <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 shrink-0">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED]">
+                Seu funil está estruturado e pronto.
+              </h3>
+              <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] mt-0.5">
+                Adicione sua primeira empresa para começar a movimentar oportunidades pelos estágios.
+              </p>
+            </div>
+          </div>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={openAddCompanyModal}
+            leftIcon={<Plus className="w-4 h-4" />}
+            className="w-full sm:w-auto shrink-0 font-semibold"
+          >
+            + Adicionar Empresa
+          </Button>
+        </div>
+      )}
+
       {/* 1. CABEÇALHO & CONTROLES DO PIPELINE */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -171,7 +209,7 @@ export const PipelineView: React.FC = () => {
           <Button
             variant="primary"
             size="sm"
-            onClick={() => setActiveRoute('clients')}
+            onClick={openAddCompanyModal}
             leftIcon={<Plus className="w-4 h-4" />}
           >
             Novo Lead

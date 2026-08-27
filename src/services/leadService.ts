@@ -49,6 +49,7 @@ export interface CreateCompanyPayload {
     whatsapp?: string;
     email?: string;
     notes?: string;
+    isPrimary?: boolean;
   };
   lead: {
     id?: string;

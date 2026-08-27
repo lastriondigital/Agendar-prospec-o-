@@ -1,4 +1,5 @@
 import React from 'react';
+import { useApp } from '../../context/AppContext';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { ToastContainer } from '../ui/ToastContainer';
 import { BottomNav } from './BottomNav';
@@ -6,8 +7,18 @@ import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { AuthModal } from '../auth/AuthModal';
 import { ConflictResolutionModal } from '../sync/ConflictResolutionModal';
+import { OnboardingTutorialModal } from '../onboarding/OnboardingTutorialModal';
+import { CompanyModal } from '../clients/CompanyModal';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const {
+    isTutorialOpen,
+    closeTutorial,
+    isAddCompanyModalOpen,
+    closeAddCompanyModal,
+    openAddCompanyModal,
+  } = useApp();
+
   return (
     <div className="min-h-screen bg-[#F7F8FA] text-[#202124] dark:bg-[#121417] dark:text-[#E8EAED] flex flex-row overflow-x-hidden antialiased font-sans transition-colors duration-150">
       {/* Desktop Persistent Sidebar */}
@@ -30,6 +41,19 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
       <ConfirmDialog />
       <AuthModal />
       <ConflictResolutionModal />
+
+      {/* Global Onboarding Tutorial & Company Modal */}
+      <OnboardingTutorialModal
+        isOpen={isTutorialOpen}
+        onClose={closeTutorial}
+        onAddFirstCompany={openAddCompanyModal}
+      />
+
+      <CompanyModal
+        isOpen={isAddCompanyModalOpen}
+        onClose={closeAddCompanyModal}
+      />
     </div>
   );
 };
+

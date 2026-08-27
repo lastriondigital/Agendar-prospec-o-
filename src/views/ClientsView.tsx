@@ -36,6 +36,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ContextualTip } from '../components/common/ContextualTip';
 import { CompanyDetailsDrawer } from '../components/clients/CompanyDetailsDrawer';
 import { CompanyModal } from '../components/clients/CompanyModal';
 import { ScoreBadge } from '../components/qualification/ScoreBadge';
@@ -329,6 +330,13 @@ export const ClientsView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-200">
+      {/* Dica Contextual */}
+      <ContextualTip
+        id="clients_view_tip"
+        title="Gestão de Empresas & Decisores"
+        message="Cadastre empresas e seus múltiplos contatos. Empresas começam como Leads/Prospects no funil e tornam-se Clientes quando fecharem negócio."
+      />
+
       {/* Header com Título e Ação Primária */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -566,13 +574,48 @@ export const ClientsView: React.FC = () => {
 
       {/* Lista de Empresas / Prospects */}
       {filteredCompanies.length === 0 ? (
-        <EmptyState
-          icon={<Building2 className="w-8 h-8 text-[#80868B]" />}
-          title="Nenhuma empresa encontrada"
-          description="Tente ajustar os filtros de busca ou cadastre uma nova empresa."
-          actionLabel="Cadastrar Empresa"
-          onAction={handleOpenAddCompany}
-        />
+        companies.length === 0 ? (
+          <div className="p-8 sm:p-12 rounded-2xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] text-center space-y-4 shadow-xs">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 text-[#3F6FB5] dark:text-blue-300 mx-auto flex items-center justify-center">
+              <Building2 className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5 max-w-md mx-auto">
+              <h3 className="text-base sm:text-lg font-bold text-[#202124] dark:text-[#E8EAED]">
+                Nenhuma empresa cadastrada
+              </h3>
+              <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed">
+                Adicione sua primeira empresa para começar. Empresas recém-adicionadas entram no funil como <strong>Leads / Prospects</strong> e tornam-se <strong>Clientes</strong> quando você fechar uma proposta.
+              </p>
+            </div>
+            <div className="pt-2">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={handleOpenAddCompany}
+                leftIcon={<Plus className="w-4 h-4" />}
+                className="px-6 py-2.5 font-bold"
+              >
+                + Adicionar Primeira Empresa
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <EmptyState
+            icon={<Building2 className="w-8 h-8 text-[#80868B]" />}
+            title="Nenhuma empresa encontrada com os filtros atuais"
+            description="Tente ajustar os termos de busca ou remover os filtros selecionados."
+            actionLabel="Limpar Filtros"
+            onAction={() => {
+              setSearch('');
+              setStatusFilter('all');
+              setStageFilter('all');
+              setTemperatureFilter('all');
+              setNicheFilter('all');
+              setPriorityFilter('all');
+              setQuickFilter('all');
+            }}
+          />
+        )
       ) : viewMode === 'grid' ? (
         /* VISUALIZAÇÃO EM GRADE */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

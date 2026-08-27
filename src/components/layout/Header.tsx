@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Moon, RefreshCw, Sun, Zap, Sparkles, ShieldCheck } from 'lucide-react';
+import { Download, HelpCircle, Moon, RefreshCw, Sun, Zap, Sparkles, ShieldCheck } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useExecutionQueue } from '../../hooks/useExecutionQueue';
@@ -9,7 +9,7 @@ import { SyncStatusIndicator } from '../sync/SyncStatusIndicator';
 import { ProductionAuditModal } from '../audit/ProductionAuditModal';
 
 export const Header: React.FC = () => {
-  const { activeRoute, setActiveRoute, isDemoMode } = useApp();
+  const { activeRoute, setActiveRoute, isDemoMode, openTutorial } = useApp();
   const { theme, toggleTheme } = useTheme();
   const { metrics, formattedDuration } = useExecutionQueue();
   const { isInstallable, hasUpdate, promptInstall, applyUpdate } = usePWA();
@@ -91,6 +91,17 @@ export const Header: React.FC = () => {
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span className="hidden xl:inline">Auditoria</span>
             <span className="px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] font-semibold">OK</span>
+          </button>
+
+          {/* Tutorial / Ajuda */}
+          <button
+            onClick={openTutorial}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#1E2228] hover:bg-neutral-100 dark:hover:bg-[#252A32] border border-[#E6E8EB] dark:border-[#2D3139] text-xs font-medium text-[#5F6368] dark:text-[#9AA0A6] transition cursor-pointer"
+            title="Abrir Tutorial do Sistema (7 Passos)"
+            aria-label="Abrir Tutorial do Sistema"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-[#3F6FB5]" />
+            <span className="hidden sm:inline">Tutorial</span>
           </button>
 
           {/* Theme Toggle */}

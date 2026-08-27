@@ -39,6 +39,7 @@ import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Kbd } from '../components/ui/Kbd';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ContextualTip } from '../components/common/ContextualTip';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -71,6 +72,7 @@ export const ProspectingView: React.FC = () => {
     logInteractionAndAdvance,
     scheduleNextAction,
     setActiveRoute,
+    openAddCompanyModal,
   } = useApp();
 
   const {
@@ -278,8 +280,96 @@ export const ProspectingView: React.FC = () => {
     isCopilotOpen,
   ]);
 
-  // Se a fila estiver vazia (Tela de Celebração de Meta Batida)
+  // Se a fila estiver vazia:
   if (!currentItem || queueItems.length === 0) {
+    if (companies.length === 0) {
+      return (
+        <div className="space-y-6 max-w-2xl mx-auto py-8 animate-in fade-in duration-300">
+          <ContextualTip
+            id="prospecting_first_access_tip"
+            title="Modo Prospecção Ativa"
+            message="O Modo Prospecção é a tela de foco onde você executa uma ação por vez (mensagens WhatsApp, ligações, emails) com atalhos de teclado e scripts prontos."
+          />
+
+          <div className="p-8 sm:p-10 rounded-2xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] shadow-xs text-center space-y-6">
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 text-[#3F6FB5] dark:text-blue-300 mx-auto flex items-center justify-center">
+              <Zap className="w-8 h-8 fill-[#3F6FB5] dark:fill-blue-300" />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-[#202124] dark:text-[#E8EAED]">
+                Fila de Prospecção Vazia
+              </h2>
+              <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6] max-w-md mx-auto leading-relaxed">
+                Adicione sua primeira empresa para que o sistema gere automaticamente as ações de abordagem e follow-up na sua fila de execução.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={openAddCompanyModal}
+                leftIcon={<Building2 className="w-4 h-4" />}
+                className="w-full sm:w-auto font-bold"
+              >
+                + Adicionar Primeira Empresa
+              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => setActiveRoute('dashboard')}
+                className="w-full sm:w-auto"
+              >
+                Voltar ao Dashboard
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (completedToday.length === 0) {
+      return (
+        <div className="space-y-6 max-w-2xl mx-auto py-8 animate-in fade-in duration-300">
+          <div className="p-8 sm:p-10 rounded-2xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] shadow-xs text-center space-y-6">
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 mx-auto flex items-center justify-center">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-[#202124] dark:text-[#E8EAED]">
+                Nenhuma Ação Agendada para Hoje
+              </h2>
+              <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6] max-w-md mx-auto leading-relaxed">
+                Suas tarefas e follow-ups estão em dia. Você pode cadastrar novas empresas ou agendar novas abordagens no painel de clientes.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => setActiveRoute('clients')}
+                leftIcon={<Building2 className="w-4 h-4" />}
+                className="w-full sm:w-auto"
+              >
+                Ver Empresas & Prospects
+              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => setActiveRoute('dashboard')}
+                className="w-full sm:w-auto"
+              >
+                Ir para o Dashboard
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6 max-w-2xl mx-auto py-8 animate-in fade-in duration-300">
         <div className="p-8 rounded-2xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] shadow-xs text-center space-y-6">

@@ -11,6 +11,7 @@ import {
   putManyInStore,
   resetAllDataToEmpty,
   saveStoredSettings,
+  seedBaseConfiguration,
   seedDemoData,
 } from '../db/indexedDB';
 import {
@@ -172,6 +173,14 @@ interface AppContextType {
     eventType: 'send' | 'reply' | 'positive_reply' | 'conversion';
   }) => Promise<void>;
 
+  // Onboarding & Global Modals
+  isTutorialOpen: boolean;
+  openTutorial: () => void;
+  closeTutorial: () => void;
+  isAddCompanyModalOpen: boolean;
+  openAddCompanyModal: () => void;
+  closeAddCompanyModal: () => void;
+
   // Settings & DB Management
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   loadDemoData: (force?: boolean) => Promise<void>;
@@ -219,9 +228,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(false);
+  const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
+
+  const openTutorial = useCallback(() => setIsTutorialOpen(true), []);
+  const closeTutorial = useCallback(() => setIsTutorialOpen(false), []);
+  const openAddCompanyModal = useCallback(() => setIsAddCompanyModalOpen(true), []);
+  const closeAddCompanyModal = useCallback(() => setIsAddCompanyModalOpen(false), []);
 
   // Track online/offline status
   useEffect(() => {
@@ -248,11 +264,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       setIsLoading(true);
 
-      // Check if DB needs initial seeding
-      const storedCompanies = await getAllFromStore<Company>('companies');
-      const storedClients = await getAllFromStore<Client>('clients');
-      if (storedCompanies.length === 0 && storedClients.length === 0) {
-        await seedDemoData(false);
+      // Check if DB needs initial base configuration seeding (stages, scripts, services, sales engine)
+      const storedStages = await getAllFromStore<PipelineStage>('stages');
+      if (storedStages.length === 0) {
+        await seedBaseConfiguration(false);
       }
 
       const [
@@ -324,6 +339,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const demoLoaded = await isDemoDataLoaded();
       setIsDemoMode(demoLoaded);
+
+      try {
+        const hasSeenTutorial = localStorage.getItem('prospect_os_tutorial_seen') === 'true';
+        if (!hasSeenTutorial && fetchedCompanies.length === 0) {
+          setIsTutorialOpen(true);
+        }
+      } catch {
+        // ignore
+      }
     } catch (err) {
       console.error('Falha ao carregar dados do IndexedDB:', err);
       error('Erro ao acessar banco de dados local', (err as Error).message);
@@ -1241,6 +1265,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         upsertAbTest,
         deleteAbTest,
         logAbTestEvent,
+        isTutorialOpen,
+        openTutorial,
+        closeTutorial,
+        isAddCompanyModalOpen,
+        openAddCompanyModal,
+        closeAddCompanyModal,
         updateSettings,
         loadDemoData,
         clearAllData,

@@ -27,6 +27,7 @@ import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ContextualTip } from '../components/common/ContextualTip';
 import { getChannelBadgeDetails, interpolateMessage, validateMessageContent, ALLOWED_VARIABLES } from '../utils/formatting';
 
 const CATEGORY_LABELS: Record<TemplateCategory, string> = {
@@ -198,12 +199,19 @@ export const MessagesView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
+      {/* Dica Contextual */}
+      <ContextualTip
+        id="messages_view_tip"
+        title="Biblioteca de Scripts & Mensagens"
+        message="Use os templates padrão ou crie novos. As variáveis dinâmicas como {nome}, {empresa} e {servico} são substituídas automaticamente na hora de enviar."
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-100">Biblioteca & Motor de Mensagens</h2>
-          <p className="text-xs text-neutral-400">
-            Gerencie templates versionados por categoria, serviço, nicho e estágio com validação inteligente e pré-visualização.
+          <h2 className="text-xl font-bold text-[#202124] dark:text-[#E8EAED]">Biblioteca & Motor de Mensagens</h2>
+          <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
+            Gerencie templates versionados por categoria, serviço, nicho e canal com validação inteligente e variáveis automáticas.
           </p>
         </div>
 
@@ -213,15 +221,15 @@ export const MessagesView: React.FC = () => {
       </div>
 
       {/* Filters & Search Toolbar */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-4 rounded-2xl bg-neutral-900 border border-neutral-800">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-4 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] shadow-xs">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#80868B]" />
           <input
             type="text"
             placeholder="Pesquisar por título, conteúdo ou notas..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-neutral-950 border border-neutral-700 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-emerald-500"
+            className="w-full pl-10 pr-4 py-2 rounded-lg bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] text-xs text-[#202124] dark:text-[#E8EAED] placeholder-[#80868B] focus:outline-none focus:border-[#3F6FB5]"
           />
         </div>
 
@@ -230,7 +238,7 @@ export const MessagesView: React.FC = () => {
           <select
             value={selectedChannel}
             onChange={(e) => setSelectedChannel(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-700 text-xs text-neutral-200 focus:outline-none focus:border-emerald-500"
+            className="px-3 py-2 rounded-lg bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] text-xs text-[#202124] dark:text-[#E8EAED] focus:outline-none focus:border-[#3F6FB5]"
           >
             <option value="all">Todos os Canais</option>
             <option value="whatsapp">WhatsApp</option>
@@ -244,7 +252,7 @@ export const MessagesView: React.FC = () => {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-700 text-xs text-neutral-200 focus:outline-none focus:border-emerald-500"
+            className="px-3 py-2 rounded-lg bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] text-xs text-[#202124] dark:text-[#E8EAED] focus:outline-none focus:border-[#3F6FB5]"
           >
             <option value="all">Todas as Categorias</option>
             {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
