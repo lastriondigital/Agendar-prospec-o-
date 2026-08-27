@@ -15,12 +15,13 @@ import {
   CalendarDays,
   CalendarRange,
   MessageSquare,
-  Building2,
-  Phone,
-  Layers,
-  Sparkles,
   Send,
-  Eye,
+  Edit2,
+  RotateCcw,
+  Search,
+  Building2,
+  User,
+  Sparkles,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
@@ -32,127 +33,164 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Input } from '../components/ui/Input';
-import { ScheduleMessageModal } from '../components/messaging/ScheduleMessageModal';
-import { getChannelBadgeDetails, formatPhoneNumber } from '../utils/formatting';
-import { CAMPAIGN_TYPE_LABELS } from '../utils/cadenceUtils';
+import { getChannelBadgeDetails, generateWhatsAppLink, formatPhoneNumber, interpolateMessage } from '../utils/formatting';
+import { ScheduleMessageModal } from '../components/scheduling/ScheduleMessageModal';
+import { ACTION_TYPE_OPTIONS } from '../utils/schedulingConfig';
 
 export const PlannerView: React.FC = () => {
   const {
     actions,
-    leads,
     companies,
     contacts,
+    clients,
     campaigns,
     templates,
+    services,
+    settings,
     upsertAction,
     completeAction,
     deleteAction,
     rescheduleAction,
     setActiveRoute,
   } = useApp();
-
   const confirm = useConfirm();
   const { success, error } = useToast();
 
-  const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'year'>('month');
+  const [viewMode, setViewMode] = useState<'year' | 'month' | 'week' | 'day'>('month');
   const [activeTab, setActiveTab] = useState<'pending' | 'completed' | 'overdue' | 'all'>('pending');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // Modal para criar novo agendamento completo
+  // Search and channel filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedChannelFilter, setSelectedChannelFilter] = useState<string>('all');
+  const [selectedCampaignFilter, setSelectedCampaignFilter] = useState<string>('all');
+
+  // Modals
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [editingAction, setEditingAction] = useState<ProspectAction | null>(null);
 
-  // Modal para visualizar/editar mensagem agendada
-  const [previewAction, setPreviewAction] = useState<ProspectAction | null>(null);
-
-  // Modal para adiar / reagendar
   const [reschedulingAction, setReschedulingAction] = useState<ProspectAction | null>(null);
-  const [newRescheduleDate, setNewRescheduleDate] = useState(
-    new Date().toISOString().slice(0, 10)
-  );
+  const [newRescheduleDate, setNewRescheduleDate] = useState(new Date().toISOString().slice(0, 10));
   const [newRescheduleTime, setNewRescheduleTime] = useState('10:30');
 
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  const dailyLimit = 25; // Limite padrão diário para evitar sobrecarga
-
-  // Ações do dia selecionado
+  // Metas e Limites Calculados
+  const dailyLimit = settings.dailyGoal || 20;
   const actionsOnSelectedDate = useMemo(() => {
-    return actions.filter(
-      (a) =>
-        a.scheduledDate === selectedDate &&
-        (a.status === 'pending' || a.status === 'agendada' || a.status === 'rescheduled')
-    );
+    return actions.filter((a) => a.scheduledDate === selectedDate && a.status === 'pending');
   }, [actions, selectedDate]);
 
   const isOverloaded = actionsOnSelectedDate.length >= dailyLimit;
 
-  // Filtragem de ações
+  // Filtragem de ações baseada na aba selecionada e filtros adicionais
   const filteredActions = useMemo(() => {
     return actions
       .filter((a) => {
-        const isPending =
-          a.status === 'pending' || a.status === 'agendada' || a.status === 'rescheduled';
-        if (activeTab === 'pending') return isPending;
-        if (activeTab === 'completed') return a.status === 'completed';
-        if (activeTab === 'overdue') return isPending && a.scheduledDate < todayStr;
+        // Status filter
+        if (activeTab === 'pending' && a.status !== 'pending') return false;
+        if (activeTab === 'completed' && a.status !== 'completed') return false;
+        if (activeTab === 'overdue' && (a.status !== 'pending' || a.scheduledDate >= todayStr)) return false;
+
+        // Channel filter
+        if (selectedChannelFilter !== 'all' && a.channel !== selectedChannelFilter) return false;
+
+        // Campaign filter
+        if (selectedCampaignFilter !== 'all' && a.campaignId !== selectedCampaignFilter) return false;
+
+        // Search term filter
+        if (searchTerm.trim()) {
+          const q = searchTerm.toLowerCase();
+          const comp = companies.find((c) => c.id === a.companyId || c.id === a.clientId);
+          const cli = clients.find((c) => c.id === a.clientId);
+          const name = comp?.name || cli?.name || cli?.company || '';
+          const actionTitle = a.actionType || a.customMessage || a.scriptTitle || '';
+          return name.toLowerCase().includes(q) || actionTitle.toLowerCase().includes(q);
+        }
+
         return true;
       })
       .sort((a, b) => {
-        const dateCompare = a.scheduledDate.localeCompare(b.scheduledDate);
-        if (dateCompare !== 0) return dateCompare;
+        const dateComp = a.scheduledDate.localeCompare(b.scheduledDate);
+        if (dateComp !== 0) return dateComp;
         return (a.scheduledTime || '00:00').localeCompare(b.scheduledTime || '00:00');
       });
-  }, [actions, activeTab, todayStr]);
+  }, [
+    actions,
+    activeTab,
+    todayStr,
+    selectedChannelFilter,
+    selectedCampaignFilter,
+    searchTerm,
+    companies,
+    clients,
+  ]);
 
   const overdueCount = useMemo(
-    () =>
-      actions.filter(
-        (a) =>
-          (a.status === 'pending' || a.status === 'agendada' || a.status === 'rescheduled') &&
-          a.scheduledDate < todayStr
-      ).length,
+    () => actions.filter((a) => a.status === 'pending' && a.scheduledDate < todayStr).length,
     [actions, todayStr]
   );
-
-  const pendingCount = useMemo(
-    () =>
-      actions.filter(
-        (a) => a.status === 'pending' || a.status === 'agendada' || a.status === 'rescheduled'
-      ).length,
-    [actions]
-  );
-
+  const pendingCount = useMemo(() => actions.filter((a) => a.status === 'pending').length, [actions]);
   const completedCount = useMemo(
     () => actions.filter((a) => a.status === 'completed').length,
     [actions]
   );
 
+  const handleOpenNewSchedule = () => {
+    setEditingAction(null);
+    setIsScheduleModalOpen(true);
+  };
+
+  const handleOpenEditAction = (action: ProspectAction) => {
+    setEditingAction(action);
+    setIsScheduleModalOpen(true);
+  };
+
   const handleRescheduleSubmit = async () => {
     if (!reschedulingAction) return;
-    const now = new Date().toISOString();
     const updated: ProspectAction = {
       ...reschedulingAction,
       scheduledDate: newRescheduleDate,
       scheduledTime: newRescheduleTime,
-      status: 'rescheduled',
-      updatedAt: now,
+      updatedAt: new Date().toISOString(),
     };
     await upsertAction(updated);
     setReschedulingAction(null);
-    success(`Mensagem reagendada para ${newRescheduleDate} às ${newRescheduleTime}`);
+    success('Ação reagendada com sucesso.', `Nova data: ${newRescheduleDate} às ${newRescheduleTime}`);
   };
 
   const handleDeleteAction = (action: ProspectAction) => {
     confirm({
-      title: 'Excluir Mensagem Agendada',
+      title: 'Excluir Agendamento',
       message: 'Deseja remover esta mensagem agendada da sua fila de prospecção?',
       isDestructive: true,
       onConfirm: async () => {
         await deleteAction(action.id);
-        success('Mensagem removida da fila.');
+        success('Agendamento removido.');
       },
     });
+  };
+
+  // Direct Execution on WhatsApp
+  const handleExecuteWhatsApp = (action: ProspectAction) => {
+    const comp = companies.find((c) => c.id === action.companyId || c.id === action.clientId);
+    const cont = contacts.find((c) => c.companyId === comp?.id);
+    const cli = clients.find((c) => c.id === action.clientId);
+    const tpl = templates.find((t) => t.id === action.templateId || t.id === action.scriptId);
+    const srv = services[0];
+
+    const phone = cont?.whatsapp || cont?.phone || cli?.whatsapp || cli?.phone;
+    if (!phone) {
+      error('Telefone / WhatsApp não encontrado para este contato.');
+      return;
+    }
+
+    const rawMsg = action.customMessage || tpl?.content || 'Olá, tudo bem?';
+    const message = interpolateMessage(rawMsg, cli, srv, comp, cont);
+
+    const link = generateWhatsAppLink(phone, message);
+    window.open(link, '_blank');
   };
 
   return (
@@ -160,12 +198,9 @@ export const PlannerView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-100 flex items-center gap-2">
-            <CalendarCheck className="w-5 h-5 text-emerald-400" />
-            Fila & Planejador de Mensagens Agendadas
-          </h2>
+          <h2 className="text-xl font-bold text-neutral-100">Planejador & Agendamentos</h2>
           <p className="text-xs text-neutral-400">
-            Acompanhe a linha do tempo, execute mensagens agendadas e controle o fluxo diário de prospecção.
+            Organize agendamentos de mensagens, horários exatos e sequências com cadência controlada.
           </p>
         </div>
 
@@ -176,13 +211,13 @@ export const PlannerView: React.FC = () => {
             onClick={() => setActiveRoute('prospecting')}
             leftIcon={<Zap className="w-4 h-4 fill-white" />}
           >
-            Execução Ativa
+            Modo Execução
           </Button>
 
           <Button
             variant="primary"
             size="sm"
-            onClick={() => setIsScheduleModalOpen(true)}
+            onClick={handleOpenNewSchedule}
             leftIcon={<Plus className="w-4 h-4" />}
           >
             Agendar Mensagem
@@ -190,25 +225,35 @@ export const PlannerView: React.FC = () => {
         </div>
       </div>
 
-      {/* Visão Hierárquica e Painel de Controle */}
+      {/* Visão Hierárquica & Métricas */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Painel Esquerdo: Contadores e Modos */}
+        {/* Seletor de Visão & Contadores */}
         <Card padding="md" className="bg-neutral-900 border-neutral-800 space-y-4 lg:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">
-              Visão Temporal
+              Modo de Visualização
             </span>
-            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-medium">
-              Sincronizado
+            <span className="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded font-medium">
+              Offline Ativo
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-1.5">
             <button
+              onClick={() => setViewMode('year')}
+              className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                viewMode === 'year'
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                  : 'bg-neutral-950 text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <CalendarRange className="w-3.5 h-3.5" /> Ano ({selectedYear})
+            </button>
+            <button
               onClick={() => setViewMode('month')}
               className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                 viewMode === 'month'
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
                   : 'bg-neutral-950 text-neutral-400 hover:text-neutral-200'
               }`}
             >
@@ -218,7 +263,7 @@ export const PlannerView: React.FC = () => {
               onClick={() => setViewMode('week')}
               className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                 viewMode === 'week'
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
                   : 'bg-neutral-950 text-neutral-400 hover:text-neutral-200'
               }`}
             >
@@ -228,378 +273,564 @@ export const PlannerView: React.FC = () => {
               onClick={() => setViewMode('day')}
               className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                 viewMode === 'day'
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
                   : 'bg-neutral-950 text-neutral-400 hover:text-neutral-200'
               }`}
             >
               <CalendarCheck className="w-3.5 h-3.5" /> Dia
-            </button>
-            <button
-              onClick={() => setViewMode('year')}
-              className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                viewMode === 'year'
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-neutral-950 text-neutral-400 hover:text-neutral-200'
-              }`}
-            >
-              <CalendarRange className="w-3.5 h-3.5" /> Ano ({selectedYear})
             </button>
           </div>
 
           <div className="pt-3 border-t border-neutral-800 space-y-2 text-xs">
             <div className="flex justify-between">
               <span className="text-neutral-400">Mensagens Pendentes:</span>
-              <span className="font-bold text-neutral-100">{pendingCount}</span>
+              <span className="font-bold text-neutral-200">{pendingCount}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-neutral-400">Atrasadas / Atenção:</span>
+              <span className="text-neutral-400">Atrasadas:</span>
               <span className="font-bold text-rose-400">{overdueCount}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-neutral-400">Concluídas / Enviadas:</span>
+              <span className="text-neutral-400">Concluídas:</span>
               <span className="font-bold text-emerald-400">{completedCount}</span>
             </div>
             <div className="flex justify-between pt-1 border-t border-neutral-800/60">
-              <span className="text-neutral-400">Carga do Dia ({selectedDate}):</span>
+              <span className="text-neutral-400">Capacidade do Dia:</span>
               <span className="font-bold text-neutral-200">
-                {actionsOnSelectedDate.length} / {dailyLimit}
+                {actionsOnSelectedDate.length}/{dailyLimit}
               </span>
             </div>
           </div>
 
           {isOverloaded && (
-            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-300 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              <span>Atenção: Limite diário atingido. Considere redistribuir os envios para outros dias.</span>
+            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <span>
+                Capacidade diária sugerida ({dailyLimit} ações) atingida para {selectedDate}. Considere distribuir os agendamentos.
+              </span>
             </div>
           )}
         </Card>
 
-        {/* Painel Principal com Fila de Ações */}
+        {/* Painel Principal */}
         <div className="lg:col-span-3 space-y-4">
-          {/* Tabs de Filtro por Status */}
-          <div className="flex flex-wrap items-center justify-between border-b border-neutral-800 pb-3 gap-2">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                onClick={() => setActiveTab('pending')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                  activeTab === 'pending'
-                    ? 'bg-neutral-800 text-emerald-400 border border-neutral-700'
-                    : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                Agendadas ({pendingCount})
-              </button>
-              <button
-                onClick={() => setActiveTab('overdue')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                  activeTab === 'overdue'
-                    ? 'bg-neutral-800 text-rose-400 border border-neutral-700'
-                    : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                Atrasadas ({overdueCount})
-              </button>
-              <button
-                onClick={() => setActiveTab('completed')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                  activeTab === 'completed'
-                    ? 'bg-neutral-800 text-emerald-400 border border-neutral-700'
-                    : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                Concluídas ({completedCount})
-              </button>
-              <button
-                onClick={() => setActiveTab('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                  activeTab === 'all'
-                    ? 'bg-neutral-800 text-emerald-400 border border-neutral-700'
-                    : 'text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                Todas ({actions.length})
-              </button>
+          {/* Search & Filters Toolbar */}
+          <div className="p-3 bg-neutral-900 border border-neutral-800 rounded-xl space-y-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              {/* Tabs de Status */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  onClick={() => setActiveTab('pending')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    activeTab === 'pending'
+                      ? 'bg-neutral-800 text-blue-400 border border-neutral-700'
+                      : 'text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  Pendentes ({pendingCount})
+                </button>
+                <button
+                  onClick={() => setActiveTab('overdue')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    activeTab === 'overdue'
+                      ? 'bg-neutral-800 text-rose-400 border border-neutral-700'
+                      : 'text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  Atrasadas ({overdueCount})
+                </button>
+                <button
+                  onClick={() => setActiveTab('completed')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    activeTab === 'completed'
+                      ? 'bg-neutral-800 text-emerald-400 border border-neutral-700'
+                      : 'text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  Concluídas ({completedCount})
+                </button>
+                <button
+                  onClick={() => setActiveTab('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    activeTab === 'all'
+                      ? 'bg-neutral-800 text-neutral-200 border border-neutral-700'
+                      : 'text-neutral-400 hover:text-neutral-200'
+                  }`}
+                >
+                  Todas ({actions.length})
+                </button>
+              </div>
+
+              {/* Data Picker */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-neutral-400">Data foco:</span>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 py-1 text-xs text-neutral-200 font-mono"
+                />
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-neutral-400">
-              <span>Data foco:</span>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-neutral-100 text-xs focus:outline-none focus:border-emerald-500 font-mono"
+            {/* Filter Inputs */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-neutral-800">
+              <Input
+                placeholder="Filtrar por prospect ou ação..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                leftIcon={<Search className="w-3.5 h-3.5 text-neutral-400" />}
               />
+
+              <select
+                value={selectedChannelFilter}
+                onChange={(e) => setSelectedChannelFilter(e.target.value)}
+                className="h-8 bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 text-xs text-neutral-300"
+              >
+                <option value="all">Todos os Canais</option>
+                <option value="whatsapp">💬 WhatsApp</option>
+                <option value="linkedin">💼 LinkedIn</option>
+                <option value="email">✉️ E-mail</option>
+                <option value="call">📞 Ligação</option>
+                <option value="instagram">📷 Instagram</option>
+              </select>
+
+              <select
+                value={selectedCampaignFilter}
+                onChange={(e) => setSelectedCampaignFilter(e.target.value)}
+                className="h-8 bg-neutral-950 border border-neutral-700 rounded-lg px-2.5 text-xs text-neutral-300"
+              >
+                <option value="all">Todas as Campanhas</option>
+                {campaigns.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    🎯 {c.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* Lista de Mensagens Agendadas */}
-          <div className="space-y-3">
-            {filteredActions.length > 0 ? (
-              filteredActions.map((action) => {
-                const lead = leads.find((l) => l.id === action.clientId || l.id === action.leadId);
-                const comp = companies.find(
-                  (c) => c.id === action.companyId || (lead && c.id === lead.companyId)
+          {/* Render View Mode Content */}
+          {viewMode === 'year' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                'Janeiro',
+                'Fevereiro',
+                'Março',
+                'Abril',
+                'Maio',
+                'Junho',
+                'Julho',
+                'Agosto',
+                'Setembro',
+                'Outubro',
+                'Novembro',
+                'Dezembro',
+              ].map((m, idx) => {
+                const monthNum = String(idx + 1).padStart(2, '0');
+                const monthActions = actions.filter((a) =>
+                  a.scheduledDate.startsWith(`${selectedYear}-${monthNum}`)
                 );
-                const cont = contacts.find(
-                  (c) => c.id === action.contactId || (lead && c.id === lead.contactId)
-                );
-                const campaign = campaigns.find((c) => c.id === action.campaignId);
-                const channel = getChannelBadgeDetails(action.channel);
-                const isOverdue =
-                  (action.status === 'pending' || action.status === 'agendada' || action.status === 'rescheduled') &&
-                  action.scheduledDate < todayStr;
-                const isToday = action.scheduledDate === todayStr;
-                const displayActionType = action.actionType || 'Primeiro contato';
-
+                const completedM = monthActions.filter((a) => a.status === 'completed').length;
                 return (
-                  <Card
-                    key={action.id}
-                    padding="md"
-                    className={`bg-neutral-900 border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${
-                      isOverdue
-                        ? 'border-rose-500/40 bg-rose-950/10'
-                        : isToday
-                        ? 'border-emerald-500/40 bg-emerald-950/5'
-                        : ''
-                    }`}
-                  >
-                    <div className="space-y-2.5 flex-1">
-                      {/* Badges: Canal, Tipo de Ação, Data, Hora, Campanha */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded font-medium ${channel.bgClass} ${channel.textClass}`}
-                        >
-                          {channel.label}
-                        </span>
-
-                        <Badge variant="emerald" size="sm">
-                          🎯 {displayActionType}
-                        </Badge>
-
-                        <Badge
-                          variant={isOverdue ? 'rose' : isToday ? 'emerald' : 'neutral'}
-                          size="sm"
-                        >
-                          {isOverdue
-                            ? `Atrasada (${action.scheduledDate})`
-                            : isToday
-                            ? 'Hoje'
-                            : action.scheduledDate}
-                        </Badge>
-
-                        {action.scheduledTime && (
-                          <span className="text-[11px] font-mono text-neutral-300 bg-neutral-800 px-2 py-0.5 rounded flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-emerald-400" />
-                            {action.scheduledTime}
-                          </span>
-                        )}
-
-                        {campaign && (
-                          <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
-                            Campanha: {campaign.name}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Prospect / Empresa e Contato */}
-                      <div>
-                        <h4 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
-                          {comp?.name || 'Prospect não identificado'}
-                          <span className="text-xs font-normal text-neutral-400">
-                            • {cont?.name ? `${cont.name}` : 'Sem contato nominal'}
-                          </span>
-                        </h4>
-
-                        {/* Mensagem customizada snapshot */}
-                        {action.customMessage && (
-                          <p className="text-xs text-neutral-300 bg-neutral-950 p-2 rounded-lg border border-neutral-800/80 mt-1 line-clamp-2 italic">
-                            "{action.customMessage}"
-                          </p>
-                        )}
-
-                        {/* Observações */}
-                        {action.notes && (
-                          <p className="text-[11px] text-neutral-400 mt-1">
-                            <span className="text-neutral-500 font-semibold">Obs:</span> {action.notes}
-                          </p>
-                        )}
-                      </div>
+                  <Card key={m} padding="sm" className="bg-neutral-900 border-neutral-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-neutral-200">
+                        {m} {selectedYear}
+                      </span>
+                      <span className="text-[10px] bg-neutral-800 px-2 py-0.5 rounded text-neutral-400">
+                        {monthActions.length} ações
+                      </span>
                     </div>
-
-                    {/* Botões Operacionais */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => setPreviewAction(action)}
-                        title="Ver Mensagem Completa"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-neutral-300" />
-                      </Button>
-
-                      {action.status !== 'completed' ? (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            onClick={() => {
-                              setReschedulingAction(action);
-                              setNewRescheduleDate(action.scheduledDate);
-                              setNewRescheduleTime(action.scheduledTime || '10:30');
-                            }}
-                          >
-                            Adiar / Reagendar
-                          </Button>
-
-                          <Button
-                            variant="execution"
-                            size="xs"
-                            onClick={() => completeAction(action.id)}
-                            leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-                          >
-                            Concluir Envio
-                          </Button>
-                        </>
-                      ) : (
-                        <Badge variant="emerald" size="sm">
-                          Concluída
-                        </Badge>
-                      )}
-
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => handleDeleteAction(action)}
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                      </Button>
+                    <div className="text-[11px] text-neutral-400 flex justify-between">
+                      <span>
+                        Pendentes:{' '}
+                        <strong className="text-neutral-200">{monthActions.length - completedM}</strong>
+                      </span>
+                      <span>
+                        Concluídas: <strong className="text-emerald-400">{completedM}</strong>
+                      </span>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => {
+                        setSelectedDate(`${selectedYear}-${monthNum}-01`);
+                        setViewMode('month');
+                      }}
+                      className="w-full mt-1"
+                    >
+                      Ver Mês
+                    </Button>
                   </Card>
                 );
-              })
-            ) : (
-              <EmptyState
-                icon={<CalendarIcon className="w-8 h-8 text-neutral-400" />}
-                title="Nenhuma mensagem agendada para este filtro"
-                description="Use o botão acima para agendar mensagens de prospecção para seus contatos."
-                actionLabel="Agendar Mensagem Agora"
-                onAction={() => setIsScheduleModalOpen(true)}
-              />
-            )}
-          </div>
+              })}
+            </div>
+          )}
+
+          {viewMode === 'month' && (
+            <div className="space-y-3">
+              {/* Highlight of day's actions */}
+              <div className="p-3 bg-neutral-900 border border-neutral-800 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-neutral-200 flex items-center gap-1.5">
+                    <CalendarCheck className="w-4 h-4 text-blue-400" />
+                    Agendamentos para {new Date(selectedDate + 'T00:00:00').toLocaleDateString('pt-BR')} ({actionsOnSelectedDate.length} ações)
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={() => {
+                      setEditingAction(null);
+                      setIsScheduleModalOpen(true);
+                    }}
+                    leftIcon={<Plus className="w-3.5 h-3.5 text-blue-400" />}
+                  >
+                    Novo Agendamento nesta data
+                  </Button>
+                </div>
+              </div>
+
+              {/* Action List */}
+              <div className="space-y-3">
+                {filteredActions.length > 0 ? (
+                  filteredActions.map((action) => {
+                    const comp = companies.find((c) => c.id === action.companyId || c.id === action.clientId);
+                    const cont = contacts.find((c) => c.companyId === comp?.id);
+                    const cli = clients.find((c) => c.id === action.clientId);
+                    const campaign = campaigns.find((c) => c.id === action.campaignId);
+                    const channel = getChannelBadgeDetails(action.channel);
+                    const isOverdue = action.status === 'pending' && action.scheduledDate < todayStr;
+                    const isToday = action.scheduledDate === todayStr;
+
+                    const prospectName = comp?.name || cli?.company || cli?.name || 'Cliente';
+                    const contactPerson = cont?.name || cli?.name;
+                    const phone = cont?.whatsapp || cont?.phone || cli?.whatsapp || cli?.phone;
+
+                    return (
+                      <Card
+                        key={action.id}
+                        padding="md"
+                        className={`bg-neutral-900 border-neutral-800 flex flex-col justify-between gap-3 hover:border-neutral-700 transition-all ${
+                          isOverdue
+                            ? 'border-rose-500/40 bg-rose-950/10'
+                            : isToday
+                            ? 'border-blue-500/40 bg-blue-950/10'
+                            : ''
+                        }`}
+                      >
+                        <div className="space-y-2.5">
+                          {/* Badges bar */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className={`text-[11px] px-2 py-0.5 rounded font-medium flex items-center gap-1 ${channel.bgClass} ${channel.textClass}`}
+                              >
+                                {channel.label}
+                              </span>
+
+                              <Badge
+                                variant={isOverdue ? 'rose' : isToday ? 'blue' : 'neutral'}
+                                size="sm"
+                              >
+                                {isOverdue
+                                  ? `Atrasada (${new Date(action.scheduledDate + 'T00:00:00').toLocaleDateString('pt-BR')})`
+                                  : isToday
+                                  ? `Hoje às ${action.scheduledTime || '10:30'}`
+                                  : `${new Date(action.scheduledDate + 'T00:00:00').toLocaleDateString('pt-BR')} às ${action.scheduledTime || '10:30'}`}
+                              </Badge>
+
+                              {action.actionType && (
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700 font-medium">
+                                  {action.actionType}
+                                </span>
+                              )}
+
+                              {campaign && (
+                                <span className="text-[10px] text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 font-medium">
+                                  🎯 {campaign.name}
+                                </span>
+                              )}
+
+                              {action.cadenceStepIndex && (
+                                <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-mono">
+                                  Etapa {action.cadenceStepIndex}
+                                </span>
+                              )}
+                            </div>
+
+                            <span className="font-mono text-xs font-bold text-neutral-300 flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5 text-blue-400" />
+                              {action.scheduledTime || '10:30'}
+                            </span>
+                          </div>
+
+                          {/* Prospect info */}
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-sm font-bold text-neutral-100">{prospectName}</h4>
+                              {contactPerson && contactPerson !== prospectName && (
+                                <span className="text-xs text-neutral-400">({contactPerson})</span>
+                              )}
+                              {phone && (
+                                <span className="text-xs font-mono text-emerald-400">
+                                  {formatPhoneNumber(phone)}
+                                </span>
+                              )}
+                            </div>
+
+                            {action.scriptTitle && (
+                              <p className="text-xs text-blue-400 font-medium mt-0.5">
+                                📄 Script: {action.scriptTitle}
+                              </p>
+                            )}
+
+                            {action.notes && (
+                              <p className="text-xs text-neutral-400 italic bg-neutral-950/60 p-2 rounded-lg mt-1 border border-neutral-800">
+                                💡 Obs: {action.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="pt-2 border-t border-neutral-800 flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            {action.status === 'pending' && action.channel === 'whatsapp' && (
+                              <Button
+                                variant="outline"
+                                size="xs"
+                                onClick={() => handleExecuteWhatsApp(action)}
+                                leftIcon={<Send className="w-3.5 h-3.5 text-emerald-400" />}
+                                className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/30 text-xs"
+                              >
+                                Executar no WhatsApp
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {action.status === 'pending' ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="xs"
+                                  onClick={() => {
+                                    setReschedulingAction(action);
+                                    setNewRescheduleDate(action.scheduledDate);
+                                    setNewRescheduleTime(action.scheduledTime || '10:30');
+                                  }}
+                                  leftIcon={<RotateCcw className="w-3 h-3 text-neutral-400" />}
+                                >
+                                  Reagendar
+                                </Button>
+
+                                <Button
+                                  variant="ghost"
+                                  size="xs"
+                                  onClick={() => handleOpenEditAction(action)}
+                                  leftIcon={<Edit2 className="w-3 h-3 text-neutral-400" />}
+                                >
+                                  Editar
+                                </Button>
+
+                                <Button
+                                  variant="execution"
+                                  size="xs"
+                                  onClick={() => completeAction(action.id)}
+                                  leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                                >
+                                  Concluir
+                                </Button>
+                              </>
+                            ) : (
+                              <Badge variant="emerald" size="sm">
+                                Concluída
+                              </Badge>
+                            )}
+
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => handleDeleteAction(action)}
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })
+                ) : (
+                  <EmptyState
+                    icon={<CalendarIcon className="w-8 h-8 text-neutral-400" />}
+                    title="Nenhum agendamento encontrado"
+                    description="Não há mensagens agendadas para os filtros selecionados."
+                    actionLabel="Agendar Mensagem"
+                    onAction={handleOpenNewSchedule}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {(viewMode === 'week' || viewMode === 'day') && (
+            <div className="space-y-3">
+              {filteredActions.length > 0 ? (
+                filteredActions.map((action) => {
+                  const comp = companies.find((c) => c.id === action.companyId || c.id === action.clientId);
+                  const cont = contacts.find((c) => c.companyId === comp?.id);
+                  const cli = clients.find((c) => c.id === action.clientId);
+                  const channel = getChannelBadgeDetails(action.channel);
+                  const isOverdue = action.status === 'pending' && action.scheduledDate < todayStr;
+                  const isToday = action.scheduledDate === todayStr;
+
+                  return (
+                    <Card
+                      key={action.id}
+                      padding="md"
+                      className={`bg-neutral-900 border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                        isOverdue ? 'border-rose-500/30 bg-rose-950/10' : isToday ? 'border-blue-500/30' : ''
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`text-[11px] px-2 py-0.5 rounded font-medium ${channel.bgClass} ${channel.textClass}`}
+                          >
+                            {channel.label}
+                          </span>
+                          <Badge
+                            variant={isOverdue ? 'rose' : isToday ? 'blue' : 'neutral'}
+                            size="sm"
+                          >
+                            {isOverdue
+                              ? 'Atrasada'
+                              : isToday
+                              ? 'Hoje'
+                              : new Date(action.scheduledDate + 'T00:00:00').toLocaleDateString('pt-BR')}{' '}
+                            às {action.scheduledTime || '10:30'}
+                          </Badge>
+                          {action.actionType && (
+                            <span className="text-[11px] text-neutral-300 bg-neutral-800 px-2 py-0.5 rounded font-medium">
+                              {action.actionType}
+                            </span>
+                          )}
+                        </div>
+
+                        <div>
+                          <h4 className="text-sm font-bold text-neutral-100">
+                            {comp?.name || cli?.name || 'Cliente'}
+                          </h4>
+                          <p className="text-xs text-neutral-400">
+                            Script: <strong className="text-neutral-200">{action.scriptTitle || 'Script Padrão'}</strong>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {action.status === 'pending' ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => {
+                                setReschedulingAction(action);
+                                setNewRescheduleDate(action.scheduledDate);
+                                setNewRescheduleTime(action.scheduledTime || '10:30');
+                              }}
+                            >
+                              Reagendar
+                            </Button>
+                            <Button
+                              variant="execution"
+                              size="xs"
+                              onClick={() => completeAction(action.id)}
+                              leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                            >
+                              Concluir
+                            </Button>
+                          </>
+                        ) : (
+                          <Badge variant="emerald" size="sm">
+                            Concluída
+                          </Badge>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => handleDeleteAction(action)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })
+              ) : (
+                <EmptyState
+                  icon={<CalendarIcon className="w-8 h-8 text-neutral-400" />}
+                  title="Nenhuma mensagem agendada"
+                  description="Não há ações correspondentes aos critérios selecionados."
+                  actionLabel="Agendar Mensagem"
+                  onAction={handleOpenNewSchedule}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Modal Principal de Agendamento */}
-      {isScheduleModalOpen && (
-        <ScheduleMessageModal
-          isOpen={isScheduleModalOpen}
-          onClose={() => setIsScheduleModalOpen(false)}
-        />
-      )}
+      {/* Global Schedule Message Modal */}
+      <ScheduleMessageModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => {
+          setIsScheduleModalOpen(false);
+          setEditingAction(null);
+        }}
+        editingAction={editingAction}
+      />
 
-      {/* Modal Visualizar Prévia da Mensagem */}
-      {previewAction && (
-        <Modal
-          isOpen={Boolean(previewAction)}
-          onClose={() => setPreviewAction(null)}
-          title="Detalhes da Mensagem Agendada"
-          maxWidth="lg"
-        >
-          <div className="space-y-4 text-xs">
-            <div className="grid grid-cols-2 gap-2 bg-neutral-900 p-3 rounded-xl border border-neutral-800">
-              <div>
-                <span className="text-neutral-500 block text-[10px]">Data & Hora:</span>
-                <strong className="text-neutral-100">
-                  {previewAction.scheduledDate} às {previewAction.scheduledTime || '10:30'}
-                </strong>
-              </div>
-              <div>
-                <span className="text-neutral-500 block text-[10px]">Tipo de Ação:</span>
-                <strong className="text-emerald-400">{previewAction.actionType || 'Geral'}</strong>
-              </div>
-              <div>
-                <span className="text-neutral-500 block text-[10px]">Canal:</span>
-                <strong className="text-neutral-100 uppercase">{previewAction.channel}</strong>
-              </div>
-              <div>
-                <span className="text-neutral-500 block text-[10px]">Script Base:</span>
-                <strong className="text-neutral-100">
-                  {previewAction.scriptName || 'Personalizado'}
-                </strong>
-              </div>
-            </div>
+      {/* Modal Reagendar Rápido */}
+      <Modal
+        isOpen={Boolean(reschedulingAction)}
+        onClose={() => setReschedulingAction(null)}
+        title="Reagendar Mensagem"
+        maxWidth="sm"
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setReschedulingAction(null)}>
+              Cancelar
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleRescheduleSubmit}>
+              Salvar Nova Data & Hora
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-neutral-400">
+            Defina a nova data e horário para este agendamento:
+          </p>
 
-            <div>
-              <label className="text-xs font-semibold text-neutral-300 block mb-1">
-                Texto Formatado para Disparo:
-              </label>
-              <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800 text-neutral-100 whitespace-pre-line leading-relaxed font-sans select-text">
-                {previewAction.customMessage || 'Sem conteúdo de texto'}
-              </div>
-            </div>
+          <Input
+            label="Nova Data"
+            type="date"
+            value={newRescheduleDate}
+            onChange={(e) => setNewRescheduleDate(e.target.value)}
+            leftIcon={<CalendarIcon className="w-4 h-4 text-neutral-400" />}
+          />
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-800">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(previewAction.customMessage || '');
-                  success('Texto copiado!');
-                }}
-              >
-                Copiar Mensagem
-              </Button>
-              <Button variant="primary" size="sm" onClick={() => setPreviewAction(null)}>
-                Fechar
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Modal Reagendar / Adiar */}
-      {reschedulingAction && (
-        <Modal
-          isOpen={Boolean(reschedulingAction)}
-          onClose={() => setReschedulingAction(null)}
-          title="Reagendar / Adiar Mensagem"
-          maxWidth="sm"
-        >
-          <div className="space-y-4">
-            <p className="text-xs text-neutral-300">
-              Defina a nova data e horário para a execução desta mensagem agendada:
-            </p>
-
-            <Input
-              label="Nova Data *"
-              type="date"
-              value={newRescheduleDate}
-              onChange={(e) => setNewRescheduleDate(e.target.value)}
-              required
-            />
-
-            <Input
-              label="Novo Horário *"
-              type="time"
-              value={newRescheduleTime}
-              onChange={(e) => setNewRescheduleTime(e.target.value)}
-              required
-            />
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-800">
-              <Button variant="ghost" size="sm" onClick={() => setReschedulingAction(null)}>
-                Cancelar
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleRescheduleSubmit}>
-                Confirmar Reagendamento
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+          <Input
+            label="Novo Horário"
+            type="time"
+            value={newRescheduleTime}
+            onChange={(e) => setNewRescheduleTime(e.target.value)}
+            leftIcon={<Clock className="w-4 h-4 text-neutral-400" />}
+          />
+        </div>
+      </Modal>
     </div>
   );
 };

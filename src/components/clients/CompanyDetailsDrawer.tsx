@@ -48,6 +48,7 @@ import { CopilotActionButtons } from '../copilot/CopilotActionButtons';
 import { CopilotAssistantModal } from '../copilot/CopilotAssistantModal';
 import { CopilotActionType } from '../../types';
 import { ApproachRecommendationCard } from '../sales/ApproachRecommendationCard';
+import { ScheduleMessageModal } from '../scheduling/ScheduleMessageModal';
 
 interface CompanyDetailsDrawerProps {
   company: Company | null;
@@ -88,6 +89,7 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [isScheduleMessageModalOpen, setIsScheduleMessageModalOpen] = useState(false);
   const [isLogInteractionOpen, setIsLogInteractionOpen] = useState(false);
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [messageTargetContactId, setMessageTargetContactId] = useState<string | undefined>(undefined);
@@ -459,14 +461,25 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                     <Zap className="w-3.5 h-3.5" />
                     Próxima Ação Agendada
                   </span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setIsScheduleOpen(true)}
-                    className="text-xs h-7 px-2"
-                  >
-                    Agendar / Alterar
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setIsScheduleMessageModalOpen(true)}
+                      className="text-xs h-7 px-2"
+                      leftIcon={<Clock className="w-3.5 h-3.5" />}
+                    >
+                      Agendar Mensagem
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setIsScheduleOpen(true)}
+                      className="text-xs h-7 px-2"
+                    >
+                      Ação Rápida
+                    </Button>
+                  </div>
                 </div>
 
                 {companyLead?.nextActionTitle ? (
@@ -1118,6 +1131,13 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
         lead={companyLead}
         service={services.find((s) => s.id === companyLead?.serviceId)}
         initialActionType={copilotInitialAction}
+      />
+
+      {/* Modal Completo de Agendamento de Mensagem */}
+      <ScheduleMessageModal
+        isOpen={isScheduleMessageModalOpen}
+        onClose={() => setIsScheduleMessageModalOpen(false)}
+        initialClientId={company.id}
       />
     </div>
   );

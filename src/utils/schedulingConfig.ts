@@ -1,0 +1,400 @@
+import { ContactChannel, CampaignSequenceStep } from '../types';
+
+export interface ActionTypeOption {
+  id: string;
+  label: string;
+  category: string;
+  defaultChannel: ContactChannel;
+  description: string;
+  suggestedOffsetDays: number;
+}
+
+export const ACTION_TYPE_OPTIONS: ActionTypeOption[] = [
+  {
+    id: 'primeiro_contato',
+    label: 'Primeiro contato',
+    category: 'primeiro_contacto',
+    defaultChannel: 'whatsapp',
+    description: 'Abordagem inicial curta com identificação do decisor e proposta de valor.',
+    suggestedOffsetDays: 0,
+  },
+  {
+    id: 'apresentacao_inicial',
+    label: 'Apresentação inicial',
+    category: 'primeiro_contacto',
+    defaultChannel: 'whatsapp',
+    description: 'Apresentação rápida do portfólio ou solução específica para o nicho.',
+    suggestedOffsetDays: 0,
+  },
+  {
+    id: 'follow_up_1',
+    label: 'Follow-up 1 (Verificação)',
+    category: 'follow_up',
+    defaultChannel: 'whatsapp',
+    description: 'Verificação cordial para saber se o prospect avaliou a mensagem anterior.',
+    suggestedOffsetDays: 2,
+  },
+  {
+    id: 'follow_up_2',
+    label: 'Follow-up 2 (Valor & Diferencial)',
+    category: 'follow_up',
+    defaultChannel: 'whatsapp',
+    description: 'Envio de diferencial prático, benefício chave ou métrica de sucesso.',
+    suggestedOffsetDays: 5,
+  },
+  {
+    id: 'follow_up_3',
+    label: 'Follow-up 3 (Mudança de Ângulo)',
+    category: 'follow_up',
+    defaultChannel: 'whatsapp',
+    description: 'Abordagem focada em resolver a dor específica ou pergunta de encerramento temporário.',
+    suggestedOffsetDays: 9,
+  },
+  {
+    id: 'diagnostico',
+    label: 'Diagnóstico / Auditoria Gratuita',
+    category: 'diagnóstico',
+    defaultChannel: 'whatsapp',
+    description: 'Oferta de análise sem custo para gerar valor imediato e confiança.',
+    suggestedOffsetDays: 3,
+  },
+  {
+    id: 'prova_social',
+    label: 'Apresentação de Prova Social / Case',
+    category: 'prova',
+    defaultChannel: 'whatsapp',
+    description: 'Compartilhamento de resultado ou depoimento de cliente do mesmo segmento.',
+    suggestedOffsetDays: 4,
+  },
+  {
+    id: 'proposta',
+    label: 'Envio de Proposta Comercial',
+    category: 'proposta',
+    defaultChannel: 'whatsapp',
+    description: 'Apresentação dos valores, prazos e entregáveis da solução.',
+    suggestedOffsetDays: 1,
+  },
+  {
+    id: 'quebra_objecao',
+    label: 'Contorno de Objeção',
+    category: 'objeção',
+    defaultChannel: 'whatsapp',
+    description: 'Resposta fundamentada para mitigar objeções de preço, tempo ou prioridade.',
+    suggestedOffsetDays: 1,
+  },
+  {
+    id: 'reuniao',
+    label: 'Agendamento de Reunião / Call',
+    category: 'fechamento',
+    defaultChannel: 'whatsapp',
+    description: 'Confirmação de dia e horário para demonstração ou alinhamento executivo.',
+    suggestedOffsetDays: 1,
+  },
+  {
+    id: 'outro_horario',
+    label: 'Nova Tentativa em Outro Horário',
+    category: 'follow_up',
+    defaultChannel: 'whatsapp',
+    description: 'Tentativa no final da tarde ou horário alternativo no mesmo dia.',
+    suggestedOffsetDays: 0,
+  },
+  {
+    id: 'reativacao',
+    label: 'Reativação de Contato Inativo',
+    category: 'reativação',
+    defaultChannel: 'whatsapp',
+    description: 'Reengajamento de contatos com histórico após 20 a 60 dias.',
+    suggestedOffsetDays: 20,
+  },
+  {
+    id: 'personalizado',
+    label: 'Ação Personalizada',
+    category: 'custom',
+    defaultChannel: 'whatsapp',
+    description: 'Ação livre configurada sob medida pelo usuário.',
+    suggestedOffsetDays: 1,
+  },
+];
+
+export interface CampaignTypeOption {
+  id: string;
+  label: string;
+  description: string;
+  recommendedDefaultChannel: ContactChannel;
+}
+
+export const CAMPAIGN_TYPE_OPTIONS: CampaignTypeOption[] = [
+  {
+    id: 'primeiro_contato',
+    label: 'Primeiro contato',
+    description: 'Aquisição ativa focada em novos leads frios e agendamento inicial.',
+    recommendedDefaultChannel: 'whatsapp',
+  },
+  {
+    id: 'prospeccao_ativa',
+    label: 'Prospecção Ativa / Outbound',
+    description: 'Fluxo estruturado para geração de reuniões com tomadores de decisão.',
+    recommendedDefaultChannel: 'whatsapp',
+  },
+  {
+    id: 'follow_up_cadenciado',
+    label: 'Follow-up Cadenciado',
+    description: 'Sequência progressiva de toques para aumentar a taxa de resposta.',
+    recommendedDefaultChannel: 'whatsapp',
+  },
+  {
+    id: 'diagnostico_prova',
+    label: 'Diagnóstico & Prova Social',
+    description: 'Oferta consultiva com auditoria e cases reais de sucesso do nicho.',
+    recommendedDefaultChannel: 'whatsapp',
+  },
+  {
+    id: 'proposta_fechamento',
+    label: 'Proposta Comercial & Fechamento',
+    description: 'Acompanhamento de orçamentos e aceleração de decisões de compra.',
+    recommendedDefaultChannel: 'whatsapp',
+  },
+  {
+    id: 'reativacao',
+    label: 'Reativação de Base Inativa',
+    description: 'Reengajamento de prospects que esfriaram ou orçamentos não fechados.',
+    recommendedDefaultChannel: 'whatsapp',
+  },
+  {
+    id: 'multicanal',
+    label: 'Cadência Multicanal',
+    description: 'Combinação coordenada entre WhatsApp, E-mail, LinkedIn e Ligação.',
+    recommendedDefaultChannel: 'whatsapp',
+  },
+  {
+    id: 'personalizada',
+    label: 'Campanha Personalizada',
+    description: 'Estratégia sob medida com etapas e canais customizados.',
+    recommendedDefaultChannel: 'whatsapp',
+  },
+];
+
+export interface CadencePreset {
+  id: string;
+  name: string;
+  description: string;
+  campaignType: string;
+  channel: ContactChannel;
+  steps: CampaignSequenceStep[];
+}
+
+export const CADENCE_PRESETS: CadencePreset[] = [
+  {
+    id: 'preset-standard-5',
+    name: 'Cadência Padrão 5 Passos (0, 2, 5, 9, 20 dias)',
+    description: 'Cadência equilibrada ideal para prospecção outbound B2B no WhatsApp.',
+    campaignType: 'follow_up_cadenciado',
+    channel: 'whatsapp',
+    steps: [
+      {
+        id: 'step-1',
+        dayOffset: 0,
+        title: 'Primeiro contato',
+        actionType: 'primeiro_contato',
+        channel: 'whatsapp',
+        notes: 'Apresentação curta e objetiva com pergunta aberta.',
+      },
+      {
+        id: 'step-2',
+        dayOffset: 2,
+        title: 'Follow-up 1 (Verificação)',
+        actionType: 'follow_up_1',
+        channel: 'whatsapp',
+        notes: 'Checar se recebeu a mensagem anterior.',
+      },
+      {
+        id: 'step-3',
+        dayOffset: 5,
+        title: 'Apresentação de Prova Social',
+        actionType: 'prova_social',
+        channel: 'whatsapp',
+        notes: 'Enviar mini-case ou resultado prático alcançado no mesmo segmento.',
+      },
+      {
+        id: 'step-4',
+        dayOffset: 9,
+        title: 'Follow-up 3 (Mudança de Ângulo)',
+        actionType: 'follow_up_3',
+        channel: 'whatsapp',
+        notes: 'Pergunta direta focada na dor e prioridade do trimestre.',
+      },
+      {
+        id: 'step-5',
+        dayOffset: 20,
+        title: 'Reativação de Contato Inativo',
+        actionType: 'reativacao',
+        channel: 'whatsapp',
+        notes: 'Retomada leve com nova condição ou novidade.',
+      },
+    ],
+  },
+  {
+    id: 'preset-quick-whatsapp-4',
+    name: 'Cadência Rápida WhatsApp (0, 1, 3, 7 dias)',
+    description: 'Fluxo ágil e dinâmico para leads com alto nível de interesse ou indicação.',
+    campaignType: 'primeiro_contato',
+    channel: 'whatsapp',
+    steps: [
+      {
+        id: 'step-1',
+        dayOffset: 0,
+        title: 'Primeiro contato direto',
+        actionType: 'primeiro_contato',
+        channel: 'whatsapp',
+        notes: 'Abordagem personalizada com proposta de valor.',
+      },
+      {
+        id: 'step-2',
+        dayOffset: 1,
+        title: 'Follow-up rápido (Mesmo dia / 24h)',
+        actionType: 'follow_up_1',
+        channel: 'whatsapp',
+        notes: 'Pergunta rápida de validação de interesse.',
+      },
+      {
+        id: 'step-3',
+        dayOffset: 3,
+        title: 'Oferta de Diagnóstico Gratuito',
+        actionType: 'diagnostico',
+        channel: 'whatsapp',
+        notes: 'Isca de alto valor sem atrito de venda.',
+      },
+      {
+        id: 'step-4',
+        dayOffset: 7,
+        title: 'Follow-up de Fechamento de Ciclo',
+        actionType: 'follow_up_3',
+        channel: 'whatsapp',
+        notes: 'Pergunta de encerramento cordial temporário.',
+      },
+    ],
+  },
+  {
+    id: 'preset-consultative-diagnosis',
+    name: 'Cadência Consultiva com Diagnóstico (0, 2, 6, 12, 25 dias)',
+    description: 'Estratégia focada em autoridade técnica, valor antecipado e ticket alto.',
+    campaignType: 'diagnostico_prova',
+    channel: 'whatsapp',
+    steps: [
+      {
+        id: 'step-1',
+        dayOffset: 0,
+        title: 'Diagnóstico & Auditoria Inicial',
+        actionType: 'diagnostico',
+        channel: 'whatsapp',
+        notes: 'Envio de 3 oportunidades de melhoria identificadas.',
+      },
+      {
+        id: 'step-2',
+        dayOffset: 2,
+        title: 'Follow-up de Feedback do Diagnóstico',
+        actionType: 'follow_up_1',
+        channel: 'whatsapp',
+        notes: 'Perguntar se viu os pontos e se faz sentido aprofundar.',
+      },
+      {
+        id: 'step-3',
+        dayOffset: 6,
+        title: 'Estudo de Caso & Resultados',
+        actionType: 'prova_social',
+        channel: 'whatsapp',
+        notes: 'Demonstrar impacto financeiro em cliente similar.',
+      },
+      {
+        id: 'step-4',
+        dayOffset: 12,
+        title: 'Convite para Sessão Estratégica',
+        actionType: 'reuniao',
+        channel: 'whatsapp',
+        notes: 'Propor alinhamento de 15 minutos com o decisor.',
+      },
+      {
+        id: 'step-5',
+        dayOffset: 25,
+        title: 'Reativação Consultiva',
+        actionType: 'reativacao',
+        channel: 'whatsapp',
+        notes: 'Nova análise de mercado para o segmento.',
+      },
+    ],
+  },
+  {
+    id: 'preset-multichannel-4',
+    name: 'Cadência Multicanal (WhatsApp + E-mail + LinkedIn + Ligação)',
+    description: 'Abordagem coordenada em múltiplos pontos de contato para maximizar alcance.',
+    campaignType: 'multicanal',
+    channel: 'whatsapp',
+    steps: [
+      {
+        id: 'step-1',
+        dayOffset: 0,
+        title: 'Primeiro contato no WhatsApp',
+        actionType: 'primeiro_contato',
+        channel: 'whatsapp',
+        notes: 'Mensagem curta e personalizada.',
+      },
+      {
+        id: 'step-2',
+        dayOffset: 2,
+        title: 'E-mail com Diagnóstico Detalhado',
+        actionType: 'diagnostico',
+        channel: 'email',
+        notes: 'Envio de e-mail institucional mais completo.',
+      },
+      {
+        id: 'step-3',
+        dayOffset: 5,
+        title: 'Conexão & Mensagem no LinkedIn',
+        actionType: 'follow_up_2',
+        channel: 'linkedin',
+        notes: 'Toque executivo no perfil do decisor.',
+      },
+      {
+        id: 'step-4',
+        dayOffset: 9,
+        title: 'Ligação Telefônica de Alinhamento',
+        actionType: 'reuniao',
+        channel: 'call',
+        notes: 'Contato direto por telefone com recepcionista ou decisor.',
+      },
+    ],
+  },
+  {
+    id: 'preset-reactivation-3',
+    name: 'Cadência de Reativação 30/60 Dias (0, 7, 21 dias)',
+    description: 'Especial para reaquecer leads frios, propostas antigas ou contatos sem resposta.',
+    campaignType: 'reativacao',
+    channel: 'whatsapp',
+    steps: [
+      {
+        id: 'step-1',
+        dayOffset: 0,
+        title: 'Reativação com Novidade / Condição Especial',
+        actionType: 'reativacao',
+        channel: 'whatsapp',
+        notes: 'Retomada de contato leve e amigável.',
+      },
+      {
+        id: 'step-2',
+        dayOffset: 7,
+        title: 'Follow-up de Oportunidade',
+        actionType: 'follow_up_1',
+        channel: 'whatsapp',
+        notes: 'Validar se a condição faz sentido para este momento.',
+      },
+      {
+        id: 'step-3',
+        dayOffset: 21,
+        title: 'Última Chamada de Atualização',
+        actionType: 'follow_up_3',
+        channel: 'whatsapp',
+        notes: 'Encerramento com porta aberta para o futuro.',
+      },
+    ],
+  },
+];

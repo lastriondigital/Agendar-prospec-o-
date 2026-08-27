@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   MessageSquareText,
   Plus,
@@ -16,14 +16,13 @@ import {
   Sparkles,
   Layers,
   FileText,
-  Calendar,
+  Clock,
   Send,
-  CheckCircle2,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
-import { ContactChannel, MessageTemplate, TemplateCategory, LeadStage, Client } from '../types';
+import { ContactChannel, MessageTemplate, TemplateCategory, LeadStage } from '../types';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -31,116 +30,89 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ContextualTip } from '../components/common/ContextualTip';
-import { ScheduleMessageModal } from '../components/messaging/ScheduleMessageModal';
-import {
-  getChannelBadgeDetails,
-  interpolateMessage,
-  validateMessageContent,
-  ALLOWED_VARIABLES,
-} from '../utils/formatting';
-import {
-  getActionTypes,
-  CHANNEL_OPTIONS,
-  DEFAULT_ACTION_TYPES,
-  resolveVariablesDetailed,
-} from '../utils/cadenceUtils';
+import { getChannelBadgeDetails, interpolateMessage, validateMessageContent, ALLOWED_VARIABLES } from '../utils/formatting';
+import { ACTION_TYPE_OPTIONS, CAMPAIGN_TYPE_OPTIONS } from '../utils/schedulingConfig';
+import { ScheduleMessageModal } from '../components/scheduling/ScheduleMessageModal';
+
+const CATEGORY_LABELS: Record<TemplateCategory, string> = {
+  primeiro_contacto: 'Primeiro Contato',
+  follow_up: 'Follow-up',
+  diagnóstico: 'Diagnóstico',
+  prova: 'Prova Social',
+  proposta: 'Proposta Comercial',
+  objeção: 'Objeção',
+  fechamento: 'Fechamento',
+  pós_venda: 'Pós-Venda',
+  reativação: 'Reativação',
+  custom: 'Personalizado',
+};
 
 export const MessagesView: React.FC = () => {
-  const { templates, services, companies, contacts, upsertTemplate, deleteTemplate } = useApp();
+  const { templates, services, companies, upsertTemplate, deleteTemplate } = useApp();
   const confirm = useConfirm();
   const { success, error } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedChannel, setSelectedChannel] = useState<string>('all');
-  const [selectedActionType, setSelectedActionType] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedActionTypeFilter, setSelectedActionTypeFilter] = useState<string>('all');
   const [showArchived, setShowArchived] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
 
-  // Modal para agendar diretamente a partir do script
-  const [scheduleTemplateId, setScheduleTemplateId] = useState<string | null>(null);
+  // Scheduling Modal from Script card
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [schedulingTemplateId, setSchedulingTemplateId] = useState<string | undefined>(undefined);
 
   // Form State
   const [formTitle, setFormTitle] = useState('');
   const [formChannel, setFormChannel] = useState<ContactChannel>('whatsapp');
-  const [formActionType, setFormActionType] = useState<string>('Primeiro contato');
-  const [customActionType, setCustomActionType] = useState('');
-  const [isCustomTypeMode, setIsCustomTypeMode] = useState(false);
+  const [formCategory, setFormCategory] = useState<TemplateCategory>('primeiro_contacto');
+  const [formActionType, setFormActionType] = useState<string>('primeiro_contato');
+  const [formCampaignType, setFormCampaignType] = useState<string>('primeiro_contato');
   const [formContent, setFormContent] = useState('');
   const [formVersion, setFormVersion] = useState('v1.0');
   const [formServiceId, setFormServiceId] = useState('');
   const [formNiche, setFormNiche] = useState('');
   const [formPipelineStage, setFormPipelineStage] = useState<LeadStage | ''>('');
-  const [formStatus, setFormStatus] = useState<'active' | 'archived' | 'draft'>('active');
   const [formNotes, setFormNotes] = useState('');
 
-  // Amostras para prévia em tempo real
-  const sampleCompany = companies[0] || {
-    name: 'Clínica Alfa',
-    niche: 'Saúde & Estética',
-    city: 'São Paulo',
-    country: 'Brasil',
-  };
-  const sampleContact: Partial<Client> = {
-    name: contacts[0]?.name || 'Dr. Roberto Santos',
-    role: contacts[0]?.role || 'Diretor Clínico',
-    phone: contacts[0]?.phone || '(11) 98765-4321',
-    whatsapp: contacts[0]?.whatsapp || '(11) 98765-4321',
-    company: companies[0]?.name || 'Clínica Alfa',
-    segment: companies[0]?.niche || 'Saúde & Estética',
-  };
-  const sampleService = services[0] || {
-    name: 'Consultoria de Aquisição Digital',
-    basePrice: 3500,
-    currency: 'R$',
-  };
+  // Sample data for live preview
+  const sampleCompany = companies[0] || { name: 'Clínica Alfa', niche: 'Saúde & Estética', city: 'São Paulo', country: 'Brasil' };
+  const sampleService = services[0] || { name: 'Landing Page de Alta Conversão', basePrice: 2500, currency: 'R$' };
 
-  // Tipos de ação disponíveis na base
-  const availableActionTypes = useMemo(() => {
-    return getActionTypes(templates);
-  }, [templates]);
-
-  // Filtragem inteligente de templates
-  const filteredTemplates = useMemo(() => {
-    return templates.filter((t) => {
-      if (showArchived && !t.isArchived && t.status !== 'archived') return false;
-      if (!showArchived && (t.isArchived || t.status === 'archived')) return false;
-      if (showFavoritesOnly && !t.isFavorite) return false;
-      if (selectedChannel !== 'all' && t.channel !== selectedChannel) return false;
-      if (selectedActionType !== 'all') {
-        const itemType = t.actionType || t.category || t.type;
-        if (itemType !== selectedActionType) return false;
-      }
-      if (searchTerm) {
-        const q = searchTerm.toLowerCase();
-        return (
-          t.title.toLowerCase().includes(q) ||
-          t.content.toLowerCase().includes(q) ||
-          (t.actionType && t.actionType.toLowerCase().includes(q)) ||
-          t.notes?.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [templates, showArchived, showFavoritesOnly, selectedChannel, selectedActionType, searchTerm]);
+  const filteredTemplates = templates.filter((t) => {
+    if (showArchived && !t.isArchived) return false;
+    if (!showArchived && t.isArchived) return false;
+    if (showFavoritesOnly && !t.isFavorite) return false;
+    if (selectedChannel !== 'all' && t.channel !== selectedChannel) return false;
+    if (selectedCategory !== 'all' && t.category !== selectedCategory && t.type !== selectedCategory) return false;
+    if (selectedActionTypeFilter !== 'all' && t.actionType !== selectedActionTypeFilter) return false;
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      return (
+        t.title.toLowerCase().includes(q) ||
+        t.content.toLowerCase().includes(q) ||
+        t.notes?.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
 
   const handleOpenAdd = () => {
     setEditingTemplate(null);
     setFormTitle('');
     setFormChannel('whatsapp');
-    setFormActionType('Primeiro contato');
-    setCustomActionType('');
-    setIsCustomTypeMode(false);
-    setFormContent(
-      'Olá {{primeiro_nome}}, tudo bem?\n\nVi que você lidera a {{empresa}} em {{cidade}}. Analisando seu setor ({{nicho}}), notei que muitos negócios enfrentam desafios com {{problema}}.\n\nNós ajudamos empresas como a sua a {{beneficio}} através do {{servico}}.\n\n{{cta}}'
-    );
+    setFormCategory('primeiro_contacto');
+    setFormActionType('primeiro_contato');
+    setFormCampaignType('primeiro_contato');
+    setFormContent('Olá {{primeiro_nome}}, tudo bem?\n\nVi que você lidera a {{empresa}} em {{cidade}}. Analisando seu setor ({{nicho}}), notei que muitos negócios enfrentam desafios com {{problema}}.\n\nNós ajudamos empresas como a sua a {{beneficio}} através do {{servico}}.\n\n{{cta}}');
     setFormVersion('v1.0');
     setFormServiceId('');
     setFormNiche('');
     setFormPipelineStage('');
-    setFormStatus('active');
     setFormNotes('');
     setIsModalOpen(true);
   };
@@ -149,19 +121,14 @@ export const MessagesView: React.FC = () => {
     setEditingTemplate(template);
     setFormTitle(template.title);
     setFormChannel(template.channel);
-    const actType = template.actionType || template.category || template.type || 'Primeiro contato';
-    setFormActionType(actType);
-    setCustomActionType('');
-    setIsCustomTypeMode(false);
+    setFormCategory(template.category || template.type || 'primeiro_contacto');
+    setFormActionType(template.actionType || 'primeiro_contato');
+    setFormCampaignType(template.campaignType || 'primeiro_contato');
     setFormContent(template.content);
     setFormVersion(template.version || 'v1.0');
     setFormServiceId(template.serviceId || '');
     setFormNiche(template.niche || '');
     setFormPipelineStage(template.pipelineStage || '');
-    setFormStatus(
-      (template.status as 'active' | 'archived' | 'draft') ||
-        (template.isArchived ? 'archived' : 'active')
-    );
     setFormNotes(template.notes || '');
     setIsModalOpen(true);
   };
@@ -177,7 +144,7 @@ export const MessagesView: React.FC = () => {
       updatedAt: new Date().toISOString(),
     };
     await upsertTemplate(duplicated);
-    success('Script duplicado com sucesso!');
+    success('Template duplicado com sucesso!');
   };
 
   const handleToggleFavorite = async (template: MessageTemplate) => {
@@ -190,48 +157,39 @@ export const MessagesView: React.FC = () => {
   };
 
   const handleToggleArchive = async (template: MessageTemplate) => {
-    const isNowArchived = !template.isArchived;
     const updated: MessageTemplate = {
       ...template,
-      isArchived: isNowArchived,
-      status: isNowArchived ? 'archived' : 'active',
+      isArchived: !template.isArchived,
       updatedAt: new Date().toISOString(),
     };
     await upsertTemplate(updated);
-    success(isNowArchived ? 'Script arquivado.' : 'Script restaurado.');
+    success(updated.isArchived ? 'Template arquivado.' : 'Template restaurado.');
   };
 
   const handleSaveTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formTitle.trim() || !formContent.trim()) {
+    if (!formTitle || !formContent) {
       error('Preencha o título e o conteúdo da mensagem.');
-      return;
-    }
-
-    const effectiveAction = isCustomTypeMode ? customActionType.trim() : formActionType;
-    if (!effectiveAction) {
-      error('Defina o tipo de ação para este script.');
       return;
     }
 
     const template: MessageTemplate = {
       id: editingTemplate ? editingTemplate.id : `tpl-${Date.now()}`,
-      title: formTitle.trim(),
+      title: formTitle,
       channel: formChannel,
-      channels: [formChannel],
-      actionType: effectiveAction,
-      category: effectiveAction as any,
-      type: effectiveAction,
-      content: formContent.trim(),
+      category: formCategory,
+      type: formCategory,
+      actionType: formActionType,
+      campaignType: formCampaignType,
+      content: formContent,
       variables: ALLOWED_VARIABLES.filter((v) => formContent.includes(`{{${v}}}`)),
       version: formVersion || 'v1.0',
       serviceId: formServiceId || undefined,
       niche: formNiche || undefined,
       pipelineStage: formPipelineStage || undefined,
-      status: formStatus,
       isFavorite: editingTemplate ? editingTemplate.isFavorite : false,
-      isArchived: formStatus === 'archived',
-      notes: formNotes.trim(),
+      isArchived: editingTemplate ? editingTemplate.isArchived : false,
+      notes: formNotes,
       createdAt: editingTemplate?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -248,7 +206,7 @@ export const MessagesView: React.FC = () => {
       isDestructive: true,
       onConfirm: async () => {
         await deleteTemplate(template.id);
-        success('Template excluído com sucesso.');
+        success('Template excluído.');
       },
     });
   };
@@ -257,97 +215,110 @@ export const MessagesView: React.FC = () => {
     setFormContent((prev) => prev + ` {{${varTag}}}`);
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    success('Mensagem copiada para a área de transferência!');
-  };
-
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* Dica Contextual */}
       <ContextualTip
         id="messages_view_tip"
-        title="Scripts & Relação com Tipos de Ações"
-        message="Vincule seus scripts diretamente a um Tipo de Ação (ex: Primeiro contato, Follow-up 1, Quebra de objeção) e Canal. Ao agendar uma mensagem, o sistema selecionará e preencherá automaticamente o script ideal."
+        title="Biblioteca & Scripts Relacionados"
+        message="Vincule cada script a um canal e tipo de ação para que o agendador e o construtor de cadências os sugiram automaticamente."
       />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-100 flex items-center gap-2">
-            <MessageSquareText className="w-5 h-5 text-emerald-400" />
-            Biblioteca & Relação de Scripts de Prospecção
-          </h2>
+          <h2 className="text-xl font-bold text-neutral-100">Biblioteca de Scripts de Mensagem</h2>
           <p className="text-xs text-neutral-400">
-            Gerencie scripts organizados por Tipo de Ação, Canal e Etapa com substituição dinâmica de variáveis.
+            Gerencie templates versionados por canal, tipo de ação e nicho com variáveis dinâmicas em tempo real.
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleOpenAdd}
-          leftIcon={<Plus className="w-4 h-4" />}
-        >
-          Novo Script
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSchedulingTemplateId(undefined);
+              setIsScheduleModalOpen(true);
+            }}
+            leftIcon={<Clock className="w-4 h-4 text-blue-400" />}
+          >
+            Agendar Mensagem
+          </Button>
+
+          <Button variant="primary" size="sm" onClick={handleOpenAdd} leftIcon={<Plus className="w-4 h-4" />}>
+            Novo Script
+          </Button>
+        </div>
       </div>
 
-      {/* Filtros e Barra de Pesquisa */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-4 rounded-xl bg-neutral-900 border border-neutral-800 shadow-sm">
+      {/* Filters & Search Toolbar */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-neutral-900 border border-neutral-800 shadow-sm">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
           <input
             type="text"
-            placeholder="Pesquisar por título, conteúdo, tipo de ação..."
+            placeholder="Pesquisar por título, conteúdo ou notas..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-emerald-500"
+            className="w-full pl-10 pr-4 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-blue-500"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Seletor de Canal */}
+          {/* Channel selector */}
           <select
             value={selectedChannel}
             onChange={(e) => setSelectedChannel(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 focus:outline-none focus:border-emerald-500"
+            className="px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-xs text-neutral-200 focus:outline-none focus:border-blue-500"
           >
             <option value="all">Todos os Canais</option>
-            {CHANNEL_OPTIONS.map((ch) => (
-              <option key={ch.value} value={ch.value}>
-                {ch.icon} {ch.label}
-              </option>
-            ))}
+            <option value="whatsapp">💬 WhatsApp</option>
+            <option value="linkedin">💼 LinkedIn</option>
+            <option value="email">✉️ E-mail</option>
+            <option value="call">📞 Ligação</option>
+            <option value="instagram">📷 Instagram</option>
           </select>
 
-          {/* Seletor de Tipo de Ação */}
+          {/* Action Type filter */}
           <select
-            value={selectedActionType}
-            onChange={(e) => setSelectedActionType(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 focus:outline-none focus:border-emerald-500"
+            value={selectedActionTypeFilter}
+            onChange={(e) => setSelectedActionTypeFilter(e.target.value)}
+            className="px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-xs text-neutral-200 focus:outline-none focus:border-blue-500"
           >
             <option value="all">Todos os Tipos de Ação</option>
-            {availableActionTypes.map((act) => (
-              <option key={act} value={act}>
-                🎯 {act}
+            {ACTION_TYPE_OPTIONS.map((at) => (
+              <option key={at.id} value={at.id}>
+                {at.label}
               </option>
             ))}
           </select>
 
-          {/* Filtro de Favoritos */}
+          {/* Category selector */}
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-xs text-neutral-200 focus:outline-none focus:border-blue-500"
+          >
+            <option value="all">Todas as Categorias</option>
+            {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+
+          {/* Favorites filter */}
           <Button
             variant={showFavoritesOnly ? 'primary' : 'secondary'}
             size="xs"
             onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-            leftIcon={
-              <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />
-            }
+            leftIcon={<Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />}
           >
             Favoritos
           </Button>
 
-          {/* Toggle de Arquivados */}
+          {/* Archive toggle */}
           <Button
             variant={showArchived ? 'primary' : 'ghost'}
             size="xs"
@@ -359,59 +330,58 @@ export const MessagesView: React.FC = () => {
         </div>
       </div>
 
-      {/* Grid de Scripts */}
+      {/* Templates Grid */}
       {filteredTemplates.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredTemplates.map((template) => {
             const channelBadge = getChannelBadgeDetails(template.channel);
-            const livePreview = interpolateMessage(
-              template.content,
-              sampleContact,
-              sampleService,
-              sampleCompany
-            );
+            const livePreview = interpolateMessage(template.content, null, sampleService, sampleCompany);
             const validation = validateMessageContent(template.content);
+
             const matchedService = services.find((s) => s.id === template.serviceId);
-            const displayActionType =
-              template.actionType || template.category || template.type || 'Primeiro contato';
+            const actionTypeObj = ACTION_TYPE_OPTIONS.find((a) => a.id === template.actionType);
 
             return (
               <Card
                 key={template.id}
                 padding="md"
-                className={`bg-neutral-900 border-neutral-800 space-y-3.5 flex flex-col justify-between transition-all ${
-                  template.isArchived || template.status === 'archived'
-                    ? 'opacity-60 grayscale'
-                    : ''
+                className={`bg-neutral-900 border-neutral-800 space-y-3.5 flex flex-col justify-between transition-all hover:border-neutral-700 ${
+                  template.isArchived ? 'opacity-60 grayscale' : ''
                 }`}
               >
                 <div className="space-y-3">
-                  {/* Cabeçalho com Badges de Canal e Tipo de Ação */}
+                  {/* Top badges & title */}
                   <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1.5">
+                    <div>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded font-medium ${channelBadge.bgClass} ${channelBadge.textClass}`}
-                        >
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${channelBadge.bgClass} ${channelBadge.textClass}`}>
                           {channelBadge.label}
                         </span>
-
-                        <Badge variant="emerald" size="sm">
-                          🎯 {displayActionType}
-                        </Badge>
-
+                        {actionTypeObj ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 font-medium">
+                            {actionTypeObj.label}
+                          </span>
+                        ) : (
+                          <Badge variant="neutral" size="sm">
+                            {CATEGORY_LABELS[template.category || template.type] || template.category}
+                          </Badge>
+                        )}
                         <span className="font-mono text-[10px] text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded">
                           {template.version || 'v1.0'}
                         </span>
-
                         {matchedService && (
                           <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                            Serviço: {matchedService.name}
+                            {matchedService.name}
+                          </span>
+                        )}
+                        {template.niche && (
+                          <span className="text-[10px] text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded">
+                            {template.niche}
                           </span>
                         )}
                       </div>
 
-                      <h4 className="text-sm font-bold text-neutral-100 mt-1 flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-neutral-100 mt-2 flex items-center gap-2">
                         {template.title}
                       </h4>
                     </div>
@@ -423,29 +393,15 @@ export const MessagesView: React.FC = () => {
                         onClick={() => handleToggleFavorite(template)}
                         title={template.isFavorite ? 'Desfavoritar' : 'Favoritar'}
                       >
-                        <Star
-                          className={`w-3.5 h-3.5 ${
-                            template.isFavorite
-                              ? 'text-amber-400 fill-amber-400'
-                              : 'text-neutral-500'
-                          }`}
-                        />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => copyToClipboard(template.content)}
-                        title="Copiar texto"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-neutral-400" />
+                        <Star className={`w-3.5 h-3.5 ${template.isFavorite ? 'text-amber-400 fill-amber-400' : 'text-neutral-500'}`} />
                       </Button>
                       <Button
                         variant="ghost"
                         size="xs"
                         onClick={() => handleDuplicate(template)}
-                        title="Duplicar template"
+                        title="Duplicar script"
                       >
-                        <Layers className="w-3.5 h-3.5 text-neutral-400" />
+                        <Copy className="w-3.5 h-3.5 text-neutral-400" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -474,34 +430,35 @@ export const MessagesView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Conteúdo do Script */}
-                  <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 font-sans leading-relaxed whitespace-pre-line select-text">
+                  {/* Content Raw */}
+                  <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 font-sans leading-relaxed whitespace-pre-line select-text max-h-32 overflow-y-auto">
                     {template.content}
                   </div>
 
-                  {/* Prévia Dinâmica */}
-                  <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-[11px] text-neutral-300 space-y-1">
-                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
-                      <Eye className="w-3 h-3" /> Prévia com Dados de Exemplo ({sampleCompany.name}):
+                  {/* Live Simulation Preview */}
+                  <div className="p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 text-[11px] text-neutral-300 space-y-1">
+                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
+                      <Eye className="w-3 h-3" /> Exemplo Renderizado ({sampleCompany.name}):
                     </span>
-                    <p className="italic text-neutral-300">{livePreview}</p>
+                    <p className="italic text-neutral-400 line-clamp-2">{livePreview}</p>
                   </div>
                 </div>
 
-                {/* Rodapé com Ação Rápida de Agendar */}
-                <div className="flex items-center justify-between pt-3 border-t border-neutral-800 text-[11px]">
-                  <span className="text-neutral-500 truncate max-w-[200px]">
-                    {template.notes || 'Pronto para uso operacional'}
-                  </span>
+                {/* Footer notes, validation status & Schedule button */}
+                <div className="flex items-center justify-between pt-2 border-t border-neutral-800 text-[11px] text-neutral-500">
+                  <span>{template.notes || 'Pronto para agendamento'}</span>
 
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="xs"
-                    className="text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20"
-                    leftIcon={<Calendar className="w-3.5 h-3.5" />}
-                    onClick={() => setScheduleTemplateId(template.id)}
+                    onClick={() => {
+                      setSchedulingTemplateId(template.id);
+                      setIsScheduleModalOpen(true);
+                    }}
+                    leftIcon={<Clock className="w-3 h-3 text-blue-400" />}
+                    className="text-xs"
                   >
-                    Agendar Envio
+                    Agendar Mensagem
                   </Button>
                 </div>
               </Card>
@@ -512,24 +469,24 @@ export const MessagesView: React.FC = () => {
         <EmptyState
           icon={<MessageSquareText className="w-8 h-8 text-neutral-400" />}
           title="Nenhum script encontrado"
-          description="Ajuste os filtros de canal e tipo de ação ou crie um novo script para sua biblioteca."
-          actionLabel="Criar Novo Script"
+          description="Ajuste os filtros de busca ou crie um novo modelo de mensagem para a sua biblioteca."
+          actionLabel="Criar Script"
           onAction={handleOpenAdd}
         />
       )}
 
-      {/* Modal Criar / Editar Script */}
+      {/* Modal Add / Edit Template */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingTemplate ? 'Editar Script de Mensagem' : 'Novo Script de Mensagem'}
         maxWidth="xl"
       >
-        <form onSubmit={handleSaveTemplate} className="space-y-4">
+        <form onSubmit={handleSaveTemplate} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
               <Input
-                label="Nome / Título do Script *"
+                label="Título do Script *"
                 placeholder="Ex: Abordagem Direta WhatsApp - Clínicas"
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
@@ -543,85 +500,48 @@ export const MessagesView: React.FC = () => {
                 value={formVersion}
                 onChange={(e) => setFormVersion(e.target.value)}
                 placeholder="Ex: v1.0"
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:border-emerald-500 font-mono"
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Canal */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Canal de Envio *</label>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">Canal Padrão</label>
               <select
                 value={formChannel}
                 onChange={(e) => setFormChannel(e.target.value as ContactChannel)}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {CHANNEL_OPTIONS.map((ch) => (
-                  <option key={ch.value} value={ch.value}>
-                    {ch.icon} {ch.label}
+                <option value="whatsapp">WhatsApp</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="email">E-mail</option>
+                <option value="call">Ligação</option>
+                <option value="instagram">Instagram</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">Tipo de Ação</label>
+              <select
+                value={formActionType}
+                onChange={(e) => setFormActionType(e.target.value)}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {ACTION_TYPE_OPTIONS.map((at) => (
+                  <option key={at.id} value={at.id}>
+                    {at.label}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Tipo de Ação */}
             <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Tipo de Ação *</label>
-              {!isCustomTypeMode ? (
-                <div className="flex gap-1.5">
-                  <select
-                    value={formActionType}
-                    onChange={(e) => setFormActionType(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:border-emerald-500"
-                  >
-                    {availableActionTypes.map((act) => (
-                      <option key={act} value={act}>
-                        {act}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    className="whitespace-nowrap text-[11px]"
-                    onClick={() => setIsCustomTypeMode(true)}
-                  >
-                    + Novo
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    placeholder="Digite o novo tipo de ação..."
-                    value={customActionType}
-                    onChange={(e) => setCustomActionType(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:border-emerald-500"
-                    autoFocus
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    className="text-[11px]"
-                    onClick={() => setIsCustomTypeMode(false)}
-                  >
-                    Lista
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Vincular a Serviço (Opcional)</label>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">Vincular a Serviço</label>
               <select
                 value={formServiceId}
                 onChange={(e) => setFormServiceId(e.target.value)}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Nenhum (Geral)</option>
                 {services.map((s) => (
@@ -631,26 +551,41 @@ export const MessagesView: React.FC = () => {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">Nicho Específico (Opcional)</label>
+              <input
+                type="text"
+                value={formNiche}
+                onChange={(e) => setFormNiche(e.target.value)}
+                placeholder="Ex: Saúde & Estética"
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
             <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Status do Script</label>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">Tipo de Campanha Recomendado</label>
               <select
-                value={formStatus}
-                onChange={(e) => setFormStatus(e.target.value as 'active' | 'archived' | 'draft')}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:border-emerald-500"
+                value={formCampaignType}
+                onChange={(e) => setFormCampaignType(e.target.value)}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="active">Ativo (Disponível para agendamento)</option>
-                <option value="draft">Rascunho (Em elaboração)</option>
-                <option value="archived">Arquivado</option>
+                {CAMPAIGN_TYPE_OPTIONS.map((ct) => (
+                  <option key={ct.id} value={ct.id}>
+                    {ct.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
-          {/* Variáveis Dinâmicas */}
+          {/* Variables Quick Insert Toolbar */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-neutral-300 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-              Inserir Variável Dinâmica:
+              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+              Inserir Variável Dinâmica no Script:
             </label>
             <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-neutral-950 border border-neutral-800 max-h-24 overflow-y-auto">
               {ALLOWED_VARIABLES.map((v) => (
@@ -666,7 +601,7 @@ export const MessagesView: React.FC = () => {
             </div>
           </div>
 
-          {/* Editor e Prévia */}
+          {/* Content Editor & Live Preview */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-neutral-300">Conteúdo do Script *</label>
@@ -675,52 +610,45 @@ export const MessagesView: React.FC = () => {
                 value={formContent}
                 onChange={(e) => setFormContent(e.target.value)}
                 placeholder="Escreva a mensagem usando as variáveis..."
-                className="w-full p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 font-sans leading-relaxed focus:outline-none focus:border-emerald-500"
+                className="w-full p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 font-sans leading-relaxed focus:outline-none focus:border-blue-500"
                 required
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-neutral-300 flex items-center gap-1">
-                <Eye className="w-3.5 h-3.5 text-emerald-400" /> Prévia com Dados de Exemplo:
+                <Eye className="w-3.5 h-3.5 text-blue-400" /> Pré-visualização com Exemplo:
               </label>
-              <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 font-sans leading-relaxed whitespace-pre-line h-[178px] overflow-y-auto">
-                {interpolateMessage(formContent, sampleContact, sampleService, sampleCompany)}
+              <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 font-sans leading-relaxed whitespace-pre-line h-[178px] overflow-y-auto">
+                {interpolateMessage(formContent, null, sampleService, sampleCompany)}
               </div>
             </div>
           </div>
 
           <Input
-            label="Notas Internas / Dica de Uso"
-            placeholder="Ex: Usar após 48h sem resposta do primeiro contato."
+            label="Notas Internas / Instruções de Envio"
+            placeholder="Ex: Usar quando o decisor for o Diretor Comercial."
             value={formNotes}
             onChange={(e) => setFormNotes(e.target.value)}
           />
 
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-800">
-            <Button variant="ghost" size="sm" type="button" onClick={() => setIsModalOpen(false)}>
+            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
               Cancelar
             </Button>
-            <Button variant="primary" size="sm" type="submit">
+            <Button type="submit" variant="primary">
               Salvar Script
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* Modal de Agendamento Aberto pelo Script */}
-      {scheduleTemplateId && (
-        <ScheduleMessageModal
-          isOpen={!!scheduleTemplateId}
-          onClose={() => setScheduleTemplateId(null)}
-          initialActionType={
-            templates.find((t) => t.id === scheduleTemplateId)?.actionType ||
-            templates.find((t) => t.id === scheduleTemplateId)?.category ||
-            'Primeiro contato'
-          }
-          initialChannel={templates.find((t) => t.id === scheduleTemplateId)?.channel}
-        />
-      )}
+      {/* Global Schedule Message Modal */}
+      <ScheduleMessageModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        initialTemplateId={schedulingTemplateId}
+      />
     </div>
   );
 };
