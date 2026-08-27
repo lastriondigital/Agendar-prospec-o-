@@ -18,18 +18,18 @@ export const Header: React.FC = () => {
   const currentNav = NAVIGATION_ITEMS.find((n) => n.id === activeRoute) || NAVIGATION_ITEMS[0];
 
   return (
-    <header className="sticky top-0 z-30 bg-slate-950/90 dark:bg-slate-950/90 light:bg-white/90 backdrop-blur-md border-b border-slate-800/80 dark:border-slate-800/80 light:border-slate-200 px-4 sm:px-6 py-3 shrink-0 select-none transition-colors duration-150">
+    <header className="sticky top-0 z-30 bg-white/90 dark:bg-[#181B20]/90 backdrop-blur-md border-b border-[#E6E8EB] dark:border-[#2D3139] px-4 sm:px-6 py-3 shrink-0 select-none transition-colors duration-150">
       <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
         {/* Title & Route Context */}
         <div className="flex items-center gap-3 min-w-0">
-          <div className="lg:hidden w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0 shadow-xs">
+          <div className="lg:hidden w-8 h-8 rounded-lg bg-[#3F6FB5] flex items-center justify-center text-white shrink-0 shadow-xs">
             <Zap className="w-4 h-4 fill-white" />
           </div>
           <div>
-            <h1 className="text-base sm:text-lg font-bold text-slate-100 dark:text-slate-100 light:text-slate-900 leading-tight truncate">
+            <h1 className="text-base sm:text-lg font-semibold text-[#202124] dark:text-[#E8EAED] leading-tight truncate">
               {currentNav.label}
             </h1>
-            <p className="hidden sm:block text-xs text-slate-400 dark:text-slate-400 light:text-slate-500 truncate">
+            <p className="hidden sm:block text-xs text-[#5F6368] dark:text-[#9AA0A6] truncate">
               {currentNav.description}
             </p>
           </div>
@@ -41,7 +41,7 @@ export const Header: React.FC = () => {
           {hasUpdate && (
             <button
               onClick={applyUpdate}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs animate-pulse cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-xs animate-pulse cursor-pointer"
               title="Nova versão disponível - clique para atualizar"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -53,7 +53,7 @@ export const Header: React.FC = () => {
           {isInstallable && (
             <button
               onClick={promptInstall}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 transition cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/40 text-[#3F6FB5] border border-blue-200 dark:border-blue-800/40 transition cursor-pointer"
               title="Instalar PROSPECT OS como aplicativo nativo (PWA)"
             >
               <Download className="w-3.5 h-3.5" />
@@ -65,8 +65,8 @@ export const Header: React.FC = () => {
           <SyncStatusIndicator />
 
           {isDemoMode && (
-            <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-amber-300 text-xs font-medium">
-              <Sparkles className="w-3 h-3 text-amber-400" />
+            <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 text-xs font-medium">
+              <Sparkles className="w-3 h-3 text-amber-600 dark:text-amber-400" />
               <span>Demonstração</span>
             </div>
           )}
@@ -75,9 +75,9 @@ export const Header: React.FC = () => {
           {activeRoute !== 'prospecting' && metrics.pendingToday > 0 && (
             <button
               onClick={() => setActiveRoute('prospecting')}
-              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition-all cursor-pointer shadow-xs"
+              className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800/40 text-[#3F6FB5] dark:text-blue-300 text-xs font-semibold transition-colors cursor-pointer shadow-xs"
             >
-              <Zap className="w-3.5 h-3.5 fill-emerald-300" />
+              <Zap className="w-3.5 h-3.5 fill-current" />
               <span>{metrics.pendingToday} pendentes ({formattedDuration})</span>
             </button>
           )}
@@ -85,18 +85,18 @@ export const Header: React.FC = () => {
           {/* Quick Production Audit Button */}
           <button
             onClick={() => setIsAuditModalOpen(true)}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-xs font-semibold text-neutral-300 transition cursor-pointer"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#1E2228] hover:bg-neutral-100 dark:hover:bg-[#252A32] border border-[#E6E8EB] dark:border-[#2D3139] text-xs font-medium text-[#5F6368] dark:text-[#9AA0A6] transition cursor-pointer"
             title="Abrir Auditoria de Produção & Verificação de 24 Passos"
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden xl:inline">Auditoria de Produção</span>
-            <span className="px-1 py-0.2 rounded bg-emerald-500/20 text-[10px] text-emerald-400 font-bold">READY</span>
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="hidden xl:inline">Auditoria</span>
+            <span className="px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] font-semibold">OK</span>
           </button>
 
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-900 border border-slate-800 dark:border-slate-800 light:border-slate-200 light:text-slate-600 light:hover:text-slate-900 light:hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-[#5F6368] hover:text-[#202124] dark:text-[#9AA0A6] dark:hover:text-[#E8EAED] hover:bg-neutral-100 dark:hover:bg-[#20242A] border border-[#E6E8EB] dark:border-[#2D3139] transition-colors cursor-pointer"
             aria-label="Alternar tema claro/escuro"
             title={`Tema atual: ${theme}`}
           >
@@ -113,5 +113,3 @@ export const Header: React.FC = () => {
     </header>
   );
 };
-
-

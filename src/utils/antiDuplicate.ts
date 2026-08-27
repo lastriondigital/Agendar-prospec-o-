@@ -1,11 +1,29 @@
 import { Company, Contact, DuplicateMatch, Lead } from '../types';
 
 /**
- * Normaliza número de telefone removendo pontuações, parênteses, espaços, hífens e símbolos.
+ * Normaliza número de telefone removendo pontuações, parênteses, espaços, hífens, símbolos e zeros à esquerda desnecessários.
  */
 export function normalizePhone(raw?: string): string {
   if (!raw) return '';
-  return raw.replace(/[\s\(\)\-\+\.\/]/g, '').trim();
+  const digits = raw.replace(/\D/g, '');
+  // Remove zero inicial de discagem local (ex: 0841234567 -> 841234567, 011987654321 -> 11987654321)
+  if (digits.startsWith('0') && digits.length >= 9) {
+    return digits.replace(/^0+/, '');
+  }
+  return digits;
+}
+
+/**
+ * Normaliza website para comparação (remove protocolo http/https, www e barras finais)
+ */
+export function normalizeWebsite(url?: string): string {
+  if (!url) return '';
+  return url
+    .toLowerCase()
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/+$/, '');
 }
 
 /**
@@ -28,7 +46,7 @@ export function normalizeText(text?: string): string {
 export function cleanCompanyCorporateSuffixes(name?: string): string {
   const norm = normalizeText(name);
   return norm
-    .replace(/\b(ltda|eireli|s\/a|sa|me|epp|inc|llc|gmbh|co|limitada|tecnologia|tech|solucoes|servicos|grupo)\b/gi, '')
+    .replace(/\b(ltda|eireli|s\/a|sa|me|epp|inc|llc|gmbh|co|limitada|tecnologia|tech|solucoes|servicos|grupo|lda)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -42,7 +60,7 @@ export function normalizeEmail(email?: string): string {
 }
 
 /**
- * Compara dois números de telefone considerando DDI (+55, +351, etc), DDD e formato local.
+ * Compara dois números de telefone considerando DDI (+258 Moçambique, +55 Brasil, +351 Portugal, etc), DDD e formato local.
  */
 export function arePhonesMatching(phoneA?: string, phoneB?: string): boolean {
   const normA = normalizePhone(phoneA);
@@ -50,14 +68,15 @@ export function arePhonesMatching(phoneA?: string, phoneB?: string): boolean {
   if (!normA || !normB) return false;
   if (normA === normB) return true;
 
-  // Se um número termina com o outro (ex: +5511999998888 termina com 11999998888 ou 999998888)
-  if (normA.endsWith(normB) && normB.length >= 8) return true;
-  if (normB.endsWith(normA) && normA.length >= 8) return true;
+  // Se um número termina com o outro (ex: 258841234567 termina com 841234567; 5511999998888 termina com 11999998888 ou 999998888)
+  if (normA.endsWith(normB) && normB.length >= 7) return true;
+  if (normB.endsWith(normA) && normA.length >= 7) return true;
 
-  // Comparar os últimos 9 dígitos (padrão celular BR) ou 8 dígitos
+  // Comparar os últimos 9 dígitos
   if (normA.length >= 9 && normB.length >= 9) {
     if (normA.slice(-9) === normB.slice(-9)) return true;
   }
+  // Comparar os últimos 8 dígitos
   if (normA.length >= 8 && normB.length >= 8) {
     if (normA.slice(-8) === normB.slice(-8)) return true;
   }
@@ -115,12 +134,16 @@ export interface AntiDuplicateParams {
   phone?: string;
   whatsapp?: string;
   email?: string;
+  website?: string;
+  companyPhone?: string;
+  companyWhatsApp?: string;
+  companyEmail?: string;
   excludeCompanyId?: string;
   excludeContactId?: string;
 }
 
 /**
- * Executa algoritmo anti-duplicação e localiza potenciais conflitos cadastrais.
+ * Executa algoritmo anti-duplicação e localiza potenciais conflitos cadastrais para Empresas e Contatos.
  */
 export function findPotentialDuplicates(
   params: AntiDuplicateParams,
@@ -129,9 +152,9 @@ export function findPotentialDuplicates(
   leads: Lead[]
 ): DuplicateMatch[] {
   const matches: DuplicateMatch[] = [];
-  const normPhone = normalizePhone(params.phone);
-  const normWhatsapp = normalizePhone(params.whatsapp);
-  const normEmail = normalizeEmail(params.email);
+  const targetPhones = [params.phone, params.whatsapp, params.companyPhone, params.companyWhatsApp].filter(Boolean) as string[];
+  const targetEmails = [params.email, params.companyEmail].filter(Boolean) as string[];
+  const normWebsite = normalizeWebsite(params.website);
   const normContactName = normalizeText(params.contactName);
   const normCompanyName = normalizeText(params.companyName);
   const normTradeName = normalizeText(params.tradeName);
@@ -147,7 +170,7 @@ export function findPotentialDuplicates(
   const leadByCompany = new Map<string, Lead>();
   leads.forEach((l) => leadByCompany.set(l.companyId, l));
 
-  // 1. Verificar contatos existentes por Telefone, WhatsApp, Email e Nome
+  // 1. Verificar contatos existentes por Telefone, WhatsApp, Email e Nome+Empresa
   for (const contact of contacts) {
     if (params.excludeContactId && contact.id === params.excludeContactId) continue;
     if (params.excludeCompanyId && contact.companyId === params.excludeCompanyId) continue;
@@ -156,46 +179,48 @@ export function findPotentialDuplicates(
     if (!comp) continue;
     const lead = leadByCompany.get(comp.id);
 
-    // Verificação por Telefone
-    if (normPhone && contact.phone && arePhonesMatching(normPhone, contact.phone)) {
-      matches.push({
-        type: 'phone',
-        reason: 'Telefone já cadastrado no sistema.',
-        company: comp,
-        contact,
-        lead,
-        matchedField: 'Telefone',
-        matchedValue: contact.phone,
-      });
-      continue;
+    // Verificação por WhatsApp / Telefone do contacto
+    for (const tPhone of targetPhones) {
+      if (contact.whatsapp && arePhonesMatching(tPhone, contact.whatsapp)) {
+        matches.push({
+          type: 'whatsapp',
+          reason: 'Número de WhatsApp já associado ao contacto ' + contact.name + ' na empresa ' + comp.name + '.',
+          company: comp,
+          contact,
+          lead,
+          matchedField: 'WhatsApp',
+          matchedValue: contact.whatsapp,
+        });
+        break;
+      }
+      if (contact.phone && arePhonesMatching(tPhone, contact.phone)) {
+        matches.push({
+          type: 'phone',
+          reason: 'Telefone já cadastrado no contacto ' + contact.name + ' na empresa ' + comp.name + '.',
+          company: comp,
+          contact,
+          lead,
+          matchedField: 'Telefone',
+          matchedValue: contact.phone,
+        });
+        break;
+      }
     }
 
-    // Verificação por WhatsApp
-    if (normWhatsapp && contact.whatsapp && arePhonesMatching(normWhatsapp, contact.whatsapp)) {
-      matches.push({
-        type: 'whatsapp',
-        reason: 'Número de WhatsApp já associado a outro contacto.',
-        company: comp,
-        contact,
-        lead,
-        matchedField: 'WhatsApp',
-        matchedValue: contact.whatsapp,
-      });
-      continue;
-    }
-
-    // Verificação por Email
-    if (normEmail && contact.email && normalizeEmail(contact.email) === normEmail) {
-      matches.push({
-        type: 'email',
-        reason: 'Endereço de e-mail já registrado.',
-        company: comp,
-        contact,
-        lead,
-        matchedField: 'E-mail',
-        matchedValue: contact.email,
-      });
-      continue;
+    // Verificação por Email do contacto
+    for (const tEmail of targetEmails) {
+      if (contact.email && normalizeEmail(contact.email) === normalizeEmail(tEmail)) {
+        matches.push({
+          type: 'email',
+          reason: 'Endereço de e-mail já registrado para ' + contact.name + ' (' + comp.name + ').',
+          company: comp,
+          contact,
+          lead,
+          matchedField: 'E-mail',
+          matchedValue: contact.email,
+        });
+        break;
+      }
     }
 
     // Verificação por Nome do Contacto + Empresa
@@ -221,42 +246,108 @@ export function findPotentialDuplicates(
           matchedField: 'Contacto + Empresa',
           matchedValue: `${contact.name} (${comp.name})`,
         });
-        continue;
       }
     }
   }
 
-  // 2. Verificar duplicação de Empresa por Nome, Nome Fantasia e Similaridade
-  if (params.companyName || params.tradeName) {
-    for (const comp of companies) {
-      if (params.excludeCompanyId && comp.id === params.excludeCompanyId) continue;
+  // 2. Verificar duplicação de Empresa por Nome, Nome Fantasia, Telefone da Empresa, WhatsApp da Empresa, Website e Email da Empresa
+  for (const comp of companies) {
+    if (params.excludeCompanyId && comp.id === params.excludeCompanyId) continue;
+    if (matches.some((m) => m.company.id === comp.id)) continue;
 
+    const compContacts = contactsByCompany.get(comp.id) || [];
+    const lead = leadByCompany.get(comp.id);
+
+    // Comparar telefones da empresa
+    if (comp.companyWhatsApp) {
+      for (const tPhone of targetPhones) {
+        if (arePhonesMatching(tPhone, comp.companyWhatsApp)) {
+          matches.push({
+            type: 'whatsapp',
+            reason: `WhatsApp corporativo já registrado na empresa "${comp.name}".`,
+            company: comp,
+            contact: compContacts[0],
+            lead,
+            matchedField: 'WhatsApp da Empresa',
+            matchedValue: comp.companyWhatsApp,
+          });
+          break;
+        }
+      }
+    }
+
+    if (comp.companyPhone && !matches.some((m) => m.company.id === comp.id)) {
+      for (const tPhone of targetPhones) {
+        if (arePhonesMatching(tPhone, comp.companyPhone)) {
+          matches.push({
+            type: 'phone',
+            reason: `Telefone corporativo já registrado na empresa "${comp.name}".`,
+            company: comp,
+            contact: compContacts[0],
+            lead,
+            matchedField: 'Telefone da Empresa',
+            matchedValue: comp.companyPhone,
+          });
+          break;
+        }
+      }
+    }
+
+    // Comparar Website da empresa
+    if (normWebsite && comp.website && !matches.some((m) => m.company.id === comp.id)) {
+      if (normalizeWebsite(comp.website) === normWebsite) {
+        matches.push({
+          type: 'name_company',
+          reason: `Website já cadastrado na empresa "${comp.name}".`,
+          company: comp,
+          contact: compContacts[0],
+          lead,
+          matchedField: 'Website',
+          matchedValue: comp.website,
+        });
+      }
+    }
+
+    // Comparar Email corporativo da empresa
+    if (comp.companyEmail && !matches.some((m) => m.company.id === comp.id)) {
+      for (const tEmail of targetEmails) {
+        if (normalizeEmail(comp.companyEmail) === normalizeEmail(tEmail)) {
+          matches.push({
+            type: 'email',
+            reason: `E-mail corporativo já cadastrado na empresa "${comp.name}".`,
+            company: comp,
+            contact: compContacts[0],
+            lead,
+            matchedField: 'E-mail da Empresa',
+            matchedValue: comp.companyEmail,
+          });
+          break;
+        }
+      }
+    }
+
+    // Comparar Nomes e Nomes Fantasia
+    if ((params.companyName || params.tradeName) && !matches.some((m) => m.company.id === comp.id)) {
       const compSimilarity = areCompanyNamesSimilar(params.companyName, comp.name);
       const tradeSimilarity = params.tradeName ? areCompanyNamesSimilar(params.tradeName, comp.tradeName || comp.name) : { similar: false };
       const crossSimilarity = areCompanyNamesSimilar(params.companyName, comp.tradeName);
 
       if (compSimilarity.similar || tradeSimilarity.similar || crossSimilarity.similar) {
-        // Se já não estiver nos matches
-        const alreadyMatched = matches.some((m) => m.company.id === comp.id);
-        if (!alreadyMatched) {
-          const compContacts = contactsByCompany.get(comp.id) || [];
-          const lead = leadByCompany.get(comp.id);
-          const reasonText =
-            compSimilarity.reason ||
-            tradeSimilarity.reason ||
-            crossSimilarity.reason ||
-            'Empresa com nome ou razão social muito semelhante já existente.';
+        const reasonText =
+          compSimilarity.reason ||
+          tradeSimilarity.reason ||
+          crossSimilarity.reason ||
+          'Empresa com nome ou razão social muito semelhante já existente.';
 
-          matches.push({
-            type: 'name_company',
-            reason: reasonText,
-            company: comp,
-            contact: compContacts[0],
-            lead,
-            matchedField: 'Nome da Empresa',
-            matchedValue: comp.name,
-          });
-        }
+        matches.push({
+          type: 'name_company',
+          reason: reasonText,
+          company: comp,
+          contact: compContacts[0],
+          lead,
+          matchedField: 'Nome da Empresa',
+          matchedValue: comp.name,
+        });
       }
     }
   }

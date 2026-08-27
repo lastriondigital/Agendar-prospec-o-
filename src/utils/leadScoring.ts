@@ -63,48 +63,48 @@ export function getScoreClassificationLabel(classification: LeadScoreClassificat
 export function getScoreColorTokens(score: number) {
   if (score >= 85) {
     return {
-      bg: 'bg-emerald-500/15',
-      text: 'text-emerald-300',
-      border: 'border-emerald-500/40',
-      badgeBg: 'bg-emerald-500',
-      badgeText: 'text-neutral-950',
-      dotColor: 'bg-emerald-400',
-      ringColor: 'ring-emerald-500/30',
+      bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+      text: 'text-emerald-800 dark:text-emerald-300',
+      border: 'border-emerald-200 dark:border-emerald-800/40',
+      badgeBg: 'bg-emerald-600 dark:bg-emerald-500',
+      badgeText: 'text-white',
+      dotColor: 'bg-emerald-600 dark:bg-emerald-400',
+      ringColor: 'ring-emerald-500/20',
       label: 'Prioridade Máxima',
     };
   }
   if (score >= 70) {
     return {
-      bg: 'bg-sky-500/15',
-      text: 'text-sky-300',
-      border: 'border-sky-500/40',
-      badgeBg: 'bg-sky-500',
-      badgeText: 'text-neutral-950',
-      dotColor: 'bg-sky-400',
-      ringColor: 'ring-sky-500/30',
+      bg: 'bg-blue-50 dark:bg-blue-950/40',
+      text: 'text-[#3F6FB5] dark:text-blue-300',
+      border: 'border-blue-200 dark:border-blue-800/40',
+      badgeBg: 'bg-[#3F6FB5] dark:bg-blue-500',
+      badgeText: 'text-white',
+      dotColor: 'bg-[#3F6FB5] dark:bg-blue-400',
+      ringColor: 'ring-blue-500/20',
       label: 'Alta',
     };
   }
   if (score >= 40) {
     return {
-      bg: 'bg-amber-500/15',
-      text: 'text-amber-300',
-      border: 'border-amber-500/40',
-      badgeBg: 'bg-amber-500',
-      badgeText: 'text-neutral-950',
-      dotColor: 'bg-amber-400',
-      ringColor: 'ring-amber-500/30',
+      bg: 'bg-amber-50 dark:bg-amber-950/40',
+      text: 'text-amber-800 dark:text-amber-300',
+      border: 'border-amber-200 dark:border-amber-800/40',
+      badgeBg: 'bg-amber-600 dark:bg-amber-500',
+      badgeText: 'text-white',
+      dotColor: 'bg-amber-600 dark:bg-amber-400',
+      ringColor: 'ring-amber-500/20',
       label: 'Média',
     };
   }
   return {
-    bg: 'bg-neutral-800/80',
-    text: 'text-neutral-400',
-    border: 'border-neutral-700/80',
-    badgeBg: 'bg-neutral-700',
-    badgeText: 'text-neutral-200',
-    dotColor: 'bg-neutral-500',
-    ringColor: 'ring-neutral-700/30',
+    bg: 'bg-[#F7F8FA] dark:bg-[#20242A]',
+    text: 'text-[#5F6368] dark:text-[#9AA0A6]',
+    border: 'border-[#E6E8EB] dark:border-[#2D3139]',
+    badgeBg: 'bg-neutral-600 dark:bg-neutral-700',
+    badgeText: 'text-white',
+    dotColor: 'bg-neutral-400 dark:bg-neutral-500',
+    ringColor: 'ring-neutral-500/20',
     label: 'Baixa',
   };
 }

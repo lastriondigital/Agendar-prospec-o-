@@ -76,6 +76,9 @@ interface AppContextType {
   deleteCompany: (id: string) => Promise<void>;
   addContactToCompany: (companyId: string, contact: Omit<Contact, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>) => Promise<Contact>;
   updateContact: (contact: Contact) => Promise<void>;
+  archiveContact: (contactId: string, companyId: string) => Promise<void>;
+  unarchiveContact: (contactId: string, companyId: string) => Promise<void>;
+  setPrimaryContact: (companyId: string, contactId: string) => Promise<void>;
   deleteContact: (contactId: string, companyId: string) => Promise<void>;
   advanceLeadStage: (leadId: string, newStage: LeadStage, note?: string) => Promise<void>;
   scheduleNextAction: (leadId: string, title: string, date: string, channel?: ContactChannel) => Promise<void>;
@@ -99,6 +102,10 @@ interface AppContextType {
     phone?: string;
     whatsapp?: string;
     email?: string;
+    website?: string;
+    companyPhone?: string;
+    companyWhatsApp?: string;
+    companyEmail?: string;
     excludeCompanyId?: string;
     excludeContactId?: string;
   }) => Promise<DuplicateMatch[]>;
@@ -420,6 +427,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         success('Contacto atualizado');
       } catch (err) {
         error('Erro ao atualizar contacto', (err as Error).message);
+      }
+    },
+    [error, refreshData, success]
+  );
+
+  const archiveContact = useCallback(
+    async (contactId: string, companyId: string) => {
+      try {
+        await leadService.archiveContact(contactId, companyId);
+        await refreshData();
+        success('Contacto arquivado com sucesso');
+      } catch (err) {
+        error('Erro ao arquivar contacto', (err as Error).message);
+      }
+    },
+    [error, refreshData, success]
+  );
+
+  const unarchiveContact = useCallback(
+    async (contactId: string, companyId: string) => {
+      try {
+        await leadService.unarchiveContact(contactId, companyId);
+        await refreshData();
+        success('Contacto restaurado com sucesso');
+      } catch (err) {
+        error('Erro ao restaurar contacto', (err as Error).message);
+      }
+    },
+    [error, refreshData, success]
+  );
+
+  const setPrimaryContact = useCallback(
+    async (companyId: string, contactId: string) => {
+      try {
+        await leadService.setPrimaryContact(companyId, contactId);
+        await refreshData();
+        success('Contato principal definido com sucesso');
+      } catch (err) {
+        error('Erro ao definir contato principal', (err as Error).message);
       }
     },
     [error, refreshData, success]
@@ -1151,6 +1197,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteCompany,
         addContactToCompany,
         updateContact,
+        archiveContact,
+        unarchiveContact,
+        setPrimaryContact,
         deleteContact,
         advanceLeadStage,
         updateLead,

@@ -3,7 +3,6 @@ import {
   BarChart3,
   Briefcase,
   CalendarCheck,
-  CheckCircle2,
   ChevronRight,
   HardDrive,
   Kanban,
@@ -20,14 +19,13 @@ import { useApp } from '../../context/AppContext';
 import { useExecutionQueue } from '../../hooks/useExecutionQueue';
 import { RouteId } from '../../types';
 import { NAVIGATION_ITEMS } from '../../utils/constants';
-import { Badge } from '../ui/Badge';
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   LayoutDashboard: <LayoutDashboard className="w-4 h-4" />,
   Zap: <Zap className="w-4 h-4" />,
   Users: <Users className="w-4 h-4" />,
   Kanban: <Kanban className="w-4 h-4" />,
-  ShieldAlert: <ShieldAlert className="w-4 h-4 text-amber-400" />,
+  ShieldAlert: <ShieldAlert className="w-4 h-4 text-amber-500" />,
   CalendarCheck: <CalendarCheck className="w-4 h-4" />,
   MessageSquareText: <MessageSquareText className="w-4 h-4" />,
   Target: <Target className="w-4 h-4" />,
@@ -43,14 +41,14 @@ export const Sidebar: React.FC = () => {
   const getBadgeForRoute = (routeId: RouteId) => {
     if (routeId === 'prospecting' && metrics.pendingToday > 0) {
       return (
-        <span className="ml-auto px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+        <span className="ml-auto px-2 py-0.5 text-[11px] font-semibold rounded-full bg-blue-100 dark:bg-blue-950/60 text-[#3F6FB5] dark:text-blue-300">
           {metrics.pendingToday}
         </span>
       );
     }
     if (routeId === 'clients') {
       return (
-        <span className="ml-auto px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500">
+        <span className="ml-auto px-1.5 py-0.5 text-[11px] font-mono text-[#5F6368] dark:text-[#9AA0A6]">
           {clients.length}
         </span>
       );
@@ -58,7 +56,7 @@ export const Sidebar: React.FC = () => {
     if (routeId === 'campaigns') {
       const activeCount = campaigns.filter((c) => c.status === 'active').length;
       return (
-        <span className="ml-auto px-1.5 py-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-500">
+        <span className="ml-auto px-1.5 py-0.5 text-[11px] font-mono text-[#5F6368] dark:text-[#9AA0A6]">
           {activeCount}
         </span>
       );
@@ -67,21 +65,21 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 h-screen bg-slate-950 border-r border-slate-800/80 shrink-0 sticky top-0 select-none">
+    <aside className="hidden lg:flex flex-col w-64 h-screen bg-white dark:bg-[#181B20] border-r border-[#E6E8EB] dark:border-[#2D3139] shrink-0 sticky top-0 select-none">
       {/* Brand Header */}
-      <div className="p-5 border-b border-slate-800/80 flex items-center justify-between">
+      <div className="p-5 border-b border-[#ECEEF1] dark:border-[#2D3139] flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white shadow-xs">
-            <Zap className="w-5 h-5 fill-white" />
+          <div className="w-8 h-8 rounded-lg bg-[#3F6FB5] flex items-center justify-center text-white shadow-xs">
+            <Zap className="w-4 h-4 fill-white" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-extrabold tracking-wider text-slate-100 uppercase">
-                PROSPECT <span className="text-emerald-400">OS</span>
+              <span className="text-sm font-bold tracking-tight text-[#202124] dark:text-[#E8EAED]">
+                PROSPECT <span className="text-[#3F6FB5]">OS</span>
               </span>
             </div>
-            <p className="text-[10px] text-slate-400 font-medium tracking-tight">
-              Executive Prospecção OS
+            <p className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6]">
+              Sistema de Prospecção
             </p>
           </div>
         </div>
@@ -91,19 +89,25 @@ export const Sidebar: React.FC = () => {
       <div className="p-3">
         <button
           onClick={() => setActiveRoute('prospecting')}
-          className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-150 cursor-pointer ${
+          className={`w-full flex items-center justify-between p-3 rounded-xl transition-colors duration-150 cursor-pointer ${
             activeRoute === 'prospecting'
-              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40 border border-emerald-500/40'
-              : 'bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/25 text-emerald-300'
+              ? 'bg-[#3F6FB5] text-white shadow-xs'
+              : 'bg-[#F7F8FA] hover:bg-neutral-200/70 dark:bg-[#20242A] dark:hover:bg-[#282D36] border border-[#E6E8EB] dark:border-[#2D3139] text-[#202124] dark:text-[#E8EAED]'
           }`}
         >
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-300">
-              <Zap className="w-4 h-4 fill-emerald-300" />
+            <div
+              className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                activeRoute === 'prospecting'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-blue-100 text-[#3F6FB5] dark:bg-blue-950/60 dark:text-blue-300'
+              }`}
+            >
+              <Zap className="w-4 h-4 fill-current" />
             </div>
             <div className="text-left">
-              <div className="text-xs font-bold leading-none">Modo Execução</div>
-              <div className="text-[10px] opacity-80 mt-1">
+              <div className="text-xs font-semibold leading-none">Modo Execução</div>
+              <div className="text-[11px] opacity-80 mt-1">
                 {metrics.pendingToday > 0
                   ? `${metrics.pendingToday} ações prontas`
                   : 'Fila zerada por hoje'}
@@ -115,9 +119,9 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Navigation List */}
-      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
-        <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          Navegação Principal
+      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
+        <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#5F6368] dark:text-[#9AA0A6]">
+          Módulos
         </div>
         {NAVIGATION_ITEMS.map((item) => {
           const isActive = activeRoute === item.id;
@@ -125,13 +129,13 @@ export const Sidebar: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setActiveRoute(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer text-left ${
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer text-left ${
                 isActive
-                  ? 'bg-slate-900 text-emerald-400 font-semibold border border-slate-800 shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                  ? 'bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 font-semibold'
+                  : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED] hover:bg-neutral-100 dark:hover:bg-[#20242A] font-medium'
               }`}
             >
-              <span className={isActive ? 'text-emerald-400' : 'text-slate-400'}>
+              <span className={isActive ? 'text-[#3F6FB5] dark:text-blue-300' : 'text-[#5F6368] dark:text-[#9AA0A6]'}>
                 {ICON_MAP[item.iconName] || <Zap className="w-4 h-4" />}
               </span>
               <span className="truncate">{item.label}</span>
@@ -142,31 +146,31 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* Footer System Status */}
-      <div className="p-3.5 border-t border-slate-800/80 bg-slate-950/70 space-y-2">
+      <div className="p-3.5 border-t border-[#ECEEF1] dark:border-[#2D3139] bg-[#F7F8FA] dark:bg-[#15171B] space-y-2">
         {isDemoMode && (
-          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px]">
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300 text-[11px]">
             <div className="flex items-center gap-1.5 font-medium">
-              <Sparkles className="w-3.5 h-3.5" />
+              <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
               <span>Modo Demonstração</span>
             </div>
             <button
               onClick={() => setActiveRoute('settings')}
-              className="text-[10px] underline hover:text-amber-200 cursor-pointer"
+              className="text-[10px] underline hover:text-amber-900 dark:hover:text-amber-200 cursor-pointer"
             >
               Ajustar
             </button>
           </div>
         )}
 
-        <div className="flex items-center justify-between px-2 text-[11px] text-slate-400">
+        <div className="flex items-center justify-between px-2 text-[11px] text-[#5F6368] dark:text-[#9AA0A6]">
           <div className="flex items-center gap-1.5">
-            <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+            <HardDrive className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             <span>IndexedDB Ativo</span>
           </div>
           <div className="flex items-center gap-1">
             <span
               className={`w-1.5 h-1.5 rounded-full ${
-                isOnline ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
+                isOnline ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
               }`}
             />
             <span className="text-[10px]">{isOnline ? 'Online' : 'Offline'}</span>

@@ -20,11 +20,16 @@ export const Card: React.FC<CardProps> = ({
   };
 
   const variantStyles = {
-    default: 'bg-slate-900/90 dark:bg-slate-900/90 light:bg-white border border-slate-800/80 dark:border-slate-800/80 light:border-slate-200 text-slate-100 dark:text-slate-100 light:text-slate-900 shadow-xs',
-    elevated: 'bg-slate-900 dark:bg-slate-900 light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-200 shadow-sm text-slate-100 dark:text-slate-100 light:text-slate-900',
-    interactive: 'bg-slate-900/90 dark:bg-slate-900/90 light:bg-white hover:bg-slate-800/70 dark:hover:bg-slate-800/70 light:hover:bg-slate-50 border border-slate-800/80 dark:border-slate-800/80 light:border-slate-200 hover:border-slate-700/80 dark:hover:border-slate-700/80 light:hover:border-slate-300 text-slate-100 dark:text-slate-100 light:text-slate-900 cursor-pointer transition-all duration-150 active:scale-[0.99] shadow-xs',
-    accent: 'bg-gradient-to-b from-slate-900 to-slate-950 dark:from-slate-900 dark:to-slate-950 light:from-white light:to-slate-50 border border-emerald-500/30 text-slate-100 dark:text-slate-100 light:text-slate-900 shadow-xs',
-    subtle: 'bg-slate-950/60 dark:bg-slate-950/60 light:bg-slate-50 border border-slate-800/60 dark:border-slate-800/60 light:border-slate-200 text-slate-300 dark:text-slate-300 light:text-slate-700',
+    default:
+      'bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] text-[#202124] dark:text-[#E8EAED] shadow-xs',
+    elevated:
+      'bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] text-[#202124] dark:text-[#E8EAED] shadow-xs',
+    interactive:
+      'bg-white dark:bg-[#181B20] hover:bg-neutral-50 dark:hover:bg-[#20242A] border border-[#E6E8EB] dark:border-[#2D3139] hover:border-neutral-300 dark:hover:border-neutral-700 text-[#202124] dark:text-[#E8EAED] cursor-pointer transition-colors duration-150 shadow-xs',
+    accent:
+      'bg-white dark:bg-[#181B20] border border-[#3F6FB5]/30 dark:border-[#3F6FB5]/40 text-[#202124] dark:text-[#E8EAED] shadow-xs',
+    subtle:
+      'bg-[#F7F8FA] dark:bg-[#15171B] border border-[#E6E8EB] dark:border-[#2D3139] text-[#5F6368] dark:text-[#9AA0A6]',
   };
 
   return (

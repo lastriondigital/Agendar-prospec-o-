@@ -87,21 +87,17 @@ export const DashboardView: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       {/* 1. TOPO: SISTEMA OPERACIONAL DIÁRIO - HERO "HOJE" */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-neutral-900 via-neutral-900/95 to-neutral-950 border border-neutral-800 p-6 sm:p-8 shadow-xl">
-        {/* Glow sutil */}
-        <div className="absolute -top-24 -right-24 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div className="rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] p-6 sm:p-8 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           {/* Lado Esquerdo: Identificação & Números Centrais do Dia */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                Hoje • {todayFormatted}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-[#5F6368] dark:text-[#9AA0A6]">
+                {todayFormatted.charAt(0).toUpperCase() + todayFormatted.slice(1)}
               </span>
               {streakDays > 0 && (
-                <span className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-                  <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                <span className="flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/40">
+                  <Flame className="w-3.5 h-3.5 fill-current" />
                   <span>{streakDays} {streakDays === 1 ? 'dia' : 'dias'} de streak</span>
                 </span>
               )}
@@ -109,29 +105,29 @@ export const DashboardView: React.FC = () => {
 
             <div>
               <div className="flex items-baseline gap-3">
-                <h1 className="text-4xl sm:text-5xl font-black text-neutral-100 tracking-tight">
+                <h1 className="text-3xl sm:text-4xl font-bold text-[#202124] dark:text-[#E8EAED] tracking-tight">
                   Hoje
                 </h1>
-                <span className="text-2xl sm:text-3xl font-extrabold text-emerald-400">
-                  {metrics.pendingToday} {metrics.pendingToday === 1 ? 'ação' : 'ações'}
+                <span className="text-xl sm:text-2xl font-semibold text-[#3F6FB5]">
+                  {metrics.pendingToday} {metrics.pendingToday === 1 ? 'ação pendente' : 'ações pendentes'}
                 </span>
               </div>
-              <p className="text-sm sm:text-base text-neutral-400 font-medium mt-1">
-                <strong className="text-neutral-200">{metrics.completedToday}/{dailyGoal}</strong> concluídas
-                <span className="mx-2 text-neutral-600">•</span>
-                Tempo estimado: <strong className="text-neutral-200">{formattedDuration}</strong>
+              <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6] mt-1">
+                <strong>{metrics.completedToday}/{dailyGoal}</strong> concluídas
+                <span className="mx-2 text-[#DADDE1] dark:text-[#2D3139]">•</span>
+                Tempo estimado: <strong>{formattedDuration}</strong>
               </p>
             </div>
 
             {/* Barra de Progresso Rápida da Meta */}
-            <div className="max-w-md space-y-1.5">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-neutral-400">Progresso da meta diária</span>
-                <span className="text-emerald-400">{progressPercentage}%</span>
+            <div className="max-w-md space-y-1 pt-1">
+              <div className="flex justify-between text-xs font-medium">
+                <span className="text-[#5F6368] dark:text-[#9AA0A6]">Meta diária ({dailyGoal} ações)</span>
+                <span className="text-[#3F6FB5] font-semibold">{progressPercentage}%</span>
               </div>
-              <div className="w-full h-2.5 bg-neutral-800/80 rounded-full overflow-hidden">
+              <div className="w-full h-2 bg-[#ECEEF1] dark:bg-[#20242A] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
+                  className="h-full bg-[#3F6FB5] rounded-full transition-all duration-300"
                   style={{ width: `${Math.min(100, progressPercentage)}%` }}
                 />
               </div>
@@ -139,77 +135,77 @@ export const DashboardView: React.FC = () => {
           </div>
 
           {/* Lado Direito: Botão Central "COMEÇAR PROSPECÇÃO" */}
-          <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
+          <div className="flex flex-col gap-2 shrink-0">
             <button
               onClick={handleStartProspecting}
-              className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-black text-base sm:text-lg tracking-wide uppercase shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-200 active:scale-[0.98] cursor-pointer"
+              className="inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-lg bg-[#3F6FB5] hover:bg-[#345d99] active:bg-[#2b4e82] text-white font-semibold text-base shadow-xs transition-colors cursor-pointer"
             >
-              <Zap className="w-6 h-6 fill-neutral-950 text-neutral-950 transition-transform group-hover:scale-110" />
+              <Zap className="w-5 h-5 fill-white" />
               <span>COMEÇAR PROSPECÇÃO</span>
             </button>
 
-            <div className="flex items-center justify-center gap-2 text-xs text-neutral-400">
-              <Clock className="w-3.5 h-3.5 text-neutral-500" />
-              <span>Decisões eliminadas: 1 ação por vez</span>
+            <div className="flex items-center justify-center gap-1.5 text-xs text-[#5F6368] dark:text-[#9AA0A6]">
+              <Clock className="w-3.5 h-3.5 text-[#80868B]" />
+              <span>Modo foco: 1 ação por vez</span>
             </div>
           </div>
         </div>
 
         {/* 2. GRADE DE MÉTRICAS OPERACIONAIS DO DIA ("HOJE") */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-8 pt-6 border-t border-neutral-800/80">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-6 pt-5 border-t border-[#ECEEF1] dark:border-[#2D3139]">
           {/* Ações Pendentes */}
-          <div className="p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800/80">
-            <span className="text-[11px] font-medium text-neutral-400 block">Pendentes</span>
-            <span className="text-xl font-bold text-neutral-100 mt-1 block">
+          <div className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139]">
+            <span className="text-xs text-[#5F6368] dark:text-[#9AA0A6] block font-medium">Pendentes</span>
+            <span className="text-lg font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5 block">
               {metrics.pendingToday}
             </span>
           </div>
 
           {/* Primeiros Contactos */}
-          <div className="p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800/80">
-            <span className="text-[11px] font-medium text-sky-400 block">1ºs Contactos</span>
-            <span className="text-xl font-bold text-sky-300 mt-1 block">
+          <div className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139]">
+            <span className="text-xs text-sky-700 dark:text-sky-400 block font-medium">1ºs Contactos</span>
+            <span className="text-lg font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5 block">
               {categoryCounts.firstContacts}
             </span>
           </div>
 
           {/* Follow-ups */}
-          <div className="p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800/80">
-            <span className="text-[11px] font-medium text-indigo-400 block">Follow-ups</span>
-            <span className="text-xl font-bold text-indigo-300 mt-1 block">
+          <div className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139]">
+            <span className="text-xs text-indigo-700 dark:text-indigo-400 block font-medium">Follow-ups</span>
+            <span className="text-lg font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5 block">
               {categoryCounts.followUps}
             </span>
           </div>
 
           {/* Propostas */}
-          <div className="p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800/80">
-            <span className="text-[11px] font-medium text-amber-400 block">Propostas</span>
-            <span className="text-xl font-bold text-amber-300 mt-1 block">
+          <div className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139]">
+            <span className="text-xs text-amber-700 dark:text-amber-400 block font-medium">Propostas</span>
+            <span className="text-lg font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5 block">
               {categoryCounts.proposals}
             </span>
           </div>
 
           {/* Reativações */}
-          <div className="p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800/80">
-            <span className="text-[11px] font-medium text-teal-400 block">Reativações</span>
-            <span className="text-xl font-bold text-teal-300 mt-1 block">
+          <div className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139]">
+            <span className="text-xs text-teal-700 dark:text-teal-400 block font-medium">Reativações</span>
+            <span className="text-lg font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5 block">
               {categoryCounts.reactivations}
             </span>
           </div>
 
           {/* Tarefas Atrasadas */}
-          <div className={`p-3.5 rounded-xl border ${
+          <div className={`p-3 rounded-lg border ${
             overdueActions.length > 0
-              ? 'bg-rose-500/10 border-rose-500/30'
-              : 'bg-neutral-950/60 border-neutral-800/80'
+              ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800/40'
+              : 'bg-[#F7F8FA] dark:bg-[#1E2228] border-[#E6E8EB] dark:border-[#2D3139]'
           }`}>
-            <span className={`text-[11px] font-medium block ${
-              overdueActions.length > 0 ? 'text-rose-400' : 'text-neutral-400'
+            <span className={`text-xs block font-medium ${
+              overdueActions.length > 0 ? 'text-red-700 dark:text-red-300 font-semibold' : 'text-[#5F6368] dark:text-[#9AA0A6]'
             }`}>
               Atrasadas
             </span>
-            <span className={`text-xl font-bold mt-1 block ${
-              overdueActions.length > 0 ? 'text-rose-400' : 'text-neutral-100'
+            <span className={`text-lg font-bold mt-0.5 block ${
+              overdueActions.length > 0 ? 'text-red-700 dark:text-red-300' : 'text-[#202124] dark:text-[#E8EAED]'
             }`}>
               {overdueActions.length}
             </span>
@@ -219,13 +215,13 @@ export const DashboardView: React.FC = () => {
 
       {/* 3. ALERTAS DE TAREFAS ATRASADAS (SE HOUVER) */}
       {overdueActions.length > 0 && (
-        <Card padding="md" className="bg-rose-950/20 border-rose-500/40 space-y-3">
+        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
+            <div className="flex items-center gap-2 text-red-800 dark:text-red-300 font-semibold text-sm">
               <AlertTriangle className="w-4 h-4" />
               <span>Atenção: {overdueActions.length} {overdueActions.length === 1 ? 'ação atrasada' : 'ações atrasadas'}</span>
             </div>
-            <span className="text-xs text-rose-300/80">Recomendado executar ou reagendar agora</span>
+            <span className="text-xs text-red-700 dark:text-red-400">Recomendado executar ou reagendar agora</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -235,29 +231,28 @@ export const DashboardView: React.FC = () => {
               return (
                 <div
                   key={action.id}
-                  className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-between gap-3 text-xs"
+                  className="p-3 rounded-lg bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] flex items-center justify-between gap-3 text-xs"
                 >
                   <div className="min-w-0">
-                    <div className="font-semibold text-neutral-200 truncate">
+                    <div className="font-semibold text-[#202124] dark:text-[#E8EAED] truncate">
                       {cont?.name || comp?.name || 'Cliente'}
                     </div>
-                    <div className="text-[11px] text-neutral-400 truncate">
+                    <div className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6] truncate">
                       {comp?.name} • Agendado para {formatRelativeDate(action.scheduledDate)}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="xs"
                       onClick={() => handleQuickReschedule(action.id, 1)}
-                      className="text-neutral-400 hover:text-neutral-200"
                       title="Mover para amanhã"
                     >
                       +1d
                     </Button>
                     <Button
-                      variant="execution"
+                      variant="primary"
                       size="xs"
                       onClick={handleStartProspecting}
                     >
@@ -268,24 +263,24 @@ export const DashboardView: React.FC = () => {
               );
             })}
           </div>
-        </Card>
+        </div>
       )}
 
       {/* 4. PROGRESSO SEMANAL & STREAK DE EXECUÇÃO */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Progresso Semanal (7 Dias) */}
-        <Card padding="md" className="lg:col-span-2 bg-neutral-900/90 border-neutral-800 space-y-4">
+        <Card padding="md" className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
-                <Target className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-sm font-semibold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2">
+                <Target className="w-4 h-4 text-[#3F6FB5]" />
                 Progresso Semanal de Execução
               </h3>
-              <p className="text-xs text-neutral-400">
+              <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
                 Consistência de prospecção nos dias da semana atual
               </p>
             </div>
-            <span className="text-xs font-mono font-semibold text-neutral-400">
+            <span className="text-xs font-mono font-medium text-[#5F6368] dark:text-[#9AA0A6]">
               Meta: {dailyGoal} / dia
             </span>
           </div>
@@ -294,35 +289,35 @@ export const DashboardView: React.FC = () => {
             {weeklyProgress.map((day) => (
               <div
                 key={day.dateStr}
-                className={`p-3 rounded-xl border text-center transition-all ${
+                className={`p-2.5 rounded-lg border text-center transition-colors ${
                   day.isToday
-                    ? 'bg-emerald-500/10 border-emerald-500/50 shadow-sm'
+                    ? 'bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800/40'
                     : day.completedCount > 0
-                    ? 'bg-neutral-950 border-neutral-800'
-                    : 'bg-neutral-950/40 border-neutral-900 text-neutral-600'
+                    ? 'bg-[#F7F8FA] dark:bg-[#1E2228] border-[#E6E8EB] dark:border-[#2D3139]'
+                    : 'bg-white dark:bg-[#181B20] border-[#E6E8EB] dark:border-[#2D3139]'
                 }`}
               >
-                <span className={`text-[11px] font-bold block ${
-                  day.isToday ? 'text-emerald-400' : 'text-neutral-400'
+                <span className={`text-[11px] font-semibold block ${
+                  day.isToday ? 'text-[#3F6FB5] dark:text-blue-300' : 'text-[#5F6368] dark:text-[#9AA0A6]'
                 }`}>
                   {day.dayShort}
                 </span>
 
-                <div className="my-2 flex items-center justify-center">
+                <div className="my-1.5 flex items-center justify-center">
                   {day.completedCount >= day.goal ? (
-                    <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold">
+                    <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center justify-center text-xs font-bold">
                       ✓
                     </span>
                   ) : (
-                    <span className={`text-base font-extrabold font-mono ${
-                      day.completedCount > 0 ? 'text-neutral-200' : 'text-neutral-600'
+                    <span className={`text-sm font-semibold font-mono ${
+                      day.completedCount > 0 ? 'text-[#202124] dark:text-[#E8EAED]' : 'text-[#80868B]'
                     }`}>
                       {day.completedCount}
                     </span>
                   )}
                 </div>
 
-                <span className="text-[10px] text-neutral-500 font-mono">
+                <span className="text-[10px] text-[#80868B] font-mono">
                   {day.completedCount}/{day.goal}
                 </span>
               </div>
@@ -331,55 +326,51 @@ export const DashboardView: React.FC = () => {
         </Card>
 
         {/* Card Streak & Consistência */}
-        <Card padding="md" className="bg-neutral-900/90 border-neutral-800 flex flex-col justify-between space-y-4">
+        <Card padding="md" className="flex flex-col justify-between space-y-3">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-[#5F6368] dark:text-[#9AA0A6] uppercase tracking-wider">
                 Streak de Prospecção
               </span>
-              <Flame className="w-5 h-5 text-amber-400 fill-amber-400" />
+              <Flame className="w-4 h-4 text-amber-500 fill-current" />
             </div>
 
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-amber-400">
+              <span className="text-3xl font-bold text-[#202124] dark:text-[#E8EAED]">
                 {streakDays}
               </span>
-              <span className="text-sm font-semibold text-neutral-300">
+              <span className="text-xs font-medium text-[#5F6368] dark:text-[#9AA0A6]">
                 {streakDays === 1 ? 'dia consecutivo' : 'dias consecutivos'}
               </span>
             </div>
 
-            <p className="text-xs text-neutral-400 leading-relaxed">
-              A disciplina de prospecção diária gera previsibilidade no pipeline e fecha mais clientes.
+            <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed">
+              A disciplina diária de prospecção gera previsibilidade no pipeline e acelera novos fechos.
             </p>
           </div>
 
-          <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-300">
-            <span className="text-emerald-400 font-semibold">Dica de alta velocidade: </span>
-            Execute os contatos sem pausar para analisar detalhes que já foram decididos.
+          <div className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-[#5F6368] dark:text-[#9AA0A6]">
+            <span className="text-[#202124] dark:text-[#E8EAED] font-semibold">Foco diário: </span>
+            Execute os contatos sem hesitar em decisões que já foram planejadas.
           </div>
         </Card>
       </div>
 
       {/* 5. PRÓXIMA AÇÃO IMEDIATA (HERO DO FOCO) */}
       {nextItem ? (
-        <Card
-          variant="accent"
-          padding="lg"
-          className="border-emerald-500/40 bg-neutral-900/95 relative overflow-hidden"
-        >
+        <Card padding="lg" className="space-y-4">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-5">
             <div className="space-y-3 flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 fill-emerald-400" />
+                <span className="text-xs font-semibold text-[#3F6FB5] flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 fill-current" />
                   Próxima Ação Imediata
                 </span>
-                <Badge variant="emerald" size="sm">
+                <Badge variant="blue" size="sm">
                   {getChannelBadgeDetails(nextItem.action.channel).label}
                 </Badge>
                 {nextItem.objective && (
-                  <Badge variant="blue" size="sm">
+                  <Badge variant="neutral" size="sm">
                     {nextItem.objective}
                   </Badge>
                 )}
@@ -391,14 +382,14 @@ export const DashboardView: React.FC = () => {
               </div>
 
               <div>
-                <h3 className="text-xl font-extrabold text-neutral-100">
+                <h3 className="text-lg font-bold text-[#202124] dark:text-[#E8EAED]">
                   {nextItem.client.name}
                 </h3>
-                <p className="text-xs sm:text-sm text-neutral-400 font-medium">
+                <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6]">
                   {nextItem.client.role ? `${nextItem.client.role} na ` : ''}
                   <button
                     onClick={() => handleOpenCompanyDrawer(nextItem.action.clientId)}
-                    className="text-neutral-200 font-bold hover:underline cursor-pointer"
+                    className="text-[#202124] dark:text-[#E8EAED] font-semibold hover:underline cursor-pointer"
                   >
                     {nextItem.client.company}
                   </button>
@@ -407,8 +398,8 @@ export const DashboardView: React.FC = () => {
               </div>
 
               {/* Pré-visualização da Mensagem */}
-              <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 text-xs sm:text-sm text-neutral-200 font-sans leading-relaxed whitespace-pre-line select-text">
-                <div className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+              <div className="p-3.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] text-xs sm:text-sm text-[#202124] dark:text-[#E8EAED] font-sans leading-relaxed whitespace-pre-line select-text">
+                <div className="text-[10px] font-semibold text-[#5F6368] dark:text-[#9AA0A6] uppercase tracking-wider mb-1.5 flex items-center justify-between">
                   <span>Mensagem Preparada</span>
                   {nextItem.template && <span>{nextItem.template.title}</span>}
                 </div>
@@ -417,10 +408,10 @@ export const DashboardView: React.FC = () => {
             </div>
 
             {/* Ações Rápidas */}
-            <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-52 justify-center">
+            <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0 md:w-48 justify-center">
               <Button
-                variant="execution"
-                size="lg"
+                variant="primary"
+                size="md"
                 onClick={handleStartProspecting}
                 leftIcon={<Zap className="w-4 h-4 fill-white" />}
               >
@@ -428,10 +419,10 @@ export const DashboardView: React.FC = () => {
               </Button>
 
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={() => completeAction(nextItem.action.id, 'Concluído diretamente pelo dashboard')}
-                leftIcon={<CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                leftIcon={<CheckCircle2 className="w-4 h-4 text-emerald-600" />}
               >
                 Marcar Concluído
               </Button>
@@ -449,7 +440,7 @@ export const DashboardView: React.FC = () => {
         </Card>
       ) : (
         <EmptyState
-          icon={<CheckCircle2 className="w-10 h-10 text-emerald-400" />}
+          icon={<CheckCircle2 className="w-8 h-8 text-emerald-600" />}
           title="Todas as ações de hoje foram concluídas!"
           description="A fila diária está zerada. Deseja prospectar novos leads ou verificar o pipeline de oportunidades?"
           actionLabel="Ver Clientes & Leads"
@@ -463,12 +454,12 @@ export const DashboardView: React.FC = () => {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
-              <Flame className="w-4 h-4 text-amber-400" />
+            <h3 className="text-sm font-semibold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2">
+              <Flame className="w-4 h-4 text-amber-500" />
               Leads Prioritários
             </h3>
-            <p className="text-xs text-neutral-400">
-              Oportunidades quentes que demandam acompanhamento rigoroso
+            <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
+              Oportunidades em andamento que demandam acompanhamento
             </p>
           </div>
 
@@ -494,7 +485,7 @@ export const DashboardView: React.FC = () => {
               <Card
                 key={lead.id}
                 padding="sm"
-                className="bg-neutral-900/90 border-neutral-800 space-y-3 hover:border-neutral-700 transition-colors"
+                className="space-y-2.5 hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -512,18 +503,18 @@ export const DashboardView: React.FC = () => {
                     </div>
                     <h4
                       onClick={() => comp && setSelectedCompany(comp)}
-                      className="text-sm font-bold text-neutral-100 mt-1 truncate hover:underline cursor-pointer"
+                      className="text-sm font-semibold text-[#202124] dark:text-[#E8EAED] mt-1 truncate hover:underline cursor-pointer"
                     >
                       {cont?.name || comp?.name}
                     </h4>
-                    <p className="text-xs text-neutral-400 truncate">
+                    <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] truncate">
                       {comp?.name} {comp?.niche ? `• ${comp.niche}` : ''}
                     </p>
                   </div>
 
                   <button
                     onClick={() => comp && setSelectedCompany(comp)}
-                    className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition-colors cursor-pointer shrink-0"
+                    className="p-1.5 rounded-lg text-[#5F6368] hover:text-[#202124] dark:text-[#9AA0A6] dark:hover:text-[#E8EAED] hover:bg-neutral-100 dark:hover:bg-[#20242A] transition-colors cursor-pointer shrink-0"
                     title="Ver detalhes"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -531,22 +522,22 @@ export const DashboardView: React.FC = () => {
                 </div>
 
                 {/* Status da Próxima Ação com Alerta Visual Obrigatório */}
-                <div className="pt-2 border-t border-neutral-800/80 text-xs">
+                <div className="pt-2 border-t border-[#ECEEF1] dark:border-[#2D3139] text-xs">
                   {hasNextAction ? (
-                    <div className="flex items-center justify-between text-neutral-300">
+                    <div className="flex items-center justify-between text-[#5F6368] dark:text-[#9AA0A6]">
                       <span className="truncate">📅 {lead.nextActionTitle}</span>
-                      <span className="text-[11px] font-mono text-neutral-400 shrink-0 ml-2">
+                      <span className="text-[11px] font-mono shrink-0 ml-2">
                         {formatRelativeDate(lead.nextActionDate!)}
                       </span>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300">
-                      <span className="font-semibold text-[11px]">
-                        ⚠️ Este lead precisa de uma próxima ação.
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300">
+                      <span className="font-medium text-[11px]">
+                        ⚠️ Precisa de próxima ação
                       </span>
                       <button
                         onClick={() => comp && setSchedulingLead({ lead, company: comp })}
-                        className="text-[11px] font-bold underline hover:text-amber-200 cursor-pointer shrink-0 ml-2"
+                        className="text-[11px] font-semibold underline hover:text-amber-950 cursor-pointer shrink-0 ml-2"
                       >
                         Agendar
                       </button>

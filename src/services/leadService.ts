@@ -29,6 +29,9 @@ export interface CreateCompanyPayload {
     country: string;
     city: string;
     address?: string;
+    companyPhone?: string;
+    companyWhatsApp?: string;
+    companyWhatsAppVerified?: boolean;
     website?: string;
     instagram?: string;
     facebook?: string;
@@ -72,7 +75,7 @@ export class LeadService {
   ) {}
 
   /**
-   * Valida anti-duplicação comparando telefone, whatsapp, email e nome+empresa.
+   * Valida anti-duplicação comparando telefone, whatsapp, email, website e nome+empresa.
    */
   async validateDuplicates(
     params: {
@@ -82,6 +85,10 @@ export class LeadService {
       phone?: string;
       whatsapp?: string;
       email?: string;
+      website?: string;
+      companyPhone?: string;
+      companyWhatsApp?: string;
+      companyEmail?: string;
       excludeCompanyId?: string;
       excludeContactId?: string;
     }
@@ -116,6 +123,9 @@ export class LeadService {
       country: payload.company.country.trim() || 'Brasil',
       city: payload.company.city.trim(),
       address: payload.company.address?.trim() || undefined,
+      companyPhone: payload.company.companyPhone?.trim() || undefined,
+      companyWhatsApp: payload.company.companyWhatsApp?.trim() || undefined,
+      companyWhatsAppVerified: payload.company.companyWhatsAppVerified ?? false,
       website: payload.company.website?.trim() || undefined,
       instagram: payload.company.instagram?.trim() || undefined,
       facebook: payload.company.facebook?.trim() || undefined,
@@ -288,16 +298,44 @@ export class LeadService {
     const saved = await this.contRepo.save({
       id,
       companyId,
+      status: contactData.status || 'active',
       ...contactData,
     });
+
+    // Se for o primeiro contato da empresa ou marcado como principal, definir como primário
+    if (contactData.isPrimary) {
+      await this.setPrimaryContact(companyId, id);
+    }
+
+    const descParts: string[] = [];
+    if (saved.role) descParts.push(`Cargo: ${saved.role}`);
+    if (saved.department) descParts.push(`Departamento: ${saved.department}`);
+    if (saved.referredByName) {
+      descParts.push(`Origem: Indicação (${saved.referredByName} indicou ${saved.name})`);
+    }
 
     await this.histRepo.add({
       companyId,
       contactId: id,
-      type: 'updated',
+      type: 'contact_created',
       title: `Novo contacto adicionado: ${saved.name}`,
-      description: saved.role ? `Cargo: ${saved.role}` : undefined,
+      description: descParts.length > 0 ? descParts.join(' | ') : undefined,
     });
+
+    // Se houver indicação, criar evento dedicado de indicação na timeline
+    if (saved.referredByName) {
+      await this.histRepo.add({
+        companyId,
+        contactId: id,
+        type: 'referral_recorded',
+        title: `Indicação registrada: ${saved.name}`,
+        description: `${saved.referredByName} indicou ${saved.name} para a empresa. Origem: Indicação.`,
+        metadata: {
+          referredByName: saved.referredByName,
+          referredByContactId: saved.referredByContactId,
+        },
+      });
+    }
 
     return saved;
   }
@@ -310,8 +348,9 @@ export class LeadService {
     await this.histRepo.add({
       companyId: contact.companyId,
       contactId: contact.id,
-      type: 'updated',
+      type: 'contact_updated',
       title: `Contacto atualizado: ${contact.name}`,
+      description: contact.role ? `Cargo: ${contact.role}` : undefined,
     });
 
     // Se for contacto primário, sincronizar com Client
@@ -329,14 +368,93 @@ export class LeadService {
   }
 
   /**
+   * Arquiva um contacto específico
+   */
+  async archiveContact(contactId: string, companyId: string): Promise<void> {
+    const contact = await this.contRepo.getById(contactId);
+    if (!contact) return;
+
+    await this.contRepo.save({
+      ...contact,
+      status: 'archived',
+      updatedAt: new Date().toISOString(),
+    });
+
+    await this.histRepo.add({
+      companyId,
+      contactId,
+      type: 'contact_archived',
+      title: `Contacto arquivado: ${contact.name}`,
+      description: `O contacto ${contact.name} foi movido para o arquivo.`,
+    });
+  }
+
+  /**
+   * Desarquiva um contacto
+   */
+  async unarchiveContact(contactId: string, companyId: string): Promise<void> {
+    const contact = await this.contRepo.getById(contactId);
+    if (!contact) return;
+
+    await this.contRepo.save({
+      ...contact,
+      status: 'active',
+      updatedAt: new Date().toISOString(),
+    });
+
+    await this.histRepo.add({
+      companyId,
+      contactId,
+      type: 'contact_unarchived',
+      title: `Contacto desarquivado: ${contact.name}`,
+      description: `O contacto ${contact.name} voltou a ficar ativo.`,
+    });
+  }
+
+  /**
+   * Define um contacto como primário/principal da empresa
+   */
+  async setPrimaryContact(companyId: string, contactId: string): Promise<void> {
+    const contacts = await this.contRepo.getByCompanyId(companyId);
+    for (const c of contacts) {
+      const isTarget = c.id === contactId;
+      if (c.isPrimary !== isTarget) {
+        await this.contRepo.save({
+          ...c,
+          isPrimary: isTarget,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    const [company, lead, targetContact] = await Promise.all([
+      this.compRepo.getById(companyId),
+      this.leadRepo.getByCompanyId(companyId),
+      this.contRepo.getById(contactId),
+    ]);
+
+    if (company && targetContact && lead) {
+      await this.leadRepo.save({
+        ...lead,
+        contactId,
+        updatedAt: new Date().toISOString(),
+      });
+      await this.syncToClientStore(company, targetContact, lead);
+    }
+  }
+
+  /**
    * Remove um contacto
    */
   async deleteContact(contactId: string, companyId: string): Promise<void> {
+    const contact = await this.contRepo.getById(contactId);
+    const contactName = contact?.name || 'Contacto';
     await this.contRepo.delete(contactId);
     await this.histRepo.add({
       companyId,
-      type: 'updated',
-      title: 'Contacto removido',
+      type: 'contact_deleted',
+      title: `Contacto removido: ${contactName}`,
+      description: `O contacto ${contactName} foi excluído da empresa.`,
     });
   }
 

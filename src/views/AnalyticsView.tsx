@@ -4,13 +4,9 @@ import {
   TrendingDown,
   SplitSquareVertical,
   FileText,
-  Layers,
-  Sparkles,
-  Download,
-  Share2,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { AnalyticsFilterState, AnalyticsPeriod, LeadStage } from '../types';
+import { AnalyticsFilterState } from '../types';
 import {
   calculateAnalyticsMetrics,
   buildFunnelSteps,
@@ -21,7 +17,6 @@ import { MetricsSummaryGrid } from '../components/analytics/MetricsSummaryGrid';
 import { FunnelView } from '../components/analytics/FunnelView';
 import { ABTestingSection } from '../components/analytics/ABTestingSection';
 import { MonthlyReportSection } from '../components/analytics/MonthlyReportSection';
-import { Button } from '../components/ui/Button';
 
 type AnalyticsTab = 'overview' | 'funnel' | 'ab-tests' | 'report';
 
@@ -106,24 +101,24 @@ export const AnalyticsView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-100 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-emerald-400" />
+          <h2 className="text-xl font-bold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-[#3F6FB5] dark:text-blue-400" />
             Analytics & Inteligência de Vendas
           </h2>
-          <p className="text-xs text-neutral-400 mt-0.5">
+          <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] mt-0.5">
             Métricas de prospecção, taxas de conversão, funil de 7 etapas, testes A/B e relatório comparativo.
           </p>
         </div>
 
         {/* Tab Navigation Chips */}
-        <div className="flex items-center gap-1 bg-neutral-900 border border-neutral-800 p-1 rounded-xl">
+        <div className="flex items-center gap-1 bg-white dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] p-1 rounded-xl shadow-xs overflow-x-auto no-scrollbar">
           <button
             id="tab-analytics-overview"
             onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
               activeTab === 'overview'
-                ? 'bg-emerald-500 text-neutral-950 shadow-sm'
-                : 'text-neutral-400 hover:text-neutral-200'
+                ? 'bg-[#3F6FB5] text-white shadow-xs'
+                : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
             }`}
           >
             <BarChart3 className="w-3.5 h-3.5" />
@@ -133,10 +128,10 @@ export const AnalyticsView: React.FC = () => {
           <button
             id="tab-analytics-funnel"
             onClick={() => setActiveTab('funnel')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
               activeTab === 'funnel'
-                ? 'bg-emerald-500 text-neutral-950 shadow-sm'
-                : 'text-neutral-400 hover:text-neutral-200'
+                ? 'bg-[#3F6FB5] text-white shadow-xs'
+                : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
             }`}
           >
             <TrendingDown className="w-3.5 h-3.5" />
@@ -146,10 +141,10 @@ export const AnalyticsView: React.FC = () => {
           <button
             id="tab-analytics-abtests"
             onClick={() => setActiveTab('ab-tests')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
               activeTab === 'ab-tests'
-                ? 'bg-emerald-500 text-neutral-950 shadow-sm'
-                : 'text-neutral-400 hover:text-neutral-200'
+                ? 'bg-[#3F6FB5] text-white shadow-xs'
+                : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
             }`}
           >
             <SplitSquareVertical className="w-3.5 h-3.5" />
@@ -159,10 +154,10 @@ export const AnalyticsView: React.FC = () => {
           <button
             id="tab-analytics-report"
             onClick={() => setActiveTab('report')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
               activeTab === 'report'
-                ? 'bg-emerald-500 text-neutral-950 shadow-sm'
-                : 'text-neutral-400 hover:text-neutral-200'
+                ? 'bg-[#3F6FB5] text-white shadow-xs'
+                : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
             }`}
           >
             <FileText className="w-3.5 h-3.5" />

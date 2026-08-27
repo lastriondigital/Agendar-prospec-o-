@@ -31,8 +31,9 @@ import { ServiceFormModal } from '../components/qualification/ServiceFormModal';
 import { IcpFormModal } from '../components/qualification/IcpFormModal';
 import { ScoringSettingsPanel } from '../components/qualification/ScoringSettingsPanel';
 import { ScoreSimulatorModal } from '../components/qualification/ScoreSimulatorModal';
+import { QualificationBuilder } from '../components/qualification/QualificationBuilder';
 
-type ActiveTab = 'services' | 'icps' | 'scoring';
+type ActiveTab = 'services' | 'icps' | 'scoring' | 'qualificacao';
 
 export const ServicesView: React.FC = () => {
   const {
@@ -191,6 +192,18 @@ export const ServicesView: React.FC = () => {
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-neutral-800 text-neutral-300">
             {icps.length}
           </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('qualificacao')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'qualificacao'
+              ? 'bg-neutral-900 text-neutral-100 border border-neutral-700 shadow-xs'
+              : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-900/50'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-emerald-400" />
+          <span>Qualificação por Serviço</span>
         </button>
 
         <button
@@ -516,7 +529,10 @@ export const ServicesView: React.FC = () => {
         </div>
       )}
 
-      {/* 5. CONTEÚDO DA ABA 3: LEAD SCORING & PESOS */}
+      {/* 5. CONTEÚDO DA ABA 3: QUALIFICAÇÃO POR SERVIÇO */}
+      {activeTab === 'qualificacao' && <QualificationBuilder />}
+
+      {/* 6. CONTEÚDO DA ABA 4: LEAD SCORING & PESOS */}
       {activeTab === 'scoring' && (
         <ScoringSettingsPanel
           weights={settings.scoringWeights}

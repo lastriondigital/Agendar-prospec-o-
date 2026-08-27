@@ -1,14 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
   Cloud,
-  Database,
   Download,
   FileSpreadsheet,
-  Flame,
   HardDrive,
-  Laptop,
   Moon,
   RefreshCw,
   RotateCcw,
@@ -47,8 +44,6 @@ export const SettingsView: React.FC = () => {
     settings,
     updateSettings,
     campaigns,
-    services,
-    templates,
     actions,
     companies,
     contacts,
@@ -58,7 +53,6 @@ export const SettingsView: React.FC = () => {
     clearAllData,
     exportJSON,
     importJSON,
-    isDemoMode,
   } = useApp();
   const { user, openAuthModal, logout } = useAuth();
   const { syncState, conflicts, openConflictModal, syncNow } = useSync();
@@ -77,6 +71,7 @@ export const SettingsView: React.FC = () => {
       dailyGoal: Number(dailyGoal),
       estMinutesPerAction: Number(estMinutes),
     });
+    success('Preferências salvas com sucesso!');
   };
 
   const handleExportBackupJSON = async () => {
@@ -160,23 +155,23 @@ export const SettingsView: React.FC = () => {
     <div className="space-y-6 max-w-4xl mx-auto animate-in fade-in duration-200">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-neutral-100">
+        <h2 className="text-xl font-bold text-[#202124] dark:text-[#E8EAED]">
           Configurações & Hardening de Produção
         </h2>
-        <p className="text-xs text-slate-500 dark:text-neutral-400">
+        <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
           Gerencie PWA, backups em múltiplos formatos, persistência IndexedDB, Cloud Sync e segurança.
         </p>
       </div>
 
       {/* PWA & Offline Readiness Card */}
-      <Card padding="md" className="bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
+      <Card padding="md" className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 border border-emerald-600/20">
+            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 border border-blue-200 dark:border-blue-800/40">
               <Smartphone className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2">
                 <span>Progressive Web App (PWA) & Offline Shell</span>
                 {isInstalled ? (
                   <Badge variant="emerald" size="sm">App Instalado</Badge>
@@ -184,7 +179,7 @@ export const SettingsView: React.FC = () => {
                   <Badge variant="blue" size="sm">Pronto para Instalação</Badge>
                 )}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-neutral-400">
+              <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
                 Service Worker ativo com cache de ativos estáticos, navegação rápida e operação offline resiliente.
               </p>
             </div>
@@ -215,26 +210,26 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-neutral-950/60 border border-slate-200 dark:border-neutral-800 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] text-xs">
           <div>
-            <span className="text-slate-400 dark:text-neutral-500">Service Worker:</span>
-            <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-neutral-200 mt-1">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span className="text-[#80868B]">Service Worker:</span>
+            <div className="flex items-center gap-1.5 font-semibold text-[#202124] dark:text-[#E8EAED] mt-1">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>Ativo (Cache v5.0.0)</span>
             </div>
           </div>
 
           <div>
-            <span className="text-slate-400 dark:text-neutral-500">Modo de Operação:</span>
-            <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-neutral-200 mt-1">
+            <span className="text-[#80868B]">Modo de Operação:</span>
+            <div className="flex items-center gap-1.5 font-semibold text-[#202124] dark:text-[#E8EAED] mt-1">
               {isOffline ? (
                 <>
-                  <WifiOff className="w-4 h-4 text-amber-500" />
+                  <WifiOff className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   <span>Offline (Dados locais seguros)</span>
                 </>
               ) : (
                 <>
-                  <Wifi className="w-4 h-4 text-emerald-500" />
+                  <Wifi className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>Online & Conectado</span>
                 </>
               )}
@@ -242,8 +237,8 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div>
-            <span className="text-slate-400 dark:text-neutral-500">Modo de Exibição:</span>
-            <p className="font-semibold text-slate-800 dark:text-neutral-200 mt-1">
+            <span className="text-[#80868B]">Modo de Exibição:</span>
+            <p className="font-semibold text-[#202124] dark:text-[#E8EAED] mt-1">
               {isInstalled ? 'Standalone (Janela Nativa)' : 'Navegador Web / PWA Host'}
             </p>
           </div>
@@ -251,14 +246,14 @@ export const SettingsView: React.FC = () => {
       </Card>
 
       {/* Cloud Sync & Firebase Card */}
-      <Card padding="md" className="bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
+      <Card padding="md" className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-600/20">
+            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 border border-blue-200 dark:border-blue-800/40">
               <Cloud className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2">
                 <span>Camada Cloud & Sincronização Firestore</span>
                 {syncState.isAuthenticated ? (
                   <Badge variant="emerald" size="sm">Conectado</Badge>
@@ -266,7 +261,7 @@ export const SettingsView: React.FC = () => {
                   <Badge variant="amber" size="sm">Desconectado</Badge>
                 )}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-neutral-400">
+              <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
                 Arquitetura Offline-first: seus dados funcionam offline e sincronizam automaticamente na nuvem.
               </p>
             </div>
@@ -275,7 +270,7 @@ export const SettingsView: React.FC = () => {
           <div className="flex items-center gap-2">
             {syncState.isAuthenticated ? (
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={syncNow}
                 disabled={syncState.status === 'syncing' || !syncState.isOnline}
@@ -297,18 +292,18 @@ export const SettingsView: React.FC = () => {
         </div>
 
         {/* Sync Details Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-neutral-950/60 border border-slate-200 dark:border-neutral-800 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] text-xs">
           <div>
-            <span className="text-slate-400 dark:text-neutral-500">Status de Rede:</span>
-            <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-neutral-200 mt-1">
+            <span className="text-[#80868B]">Status de Rede:</span>
+            <div className="flex items-center gap-1.5 font-semibold text-[#202124] dark:text-[#E8EAED] mt-1">
               {syncState.isOnline ? (
                 <>
-                  <Wifi className="w-4 h-4 text-emerald-500" />
+                  <Wifi className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>Online (Conectado à internet)</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className="w-4 h-4 text-amber-500" />
+                  <WifiOff className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   <span>Offline — dados salvos neste dispositivo</span>
                 </>
               )}
@@ -316,8 +311,8 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div>
-            <span className="text-slate-400 dark:text-neutral-500">Última Sincronização:</span>
-            <p className="font-semibold text-slate-800 dark:text-neutral-200 mt-1">
+            <span className="text-[#80868B]">Última Sincronização:</span>
+            <p className="font-semibold text-[#202124] dark:text-[#E8EAED] mt-1">
               {syncState.lastSyncedAt
                 ? new Date(syncState.lastSyncedAt).toLocaleString('pt-BR')
                 : 'Pendente de primeira sincronização'}
@@ -325,8 +320,8 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div>
-            <span className="text-slate-400 dark:text-neutral-500">Fila Pendente:</span>
-            <p className="font-semibold text-slate-800 dark:text-neutral-200 mt-1">
+            <span className="text-[#80868B]">Fila Pendente:</span>
+            <p className="font-semibold text-[#202124] dark:text-[#E8EAED] mt-1">
               {syncState.pendingCount} {syncState.pendingCount === 1 ? 'mutação' : 'mutações'}
             </p>
           </div>
@@ -349,14 +344,14 @@ export const SettingsView: React.FC = () => {
 
         {/* User Account Info */}
         {syncState.isAuthenticated && user && (
-          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-neutral-800/80 text-xs">
-            <div className="flex items-center gap-2 text-slate-600 dark:text-neutral-300">
-              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+          <div className="flex items-center justify-between pt-2 border-t border-[#ECEEF1] dark:border-[#2D3139] text-xs">
+            <div className="flex items-center gap-2 text-[#5F6368] dark:text-[#9AA0A6]">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>Autenticado como: <strong>{user.email}</strong> ({user.displayName})</span>
             </div>
             <button
               onClick={logout}
-              className="text-xs text-red-500 hover:text-red-600 hover:underline font-medium cursor-pointer"
+              className="text-xs text-rose-600 dark:text-rose-400 hover:underline font-medium cursor-pointer"
             >
               Desconectar
             </button>
@@ -365,17 +360,17 @@ export const SettingsView: React.FC = () => {
       </Card>
 
       {/* Backup, Validation & Multi-Format Exports */}
-      <Card padding="md" className="bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
+      <Card padding="md" className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+            <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40">
               <HardDrive className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100">
+              <h3 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED]">
                 Central de Backup & Exportações
               </h3>
-              <p className="text-xs text-slate-500 dark:text-neutral-400">
+              <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
                 Exporte relatórios CSV para planilhas ou faça backup integral com validação de esquema.
               </p>
             </div>
@@ -386,64 +381,64 @@ export const SettingsView: React.FC = () => {
         </div>
 
         {/* DB Volume Counters */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-neutral-950/60 border border-slate-200 dark:border-neutral-800 text-center text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 p-3 rounded-xl bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] text-center text-xs">
           <div>
-            <span className="text-slate-400 dark:text-neutral-500">Empresas:</span>
-            <p className="font-mono font-bold text-slate-800 dark:text-neutral-200 mt-0.5">{companies.length}</p>
+            <span className="text-[#80868B]">Empresas:</span>
+            <p className="font-mono font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5">{companies.length}</p>
           </div>
           <div>
-            <span className="text-slate-400 dark:text-neutral-500">Contatos:</span>
-            <p className="font-mono font-bold text-slate-800 dark:text-neutral-200 mt-0.5">{contacts.length}</p>
+            <span className="text-[#80868B]">Contatos:</span>
+            <p className="font-mono font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5">{contacts.length}</p>
           </div>
           <div>
-            <span className="text-slate-400 dark:text-neutral-500">Leads:</span>
-            <p className="font-mono font-bold text-slate-800 dark:text-neutral-200 mt-0.5">{leads.length}</p>
+            <span className="text-[#80868B]">Leads:</span>
+            <p className="font-mono font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5">{leads.length}</p>
           </div>
           <div>
-            <span className="text-slate-400 dark:text-neutral-500">Ações:</span>
-            <p className="font-mono font-bold text-slate-800 dark:text-neutral-200 mt-0.5">{actions.length}</p>
+            <span className="text-[#80868B]">Ações:</span>
+            <p className="font-mono font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5">{actions.length}</p>
           </div>
           <div>
-            <span className="text-slate-400 dark:text-neutral-500">Campanhas:</span>
-            <p className="font-mono font-bold text-slate-800 dark:text-neutral-200 mt-0.5">{campaigns.length}</p>
+            <span className="text-[#80868B]">Campanhas:</span>
+            <p className="font-mono font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5">{campaigns.length}</p>
           </div>
         </div>
 
         {/* Action Buttons Grid */}
         <div className="space-y-3 pt-2">
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <div className="text-xs font-bold text-[#5F6368] dark:text-[#9AA0A6] uppercase tracking-wider">
             Exportações em CSV (Compatível com Excel & Google Sheets)
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={handleExportCompaniesCSV}
-              leftIcon={<FileSpreadsheet className="w-4 h-4 text-emerald-500" />}
+              leftIcon={<FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
             >
               CSV Empresas & Leads
             </Button>
 
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={handleExportActionsCSV}
-              leftIcon={<FileSpreadsheet className="w-4 h-4 text-amber-500" />}
+              leftIcon={<FileSpreadsheet className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
             >
               CSV Fila de Ações
             </Button>
 
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={handleExportHistoryCSV}
-              leftIcon={<FileSpreadsheet className="w-4 h-4 text-blue-500" />}
+              leftIcon={<FileSpreadsheet className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
             >
               CSV Histórico Interações
             </Button>
           </div>
 
-          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider pt-3 border-t border-slate-100 dark:border-neutral-800/80">
+          <div className="text-xs font-bold text-[#5F6368] dark:text-[#9AA0A6] uppercase tracking-wider pt-3 border-t border-[#ECEEF1] dark:border-[#2D3139]">
             Backup Estruturado JSON & Restauração
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -469,12 +464,12 @@ export const SettingsView: React.FC = () => {
       </Card>
 
       {/* Theme and Preferences */}
-      <Card padding="md" className="bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100">Aparência & Metas de Execução</h3>
+      <Card padding="md" className="space-y-4">
+        <h3 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED]">Aparência & Metas de Execução</h3>
         <div className="grid grid-cols-3 gap-3">
           {[
-            { id: 'dark', label: 'Escuro (Pro Focus)', icon: <Moon className="w-4 h-4" /> },
             { id: 'light', label: 'Claro (Light)', icon: <Sun className="w-4 h-4" /> },
+            { id: 'dark', label: 'Escuro (Dark)', icon: <Moon className="w-4 h-4" /> },
             { id: 'system', label: 'Automático (Sistema)', icon: <RefreshCw className="w-4 h-4" /> },
           ].map((opt) => (
             <button
@@ -482,8 +477,8 @@ export const SettingsView: React.FC = () => {
               onClick={() => setTheme(opt.id as any)}
               className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
                 theme === opt.id
-                  ? 'bg-slate-100 dark:bg-neutral-800 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
-                  : 'bg-slate-50 dark:bg-neutral-950/60 border-slate-200 dark:border-neutral-800 text-slate-600 dark:text-neutral-400 hover:text-slate-900'
+                  ? 'bg-blue-50 dark:bg-blue-950/40 border-[#3F6FB5] dark:border-blue-500 text-[#3F6FB5] dark:text-blue-300 font-bold shadow-xs'
+                  : 'bg-white dark:bg-[#1E2228] border-[#E6E8EB] dark:border-[#2D3139] text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
               }`}
             >
               {opt.icon}
@@ -492,7 +487,7 @@ export const SettingsView: React.FC = () => {
           ))}
         </div>
 
-        <div className="pt-4 border-t border-slate-100 dark:border-neutral-800/80 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="pt-4 border-t border-[#ECEEF1] dark:border-[#2D3139] grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
             label="Meta Diária de Prospecções Padrão"
             type="number"
@@ -515,12 +510,12 @@ export const SettingsView: React.FC = () => {
       </Card>
 
       {/* Demo Data Management */}
-      <Card padding="md" className="bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-800 space-y-4 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100 flex items-center gap-2">
+      <Card padding="md" className="space-y-4">
+        <h3 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-amber-500" />
           Gerenciamento de Base de Dados
         </h3>
-        <p className="text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
+        <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed">
           O PROSPECT OS separa dados de teste para exploração de novos usuários e a base de prospecção real.
         </p>
 
@@ -546,27 +541,27 @@ export const SettingsView: React.FC = () => {
       </Card>
 
       {/* Production Audit & Diagnostics Card */}
-      <Card padding="md" className="bg-gradient-to-br from-neutral-900 to-neutral-950 border-emerald-500/30 space-y-4 shadow-md">
+      <Card padding="md" className="space-y-4 border-[#3F6FB5]/40 dark:border-blue-500/30">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 border border-blue-200 dark:border-blue-800/40">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2">
                 <span>Auditoria Completa de Produção & Verificação de 24 Passos</span>
                 <Badge variant="emerald" size="sm">
                   READY
                 </Badge>
               </h3>
-              <p className="text-xs text-neutral-400 mt-0.5">
+              <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] mt-0.5">
                 Executa a suíte de testes de ponta a ponta: 24 passos operacionais, resiliência offline, anti-duplicação, segurança do Gemini e integridade de dados.
               </p>
             </div>
           </div>
 
           <Button
-            variant="execution"
+            variant="primary"
             size="sm"
             onClick={() => setIsAuditModalOpen(true)}
             leftIcon={<Zap className="w-4 h-4 fill-white" />}

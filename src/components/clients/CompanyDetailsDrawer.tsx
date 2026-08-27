@@ -4,7 +4,9 @@ import {
   ArchiveRestore,
   Building2,
   Calendar,
+  Check,
   Clock,
+  Copy,
   Edit2,
   ExternalLink,
   Flame,
@@ -17,6 +19,7 @@ import {
   Phone,
   Plus,
   Send,
+  Share2,
   Sparkles,
   Thermometer,
   Trash2,
@@ -31,7 +34,7 @@ import { useConfirm } from '../../context/ConfirmDialogContext';
 import { useToast } from '../../context/ToastContext';
 import { Company, Contact, HistoryEvent, Lead, LeadStage } from '../../types';
 import { ALL_LEAD_STAGES, STAGES_CONFIG } from '../../utils/constants';
-import { formatPhoneNumber, formatRelativeDate } from '../../utils/formatting';
+import { cleanPhoneNumberDigits, formatPhoneNumber, formatRelativeDate, generateWhatsAppLink } from '../../utils/formatting';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { AddContactModal } from './AddContactModal';
@@ -40,6 +43,7 @@ import { LogInteractionModal } from './LogInteractionModal';
 import { ScoreBadge } from '../qualification/ScoreBadge';
 import { calculateLeadScore } from '../../utils/leadScoring';
 import { LeadMessageModal } from '../qualification/LeadMessageModal';
+import { QualificationModal } from '../qualification/QualificationModal';
 import { CopilotActionButtons } from '../copilot/CopilotActionButtons';
 import { CopilotAssistantModal } from '../copilot/CopilotAssistantModal';
 import { CopilotActionType } from '../../types';
@@ -66,9 +70,11 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
     advanceLeadStage,
     scheduleNextAction,
     addHistoryEvent,
-    logInteractionAndAdvance,
     addContactToCompany,
     updateContact,
+    archiveContact,
+    unarchiveContact,
+    setPrimaryContact,
     deleteContact,
     archiveCompany,
     unarchiveCompany,
@@ -76,7 +82,7 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
   } = useApp();
 
   const confirm = useConfirm();
-  const { success } = useToast();
+  const { success, error } = useToast();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'approach' | 'contacts' | 'history'>('overview');
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
@@ -84,15 +90,20 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [isLogInteractionOpen, setIsLogInteractionOpen] = useState(false);
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+  const [messageTargetContactId, setMessageTargetContactId] = useState<string | undefined>(undefined);
+  const [isQualificationOpen, setIsQualificationOpen] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copilotInitialAction, setCopilotInitialAction] = useState<CopilotActionType>('PERSONALIZAR');
   const [quickNote, setQuickNote] = useState('');
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [copiedContactPhoneId, setCopiedContactPhoneId] = useState<string | null>(null);
 
   if (!company) return null;
 
   const companyContacts = contacts.filter((c) => c.companyId === company.id);
-  const primaryContact = companyContacts.find((c) => c.isPrimary) || companyContacts[0];
+  const primaryContact = companyContacts.find((c) => c.isPrimary && c.status !== 'archived') ||
+    companyContacts.find((c) => c.status !== 'archived') ||
+    companyContacts[0];
   const companyLead = leads.find((l) => l.companyId === company.id);
   const companyHistory = history.filter((h) => h.companyId === company.id);
 
@@ -156,9 +167,9 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
 
   const handleDeleteContact = (c: Contact) => {
     confirm({
-      title: `Remover contato ${c.name}?`,
-      message: 'Tem certeza de que deseja excluir este contato da empresa?',
-      confirmText: 'Excluir',
+      title: `Remover contacto ${c.name}?`,
+      message: `Tem certeza de que deseja excluir permanentemente o contacto ${c.name} da empresa?`,
+      confirmText: 'Excluir definitivamente',
       cancelText: 'Cancelar',
       isDestructive: true,
       onConfirm: async () => {
@@ -167,33 +178,72 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
     });
   };
 
-  const getCleanPhone = (phoneStr?: string) => {
-    if (!phoneStr) return '';
-    return phoneStr.replace(/\D/g, '');
+  const handleToggleArchiveContact = async (c: Contact) => {
+    if (c.status === 'archived') {
+      await unarchiveContact(c.id, company.id);
+    } else {
+      confirm({
+        title: `Arquivar contacto ${c.name}?`,
+        message: 'O contacto será ocultado da lista ativa, mas seu histórico permanecerá salvo.',
+        confirmText: 'Arquivar contacto',
+        cancelText: 'Cancelar',
+        onConfirm: async () => {
+          await archiveContact(c.id, company.id);
+        },
+      });
+    }
+  };
+
+  const handleCopyPhone = async (contactId: string, phoneStr?: string) => {
+    if (!phoneStr) return;
+    try {
+      await navigator.clipboard.writeText(phoneStr);
+      setCopiedContactPhoneId(contactId);
+      success(`Número copiado: ${formatPhoneNumber(phoneStr)}`);
+      setTimeout(() => setCopiedContactPhoneId(null), 2000);
+    } catch {
+      error('Falha ao copiar número de telefone');
+    }
+  };
+
+  const handleOpenMessageForContact = (contactId?: string) => {
+    setMessageTargetContactId(contactId);
+    setIsMessageModalOpen(true);
+  };
+
+  const handleOpenCompanyWhatsApp = () => {
+    const rawPhone = company.companyWhatsApp || company.companyPhone;
+    if (!rawPhone) {
+      error('Empresa não possui WhatsApp ou telefone corporativo cadastrado.');
+      return;
+    }
+    const cleanDigits = cleanPhoneNumberDigits(rawPhone);
+    const link = `https://wa.me/${cleanDigits}`;
+    window.open(link, '_blank');
   };
 
   return (
     <div
       id="company-details-drawer-backdrop"
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
         id="company-details-drawer-panel"
-        className="w-full max-w-2xl bg-slate-900 border-l border-slate-800 h-full flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-right duration-300"
+        className="w-full max-w-2xl bg-white dark:bg-[#181B20] border-l border-[#E6E8EB] dark:border-[#2D3139] h-full flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-right duration-300"
       >
         {/* Header */}
-        <div className="p-5 bg-slate-950 border-b border-slate-800 shrink-0">
+        <div className="p-5 bg-[#F7F8FA] dark:bg-[#15171B] border-b border-[#E6E8EB] dark:border-[#2D3139] shrink-0">
           <div className="flex items-start justify-between gap-3 mb-2">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-200 font-bold text-lg">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/40 flex items-center justify-center text-[#3F6FB5] dark:text-blue-300 font-bold text-lg">
                 {company.name.slice(0, 2).toUpperCase()}
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg font-bold text-slate-100">{company.name}</h2>
+                  <h2 className="text-lg font-bold text-[#202124] dark:text-[#E8EAED]">{company.name}</h2>
                   {company.status === 'archived' && (
                     <Badge variant="neutral" size="sm">
                       Arquivado
@@ -206,32 +256,38 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                   )}
                 </div>
                 {company.tradeName && (
-                  <p className="text-xs text-slate-400 font-medium">({company.tradeName})</p>
+                  <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] font-medium">({company.tradeName})</p>
                 )}
-                <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                <div className="flex items-center gap-2 text-xs text-[#5F6368] dark:text-[#9AA0A6] mt-1">
                   <span>{company.niche}</span>
                   <span>•</span>
                   <span>{company.city}, {company.country}</span>
+                  {company.unitsCount && company.unitsCount > 1 && (
+                    <>
+                      <span>•</span>
+                      <span className="text-[#3F6FB5] dark:text-blue-300">{company.unitsCount} unidades</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED] hover:bg-neutral-100 dark:hover:bg-[#20242A] transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Quick Stage Selector & Scores */}
-          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-3 flex-wrap">
+          <div className="mt-4 pt-3 border-t border-[#ECEEF1] dark:border-[#2D3139] flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400 font-medium">Estágio:</span>
+              <span className="text-xs text-[#5F6368] dark:text-[#9AA0A6] font-medium">Estágio:</span>
               <select
                 value={stageKey}
                 onChange={(e) => handleStageChange(e.target.value as LeadStage)}
-                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400 cursor-pointer"
+                className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] text-[#202124] dark:text-[#E8EAED] focus:outline-none focus:border-[#3F6FB5] cursor-pointer"
               >
                 {ALL_LEAD_STAGES.map((stg) => (
                   <option key={stg} value={stg}>
@@ -241,15 +297,26 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
               </select>
 
               {companyLead && (
-                <Button
-                  variant="primary"
-                  size="xs"
-                  onClick={() => setIsMessageModalOpen(true)}
-                  leftIcon={<MessageSquare className="w-3.5 h-3.5" />}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white ml-2"
-                >
-                  Preparar Mensagem
-                </Button>
+                <>
+                  <Button
+                    variant="primary"
+                    size="xs"
+                    onClick={() => handleOpenMessageForContact(primaryContact?.id)}
+                    leftIcon={<MessageSquare className="w-3.5 h-3.5" />}
+                    className="ml-2"
+                  >
+                    Preparar Mensagem
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => setIsQualificationOpen(true)}
+                    leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-500" />}
+                  >
+                    Qualificar Lead
+                  </Button>
+                </>
               )}
             </div>
 
@@ -257,15 +324,15 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
               {companyLead?.temperature && (
                 <div className="flex items-center gap-1 font-medium">
                   {companyLead.temperature === 'quente' ? (
-                    <span className="text-amber-400 flex items-center gap-1">
-                      <Flame className="w-3.5 h-3.5 fill-amber-400" /> Quente
+                    <span className="text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                      <Flame className="w-3.5 h-3.5 fill-current" /> Quente
                     </span>
                   ) : companyLead.temperature === 'morno' ? (
-                    <span className="text-blue-400 flex items-center gap-1">
+                    <span className="text-[#3F6FB5] dark:text-blue-300 flex items-center gap-1">
                       <Zap className="w-3.5 h-3.5" /> Morno
                     </span>
                   ) : (
-                    <span className="text-slate-400 flex items-center gap-1">
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] flex items-center gap-1">
                       <Thermometer className="w-3.5 h-3.5" /> Frio
                     </span>
                   )}
@@ -282,8 +349,8 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                   showLabel
                 />
               ) : companyLead?.score !== undefined ? (
-                <div className="flex items-center gap-1.5 font-mono text-slate-300">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <div className="flex items-center gap-1.5 font-mono text-[#202124] dark:text-[#E8EAED]">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                   <span className="font-bold">{companyLead.score} pts</span>
                 </div>
               ) : null}
@@ -292,13 +359,13 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="px-5 border-b border-slate-800 bg-slate-950/50 flex gap-4 shrink-0 overflow-x-auto no-scrollbar">
+        <div className="px-5 border-b border-[#E6E8EB] dark:border-[#2D3139] bg-white dark:bg-[#181B20] flex gap-4 shrink-0 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`py-3 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+            className={`py-3 text-xs border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === 'overview'
-                ? 'border-slate-200 text-slate-100 font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[#3F6FB5] text-[#3F6FB5] dark:text-blue-400 font-semibold'
+                : 'border-transparent text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
@@ -307,34 +374,34 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
 
           <button
             onClick={() => setActiveTab('approach')}
-            className={`py-3 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+            className={`py-3 text-xs border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === 'approach'
-                ? 'border-indigo-400 text-indigo-300 font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[#3F6FB5] text-[#3F6FB5] dark:text-blue-400 font-semibold'
+                : 'border-transparent text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <Sparkles className="w-3.5 h-3.5 text-[#3F6FB5]" />
             Recomendação de Abordagem (7 Pilares)
           </button>
 
           <button
             onClick={() => setActiveTab('contacts')}
-            className={`py-3 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+            className={`py-3 text-xs border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === 'contacts'
-                ? 'border-slate-200 text-slate-100 font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[#3F6FB5] text-[#3F6FB5] dark:text-blue-400 font-semibold'
+                : 'border-transparent text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            Contatos ({companyContacts.length})
+            Contactos ({companyContacts.length})
           </button>
 
           <button
             onClick={() => setActiveTab('history')}
-            className={`py-3 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+            className={`py-3 text-xs border-b-2 flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${
               activeTab === 'history'
-                ? 'border-slate-200 text-slate-100 font-semibold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-[#3F6FB5] text-[#3F6FB5] dark:text-blue-400 font-semibold'
+                : 'border-transparent text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
@@ -346,7 +413,7 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* TAB: RECOMENDAÇÃO DE ABORDAGEM (7 PILARES) */}
           {activeTab === 'approach' && (
-            <div className="space-y-4 animate-fadeIn">
+            <div className="space-y-4">
               <ApproachRecommendationCard
                 company={company}
                 contact={primaryContact}
@@ -366,13 +433,13 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
               />
 
               {/* Copiloto de Prospecção Gemini */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/30 space-y-2.5 shadow-sm">
+              <div className="p-4 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] space-y-2.5 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                    Copiloto Gemini de Prospecção
+                  <span className="text-xs font-bold text-[#3F6FB5] dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[#3F6FB5] dark:text-blue-400" />
+                    Copiloto de Prospecção
                   </span>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6]">
                     Análise e Estratégia sem Disparo Automático
                   </span>
                 </div>
@@ -386,14 +453,14 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
               </div>
 
               {/* Próxima Ação em Destaque */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80">
+              <div className="p-4 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] shadow-xs">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Zap className="w-3.5 h-3.5" />
                     Próxima Ação Agendada
                   </span>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setIsScheduleOpen(true)}
                     className="text-xs h-7 px-2"
@@ -404,84 +471,137 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
 
                 {companyLead?.nextActionTitle ? (
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-slate-100">{companyLead.nextActionTitle}</p>
-                    <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <p className="text-sm font-semibold text-[#202124] dark:text-[#E8EAED]">{companyLead.nextActionTitle}</p>
+                    <div className="flex items-center gap-3 text-xs text-[#5F6368] dark:text-[#9AA0A6]">
                       <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <Calendar className="w-3.5 h-3.5 text-[#80868B]" />
                         {companyLead.nextActionDate || 'Data a definir'}
                       </span>
                       <span>•</span>
-                      <span className="uppercase font-mono text-[11px] text-slate-300">
+                      <span className="uppercase font-mono text-[11px] text-[#202124] dark:text-[#E8EAED]">
                         Via {companyLead.nextActionChannel || 'WhatsApp'}
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500">Nenhuma ação planejada no momento.</p>
+                  <p className="text-xs text-[#80868B]">Nenhuma ação planejada no momento.</p>
                 )}
               </div>
 
               {/* Detalhes do Lead */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              <div className="p-4 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] space-y-3 shadow-xs">
+                <h3 className="text-xs font-semibold text-[#5F6368] dark:text-[#9AA0A6] uppercase tracking-wider">
                   Qualificação & Estratégia
                 </h3>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                   <div>
-                    <span className="text-slate-500 block">Serviço de Interesse:</span>
-                    <span className="font-medium text-slate-200">
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">Serviço de Interesse:</span>
+                    <span className="font-medium text-[#202124] dark:text-[#E8EAED]">
                       {companyLead?.serviceName || 'A definir'}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-slate-500 block">Origem do Lead:</span>
-                    <span className="font-medium text-slate-200">
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">Origem do Lead:</span>
+                    <span className="font-medium text-[#202124] dark:text-[#E8EAED]">
                       {companyLead?.source || 'Outbound Direto'}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-slate-500 block">Prioridade:</span>
-                    <span className="font-medium text-slate-200 capitalize">
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">Prioridade:</span>
+                    <span className="font-medium text-[#202124] dark:text-[#E8EAED] capitalize">
                       {companyLead?.priority || 'Média'}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-slate-500 block">Data de Entrada:</span>
-                    <span className="font-medium text-slate-200">
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">Data de Entrada:</span>
+                    <span className="font-medium text-[#202124] dark:text-[#E8EAED]">
                       {companyLead?.entryDate || company.createdAt?.slice(0, 10) || '—'}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-slate-500 block">Último Contato:</span>
-                    <span className="font-medium text-slate-200">
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">Último Contato:</span>
+                    <span className="font-medium text-[#202124] dark:text-[#E8EAED]">
                       {companyLead?.lastContactDate || 'Ainda não contatado'}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-slate-500 block">Nº de Unidades:</span>
-                    <span className="font-medium text-slate-200">{company.unitsCount || 1}</span>
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">Nº de Unidades:</span>
+                    <span className="font-medium text-[#202124] dark:text-[#E8EAED]">{company.unitsCount || 1}</span>
                   </div>
                 </div>
 
                 {companyLead?.notes && (
-                  <div className="pt-2 border-t border-slate-800 text-xs">
-                    <span className="text-slate-500 block mb-1">Notas do Lead:</span>
-                    <p className="text-slate-300 whitespace-pre-wrap">{companyLead.notes}</p>
+                  <div className="pt-2 border-t border-[#ECEEF1] dark:border-[#2D3139] text-xs">
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block mb-1">Notas do Lead:</span>
+                    <p className="text-[#202124] dark:text-[#E8EAED] whitespace-pre-wrap">{companyLead.notes}</p>
                   </div>
                 )}
               </div>
 
-              {/* Presença Digital & Endereço */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Presença & Redes Sociais
-                </h3>
+              {/* Presença Digital & Contato Corporativo */}
+              <div className="p-4 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] space-y-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-[#5F6368] dark:text-[#9AA0A6] uppercase tracking-wider">
+                    Canais da Empresa & Presença Digital
+                  </h3>
+                  {(company.companyWhatsApp || company.companyPhone) && (
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      onClick={handleOpenCompanyWhatsApp}
+                      leftIcon={<MessageSquare className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />}
+                      className="text-[11px]"
+                    >
+                      Abrir WhatsApp da Empresa
+                    </Button>
+                  )}
+                </div>
+
+                {/* Telefones da Empresa */}
+                {(company.companyPhone || company.companyWhatsApp || company.companyEmail) && (
+                  <div className="flex flex-wrap gap-2 pb-2 border-b border-[#ECEEF1] dark:border-[#2D3139]">
+                    {company.companyWhatsApp && (
+                      <a
+                        href={generateWhatsAppLink(company.companyWhatsApp)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800/40 text-xs font-medium text-emerald-800 dark:text-emerald-300 transition-colors"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>WhatsApp Empresa: {formatPhoneNumber(company.companyWhatsApp)}</span>
+                        {company.companyWhatsAppVerified && (
+                          <span className="text-[10px] bg-emerald-600 text-white px-1 rounded font-bold">Verificado</span>
+                        )}
+                      </a>
+                    )}
+
+                    {company.companyPhone && (
+                      <a
+                        href={`tel:${cleanPhoneNumberDigits(company.companyPhone)}`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] hover:bg-neutral-100 border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-[#202124] dark:text-[#E8EAED] transition-colors"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-[#3F6FB5]" />
+                        <span>Recepção: {formatPhoneNumber(company.companyPhone)}</span>
+                      </a>
+                    )}
+
+                    {company.companyEmail && (
+                      <a
+                        href={`mailto:${company.companyEmail}`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] hover:bg-neutral-100 border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-[#202124] dark:text-[#E8EAED] transition-colors"
+                      >
+                        <Mail className="w-3.5 h-3.5 text-[#80868B]" />
+                        <span>E-mail Corporativo: {company.companyEmail}</span>
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex flex-wrap gap-2">
                   {company.website && (
@@ -489,11 +609,11 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                       href={company.website.startsWith('http') ? company.website : `https://${company.website}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-200 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] hover:bg-neutral-100 border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-[#202124] dark:text-[#E8EAED] transition-colors"
                     >
-                      <Globe className="w-3.5 h-3.5 text-blue-400" />
+                      <Globe className="w-3.5 h-3.5 text-[#3F6FB5]" />
                       Website
-                      <ExternalLink className="w-3 h-3 text-slate-500" />
+                      <ExternalLink className="w-3 h-3 text-[#80868B]" />
                     </a>
                   )}
 
@@ -502,11 +622,11 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                       href={`https://instagram.com/${company.instagram.replace('@', '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-pink-300 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] hover:bg-neutral-100 border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-pink-700 dark:text-pink-300 transition-colors"
                     >
-                      <Instagram className="w-3.5 h-3.5 text-pink-400" />
+                      <Instagram className="w-3.5 h-3.5 text-pink-500" />
                       {company.instagram}
-                      <ExternalLink className="w-3 h-3 text-slate-500" />
+                      <ExternalLink className="w-3 h-3 text-[#80868B]" />
                     </a>
                   )}
 
@@ -515,11 +635,11 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                       href={company.linkedin.startsWith('http') ? company.linkedin : `https://${company.linkedin}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-blue-300 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] hover:bg-neutral-100 border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-blue-700 dark:text-blue-300 transition-colors"
                     >
-                      <Linkedin className="w-3.5 h-3.5 text-blue-400" />
+                      <Linkedin className="w-3.5 h-3.5 text-blue-500" />
                       LinkedIn
-                      <ExternalLink className="w-3 h-3 text-slate-500" />
+                      <ExternalLink className="w-3 h-3 text-[#80868B]" />
                     </a>
                   )}
 
@@ -528,43 +648,43 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                       href={company.googleBusiness.startsWith('http') ? company.googleBusiness : `https://${company.googleBusiness}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-emerald-300 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] hover:bg-neutral-100 border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-emerald-700 dark:text-emerald-300 transition-colors"
                     >
-                      <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                      <MapPin className="w-3.5 h-3.5 text-emerald-500" />
                       Google Maps
-                      <ExternalLink className="w-3 h-3 text-slate-500" />
+                      <ExternalLink className="w-3 h-3 text-[#80868B]" />
                     </a>
                   )}
                 </div>
 
                 {company.address && (
-                  <div className="pt-2 border-t border-slate-800 flex items-start gap-2 text-xs text-slate-300">
-                    <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                  <div className="pt-2 border-t border-[#ECEEF1] dark:border-[#2D3139] flex items-start gap-2 text-xs text-[#202124] dark:text-[#E8EAED]">
+                    <MapPin className="w-4 h-4 text-[#80868B] shrink-0 mt-0.5" />
                     <span>{company.address}</span>
                   </div>
                 )}
               </div>
 
               {company.notes && (
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <div className="p-4 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] space-y-1.5 shadow-xs">
+                  <h3 className="text-xs font-semibold text-[#5F6368] dark:text-[#9AA0A6] uppercase tracking-wider">
                     Observações Cadastrais da Empresa
                   </h3>
-                  <p className="text-xs text-slate-300 whitespace-pre-wrap">{company.notes}</p>
+                  <p className="text-xs text-[#202124] dark:text-[#E8EAED] whitespace-pre-wrap">{company.notes}</p>
                 </div>
               )}
             </div>
           )}
 
-          {/* TAB 2: CONTATOS */}
+          {/* TAB 2: CONTACTOS (1:N) */}
           {activeTab === 'contacts' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Contatos Vinculados
+                <span className="text-xs font-semibold text-[#5F6368] dark:text-[#9AA0A6] uppercase tracking-wider">
+                  Contactos Vinculados ({companyContacts.length})
                 </span>
                 <Button
-                  variant="outline"
+                  variant="primary"
                   size="sm"
                   onClick={() => {
                     setEditingContact(null);
@@ -572,104 +692,186 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                   }}
                   leftIcon={<Plus className="w-3.5 h-3.5" />}
                 >
-                  Novo Contato
+                  Adicionar Contacto
                 </Button>
               </div>
 
               <div className="space-y-3">
-                {companyContacts.map((c) => {
-                  const cleanWa = getCleanPhone(c.whatsapp || c.phone);
-                  const cleanTel = getCleanPhone(c.phone || c.whatsapp);
+                {companyContacts.length === 0 ? (
+                  <div className="p-8 text-center rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] text-[#5F6368] dark:text-[#9AA0A6] text-xs space-y-2">
+                    <User className="w-8 h-8 mx-auto text-[#80868B] mb-1" />
+                    <p className="font-semibold text-[#202124] dark:text-[#E8EAED]">Nenhum contacto cadastrado ainda</p>
+                    <p className="text-[#5F6368] dark:text-[#9AA0A6]">Adicione pessoas decisoras e operacionais desta empresa.</p>
+                  </div>
+                ) : (
+                  companyContacts.map((c) => {
+                    const rawWa = c.whatsapp || c.phone;
+                    const rawTel = c.phone || c.whatsapp;
+                    const isArchived = c.status === 'archived';
 
-                  return (
-                    <div
-                      key={c.id}
-                      className="p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors space-y-3"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-9 h-9 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 font-semibold text-sm">
-                            {c.name.slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-sm font-semibold text-slate-100">{c.name}</h4>
-                              {c.isPrimary && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium flex items-center gap-1">
-                                  <UserCheck className="w-3 h-3" /> Principal
-                                </span>
-                              )}
+                    return (
+                      <div
+                        key={c.id}
+                        className={`p-4 rounded-xl bg-white dark:bg-[#181B20] border transition-colors space-y-3 shadow-xs ${
+                          isArchived
+                            ? 'border-[#E6E8EB] dark:border-[#2D3139] opacity-60'
+                            : c.isPrimary
+                            ? 'border-blue-300 dark:border-blue-800'
+                            : 'border-[#E6E8EB] dark:border-[#2D3139] hover:border-[#DADDE1]'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-semibold text-sm ${
+                              c.isPrimary
+                                ? 'bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 border border-blue-200 dark:border-blue-800/40'
+                                : 'bg-[#F7F8FA] dark:bg-[#20242A] text-[#5F6368] dark:text-[#9AA0A6]'
+                            }`}>
+                              {c.name.slice(0, 2).toUpperCase()}
                             </div>
-                            {c.role && <p className="text-xs text-slate-400">{c.role}</p>}
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="text-sm font-semibold text-[#202124] dark:text-[#E8EAED]">{c.name}</h4>
+                                {c.isPrimary && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 font-medium flex items-center gap-1">
+                                    <UserCheck className="w-3 h-3" /> Principal
+                                  </span>
+                                )}
+                                {c.referredByName && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#F7F8FA] dark:bg-[#20242A] text-[#5F6368] dark:text-[#9AA0A6] font-medium flex items-center gap-1" title={`Indicado por ${c.referredByName}`}>
+                                    <Share2 className="w-3 h-3" /> Indicado por: {c.referredByName}
+                                  </span>
+                                )}
+                                {isArchived && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-[#20242A] text-[#5F6368] dark:text-[#9AA0A6] font-medium">
+                                    Arquivado
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-[#5F6368] dark:text-[#9AA0A6] mt-0.5 flex-wrap">
+                                {c.role && <span>{c.role}</span>}
+                                {c.role && c.department && <span>•</span>}
+                                {c.department && <span>Depto: {c.department}</span>}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {!c.isPrimary && !isArchived && (
+                              <button
+                                onClick={async () => {
+                                  await setPrimaryContact(company.id, c.id);
+                                }}
+                                className="px-2 py-1 rounded text-[11px] font-medium text-[#3F6FB5] dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-blue-200 dark:border-blue-800/40 transition-colors flex items-center gap-1 mr-1 cursor-pointer"
+                                title="Tornar este o contacto principal e decisor da empresa"
+                              >
+                                <UserCheck className="w-3 h-3" /> Tornar Principal
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => {
+                                setEditingContact(c);
+                                setIsAddContactOpen(true);
+                              }}
+                              className="p-1.5 rounded-lg text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED] hover:bg-neutral-100 dark:hover:bg-[#20242A] transition-colors cursor-pointer"
+                              title="Editar Contacto"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              onClick={() => handleToggleArchiveContact(c)}
+                              className="p-1.5 rounded-lg text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED] hover:bg-neutral-100 dark:hover:bg-[#20242A] transition-colors cursor-pointer"
+                              title={isArchived ? 'Desarquivar contacto' : 'Arquivar contacto'}
+                            >
+                              {isArchived ? <ArchiveRestore className="w-3.5 h-3.5 text-[#3F6FB5]" /> : <Archive className="w-3.5 h-3.5" />}
+                            </button>
+
+                            {companyContacts.length > 1 && (
+                              <button
+                                onClick={() => handleDeleteContact(c)}
+                                className="p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                title="Remover Contacto"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingContact(c);
-                              setIsAddContactOpen(true);
-                            }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-                            title="Editar Contato"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          {companyContacts.length > 1 && (
+                        {/* Canais de Comunicação Direta */}
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          {rawWa && (
                             <button
-                              onClick={() => handleDeleteContact(c)}
-                              className="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
-                              title="Remover Contato"
+                              onClick={() => handleOpenMessageForContact(c.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800/40 text-xs font-semibold text-emerald-800 dark:text-emerald-300 transition-colors cursor-pointer"
+                              title="Preparar mensagem de script e abrir WhatsApp"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <MessageSquare className="w-3.5 h-3.5" />
+                              WhatsApp: {c.whatsapp ? formatPhoneNumber(c.whatsapp) : formatPhoneNumber(rawWa)}
                             </button>
                           )}
+
+                          {rawTel && (
+                            <button
+                              onClick={() => handleCopyPhone(c.id, rawTel)}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] hover:bg-neutral-100 border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-[#202124] dark:text-[#E8EAED] transition-colors cursor-pointer"
+                              title="Copiar telefone para discagem"
+                            >
+                              {copiedContactPhoneId === c.id ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5 text-[#80868B]" />
+                              )}
+                              {copiedContactPhoneId === c.id ? 'Copiado!' : formatPhoneNumber(rawTel)}
+                            </button>
+                          )}
+
+                          {c.email && (
+                            <a
+                              href={`mailto:${c.email}`}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] hover:bg-neutral-100 border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-[#202124] dark:text-[#E8EAED] transition-colors"
+                            >
+                              <Mail className="w-3.5 h-3.5 text-[#80868B]" />
+                              {c.email}
+                            </a>
+                          )}
+
+                          {c.instagram && (
+                            <a
+                              href={`https://instagram.com/${c.instagram.replace('@', '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] hover:bg-neutral-100 border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-pink-700 dark:text-pink-300 transition-colors"
+                            >
+                              <Instagram className="w-3.5 h-3.5 text-pink-500" />
+                              {c.instagram}
+                            </a>
+                          )}
+
+                          {c.linkedin && (
+                            <a
+                              href={c.linkedin.startsWith('http') ? c.linkedin : `https://${c.linkedin}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] hover:bg-neutral-100 border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-blue-700 dark:text-blue-300 transition-colors"
+                            >
+                              <Linkedin className="w-3.5 h-3.5 text-blue-500" />
+                              LinkedIn
+                            </a>
+                          )}
                         </div>
-                      </div>
 
-                      {/* Canais de Comunicação Direta */}
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {cleanWa && (
-                          <a
-                            href={`https://wa.me/55${cleanWa}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs font-medium text-emerald-300 transition-colors"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            {c.whatsapp ? formatPhoneNumber(c.whatsapp) : formatPhoneNumber(cleanWa)}
-                          </a>
-                        )}
-
-                        {cleanTel && (
-                          <a
-                            href={`tel:${cleanTel}`}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-200 transition-colors"
-                          >
-                            <Phone className="w-3.5 h-3.5 text-slate-400" />
-                            {c.phone ? formatPhoneNumber(c.phone) : formatPhoneNumber(cleanTel)}
-                          </a>
-                        )}
-
-                        {c.email && (
-                          <a
-                            href={`mailto:${c.email}`}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs text-slate-200 transition-colors"
-                          >
-                            <Mail className="w-3.5 h-3.5 text-slate-400" />
-                            {c.email}
-                          </a>
+                        {c.notes && (
+                          <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] pt-1 border-t border-[#ECEEF1] dark:border-[#2D3139]">
+                            {c.notes}
+                          </p>
                         )}
                       </div>
-
-                      {c.notes && (
-                        <p className="text-xs text-slate-400 pt-1 border-t border-slate-900">
-                          {c.notes}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
@@ -678,11 +880,11 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
           {activeTab === 'history' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <span className="text-xs font-semibold text-[#5F6368] dark:text-[#9AA0A6] uppercase tracking-wider">
                   Timeline de Eventos ({companyHistory.length})
                 </span>
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   onClick={() => setIsLogInteractionOpen(true)}
                   leftIcon={<Plus className="w-3.5 h-3.5" />}
@@ -699,7 +901,7 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                     value={quickNote}
                     onChange={(e) => setQuickNote(e.target.value)}
                     placeholder="Registrar nota rápida ou resultado de contato..."
-                    className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                    className="flex-1 px-3 py-2 bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] rounded-lg text-xs text-[#202124] dark:text-[#E8EAED] placeholder:text-[#80868B] focus:outline-none focus:border-[#3F6FB5]"
                   />
                   <Button
                     type="submit"
@@ -717,47 +919,60 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
               {/* Linha do Tempo Visual */}
               <div className="space-y-3 pt-2">
                 {companyHistory.length === 0 ? (
-                  <p className="text-xs text-slate-500 text-center py-6">
+                  <p className="text-xs text-[#80868B] text-center py-6">
                     Nenhum evento registrado no histórico ainda.
                   </p>
                 ) : (
                   companyHistory.map((item) => {
                     const isStage = item.type === 'stage_change';
                     const isMessage = item.type === 'message_sent';
+                    const isPrepared = item.type === 'message_prepared';
+                    const isWaOpened = item.type === 'whatsapp_opened';
                     const isCall = item.type === 'contact_made';
                     const isResponse = item.type === 'response_received';
                     const isProposal = item.type === 'proposal_sent';
                     const isMeeting = item.type === 'meeting_held' || item.type === 'meeting_scheduled';
+                    const isContactEvent = item.type.startsWith('contact_');
+                    const isReferral = item.type === 'referral_recorded';
 
-                    let iconColor = 'text-slate-400';
-                    let bgColor = 'bg-slate-900';
+                    let iconColor = 'text-[#5F6368] dark:text-[#9AA0A6]';
+                    let bgColor = 'bg-white dark:bg-[#181B20] border-[#E6E8EB] dark:border-[#2D3139]';
                     if (isStage) {
-                      iconColor = 'text-amber-400';
-                      bgColor = 'bg-amber-500/10 border-amber-500/30';
+                      iconColor = 'text-amber-700 dark:text-amber-400';
+                      bgColor = 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/40';
                     } else if (isMessage || isResponse) {
-                      iconColor = 'text-emerald-400';
-                      bgColor = 'bg-emerald-500/10 border-emerald-500/30';
+                      iconColor = 'text-emerald-700 dark:text-emerald-400';
+                      bgColor = 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40';
+                    } else if (isWaOpened || isPrepared) {
+                      iconColor = 'text-emerald-700 dark:text-emerald-400';
+                      bgColor = 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-200 dark:border-emerald-800/30';
                     } else if (isCall) {
-                      iconColor = 'text-blue-400';
-                      bgColor = 'bg-blue-500/10 border-blue-500/30';
+                      iconColor = 'text-[#3F6FB5] dark:text-blue-300';
+                      bgColor = 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/40';
                     } else if (isProposal || isMeeting) {
-                      iconColor = 'text-purple-400';
-                      bgColor = 'bg-purple-500/10 border-purple-500/30';
+                      iconColor = 'text-purple-700 dark:text-purple-300';
+                      bgColor = 'bg-purple-50/50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800/40';
+                    } else if (isReferral) {
+                      iconColor = 'text-[#3F6FB5] dark:text-blue-300';
+                      bgColor = 'bg-blue-50/30 dark:bg-blue-950/10 border-blue-200 dark:border-blue-800/30';
+                    } else if (isContactEvent) {
+                      iconColor = 'text-indigo-700 dark:text-indigo-300';
+                      bgColor = 'bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/40';
                     }
 
                     return (
                       <div
                         key={item.id}
-                        className={`p-3.5 rounded-xl border space-y-1.5 text-xs transition-colors ${bgColor}`}
+                        className={`p-3.5 rounded-xl border space-y-1.5 text-xs transition-colors shadow-xs ${bgColor}`}
                       >
-                        <div className="flex items-center justify-between text-slate-400">
+                        <div className="flex items-center justify-between text-[#5F6368] dark:text-[#9AA0A6]">
                           <span className={`font-bold ${iconColor}`}>{item.title}</span>
-                          <span className="text-[11px] font-mono text-slate-400">
+                          <span className="text-[11px] font-mono text-[#80868B]">
                             {formatRelativeDate(item.timestamp)}
                           </span>
                         </div>
                         {item.description && (
-                          <p className="text-slate-200 text-xs whitespace-pre-wrap">{item.description}</p>
+                          <p className="text-[#202124] dark:text-[#E8EAED] text-xs whitespace-pre-wrap">{item.description}</p>
                         )}
                       </div>
                     );
@@ -769,10 +984,10 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
         </div>
 
         {/* Rodapé de Ações */}
-        <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-2 shrink-0">
+        <div className="p-4 bg-[#F7F8FA] dark:bg-[#15171B] border-t border-[#E6E8EB] dark:border-[#2D3139] flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => onEditCompany(company)}
               leftIcon={<Edit2 className="w-3.5 h-3.5" />}
@@ -784,12 +999,11 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
               variant="ghost"
               size="sm"
               onClick={handleToggleArchive}
-              className="text-slate-400 hover:text-slate-200"
               leftIcon={
                 company.status === 'archived' ? (
-                  <ArchiveRestore className="w-3.5 h-3.5 text-blue-400" />
+                  <ArchiveRestore className="w-3.5 h-3.5 text-[#3F6FB5]" />
                 ) : (
-                  <Archive className="w-3.5 h-3.5 text-slate-400" />
+                  <Archive className="w-3.5 h-3.5 text-[#5F6368]" />
                 )
               }
             >
@@ -801,7 +1015,7 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
             variant="ghost"
             size="sm"
             onClick={handleDeleteCompany}
-            className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+            className="text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30"
             leftIcon={<Trash2 className="w-3.5 h-3.5" />}
           >
             Excluir
@@ -809,12 +1023,13 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
         </div>
       </div>
 
-      {/* Modal para Adicionar/Editar Contato Secundário */}
+      {/* Modal para Adicionar/Editar Contato */}
       <AddContactModal
         isOpen={isAddContactOpen}
         onClose={() => setIsAddContactOpen(false)}
         companyId={company.id}
         companyName={company.name}
+        existingContacts={companyContacts}
         editingContact={editingContact}
         onSave={async (contactData) => {
           if (editingContact) {
@@ -879,6 +1094,18 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
           onClose={() => setIsMessageModalOpen(false)}
           lead={companyLead}
           company={company}
+          initialContactId={messageTargetContactId}
+        />
+      )}
+
+      {/* Modal de Qualificação de Lead */}
+      {companyLead && (
+        <QualificationModal
+          isOpen={isQualificationOpen}
+          onClose={() => setIsQualificationOpen(false)}
+          company={company}
+          contact={primaryContact}
+          lead={companyLead}
         />
       )}
 

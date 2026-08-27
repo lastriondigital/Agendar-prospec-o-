@@ -147,23 +147,23 @@ export const PipelineView: React.FC = () => {
       {/* 1. CABEÇALHO & CONTROLES DO PIPELINE */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-neutral-100 flex items-center gap-2.5">
+          <h1 className="text-2xl font-bold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2.5">
             <span>Pipeline de Oportunidades</span>
-            <span className="text-xs font-mono font-bold bg-neutral-800 text-neutral-300 px-2.5 py-0.5 rounded-full">
+            <span className="text-xs font-mono font-semibold bg-[#F7F8FA] dark:bg-[#20242A] text-[#5F6368] dark:text-[#9AA0A6] px-2.5 py-0.5 rounded-full border border-[#E6E8EB] dark:border-[#2D3139]">
               {filteredLeads.length} leads
             </span>
           </h1>
-          <p className="text-xs text-neutral-400 mt-1">
+          <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6] mt-0.5">
             Gestão visual do funil comercial com arrastar e soltar e verificação de próximas ações.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => setActiveRoute('dashboard')}
-            leftIcon={<Zap className="w-4 h-4 text-emerald-400" />}
+            leftIcon={<Zap className="w-4 h-4 text-[#3F6FB5]" />}
           >
             Modo Prospecção
           </Button>
@@ -180,16 +180,16 @@ export const PipelineView: React.FC = () => {
       </div>
 
       {/* 2. FILTROS RÁPIDOS & BUSCA */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-neutral-900/60 border border-neutral-800 p-3 rounded-2xl">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] p-3 rounded-xl shadow-xs">
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
           {filterGroups.map((group) => (
             <button
               key={group.id}
               onClick={() => setFilterGroup(group.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 cursor-pointer ${
                 filterGroup === group.id
-                  ? 'bg-emerald-500 text-neutral-950 shadow-sm'
-                  : 'bg-neutral-950 hover:bg-neutral-800 text-neutral-400 border border-neutral-800/80'
+                  ? 'bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 border border-blue-200 dark:border-blue-800/40 shadow-xs'
+                  : 'bg-[#F7F8FA] hover:bg-neutral-100 dark:bg-[#20242A] dark:hover:bg-[#282D36] text-[#5F6368] dark:text-[#9AA0A6] border border-[#E6E8EB] dark:border-[#2D3139]'
               }`}
             >
               {group.label}
@@ -198,13 +198,13 @@ export const PipelineView: React.FC = () => {
         </div>
 
         <div className="relative w-full sm:w-64 shrink-0">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#80868B]" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Filtrar por empresa, contato..."
-            className="w-full pl-9 pr-3 py-1.5 bg-neutral-950 border border-neutral-800 rounded-xl text-xs text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] rounded-lg text-xs text-[#202124] dark:text-[#E8EAED] placeholder:text-[#80868B] focus:outline-none focus:border-[#3F6FB5]"
           />
         </div>
       </div>
@@ -220,24 +220,24 @@ export const PipelineView: React.FC = () => {
               key={stageKey}
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(stageKey)}
-              className="w-72 sm:w-80 shrink-0 flex flex-col bg-neutral-900/50 border border-neutral-800/90 rounded-2xl p-3.5 max-h-[78vh] transition-colors hover:border-neutral-700/80"
+              className="w-72 sm:w-80 shrink-0 flex flex-col bg-[#F7F8FA] dark:bg-[#15171B] border border-[#E6E8EB] dark:border-[#2D3139] rounded-xl p-3.5 max-h-[78vh] transition-colors"
             >
               {/* Cabeçalho da Coluna */}
-              <div className="flex items-center justify-between pb-3 border-b border-neutral-800 shrink-0">
+              <div className="flex items-center justify-between pb-3 border-b border-[#ECEEF1] dark:border-[#2D3139] shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                     stageDef.badgeVariant === 'emerald' ? 'bg-emerald-500' :
                     stageDef.badgeVariant === 'purple' ? 'bg-purple-500' :
-                    stageDef.badgeVariant === 'blue' ? 'bg-sky-500' :
+                    stageDef.badgeVariant === 'blue' ? 'bg-blue-500' :
                     stageDef.badgeVariant === 'amber' ? 'bg-amber-500' :
                     stageDef.badgeVariant === 'rose' ? 'bg-rose-500' :
-                    'bg-neutral-500'
+                    'bg-neutral-400'
                   }`} />
-                  <h3 className="text-xs font-extrabold text-neutral-100 truncate">
+                  <h3 className="text-xs font-bold text-[#202124] dark:text-[#E8EAED] truncate">
                     {stageDef.label}
                   </h3>
                 </div>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-neutral-950 text-neutral-300 border border-neutral-800 shrink-0">
+                <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-[#20242A] text-[#5F6368] dark:text-[#9AA0A6] border border-[#E6E8EB] dark:border-[#2D3139] shrink-0">
                   {stageLeads.length}
                 </span>
               </div>
@@ -262,18 +262,18 @@ export const PipelineView: React.FC = () => {
                       key={lead.id}
                       draggable
                       onDragStart={() => handleDragStart(lead.id)}
-                      className="group p-3 rounded-xl bg-neutral-950 border border-neutral-800/90 hover:border-neutral-700 transition-all space-y-2.5 shadow-xs cursor-grab active:cursor-grabbing"
+                      className="group p-3 rounded-lg bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] hover:border-[#DADDE1] dark:hover:border-neutral-600 transition-colors space-y-2 shadow-xs cursor-grab active:cursor-grabbing"
                     >
                       {/* Topo do Card: Contato & Empresa */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h4
                             onClick={() => comp && setSelectedCompany(comp)}
-                            className="text-xs font-bold text-neutral-100 hover:text-emerald-400 cursor-pointer truncate"
+                            className="text-xs font-bold text-[#202124] dark:text-[#E8EAED] hover:underline cursor-pointer truncate"
                           >
                             {cont?.name || comp?.name || 'Sem nome'}
                           </h4>
-                          <p className="text-[11px] text-neutral-400 truncate mt-0.5">
+                          <p className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6] truncate mt-0.5">
                             {comp?.name} {comp?.niche ? `• ${comp.niche}` : ''}
                           </p>
                         </div>
@@ -288,13 +288,13 @@ export const PipelineView: React.FC = () => {
                               companyName={comp?.name}
                             />
                           ) : (
-                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                            <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
                               ★ {finalScore}
                             </span>
                           )}
                           <button
                             onClick={() => comp && setSelectedCompany(comp)}
-                            className="p-1 text-neutral-400 hover:text-neutral-200 rounded transition-colors cursor-pointer"
+                            className="p-1 text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED] rounded transition-colors cursor-pointer"
                             title="Ver detalhes da empresa"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
@@ -304,52 +304,52 @@ export const PipelineView: React.FC = () => {
 
                       {/* Serviço & Notas */}
                       <div className="space-y-1">
-                        <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded inline-block">
+                        <span className="text-[10px] font-medium text-[#3F6FB5] dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-md inline-block border border-blue-100 dark:border-blue-900/40">
                           {lead.serviceName || 'Geral'}
                         </span>
 
                         {lead.notes && (
-                          <p className="text-[11px] text-neutral-400 line-clamp-2 bg-neutral-900/60 p-1.5 rounded border border-neutral-800/60">
+                          <p className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6] line-clamp-2 bg-[#F7F8FA] dark:bg-[#1E2228] p-1.5 rounded-md border border-[#E6E8EB] dark:border-[#2D3139]">
                             {lead.notes}
                           </p>
                         )}
                       </div>
 
                       {/* Status de Próxima Ação com Alerta Obrigatório */}
-                      <div className="pt-2 border-t border-neutral-800/80 text-[11px]">
+                      <div className="pt-2 border-t border-[#ECEEF1] dark:border-[#2D3139] text-[11px]">
                         {hasNextAction ? (
-                          <div className="flex items-center justify-between text-neutral-300">
+                          <div className="flex items-center justify-between text-[#5F6368] dark:text-[#9AA0A6]">
                             <span className="truncate">📅 {lead.nextActionTitle}</span>
-                            <span className="font-mono text-neutral-500 shrink-0 ml-1 text-[10px]">
+                            <span className="font-mono text-[#80868B] shrink-0 ml-1 text-[10px]">
                               {formatRelativeDate(lead.nextActionDate!)}
                             </span>
                           </div>
                         ) : needsNextAction ? (
-                          <div className="flex items-center justify-between p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300">
-                            <span className="font-bold text-[10px]">
-                              ⚠️ Precisa de próxima ação
+                          <div className="flex items-center justify-between p-1.5 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 text-amber-800 dark:text-amber-300">
+                            <span className="font-medium text-[10px]">
+                              ⚠️ Precisa de ação
                             </span>
                             <button
                               onClick={() => comp && setSchedulingLead({ lead, company: comp })}
-                              className="text-[10px] font-bold underline hover:text-amber-200 cursor-pointer shrink-0 ml-1"
+                              className="text-[10px] font-semibold underline hover:text-amber-950 cursor-pointer shrink-0 ml-1"
                             >
                               Agendar
                             </button>
                           </div>
                         ) : (
-                          <span className="text-neutral-500 text-[10px]">Lead finalizado</span>
+                          <span className="text-[#80868B] text-[10px]">Lead finalizado</span>
                         )}
                       </div>
 
                       {/* Controles de 1 Toque para Avançar ou Retroceder Estágio */}
-                      <div className="flex items-center justify-between pt-1 border-t border-neutral-800/60 text-[10px] text-neutral-500">
+                      <div className="flex items-center justify-between pt-1 border-t border-[#ECEEF1] dark:border-[#2D3139] text-[10px] text-[#80868B]">
                         <span>{lead.lastContactDate ? `Último: ${formatRelativeDate(lead.lastContactDate)}` : 'Sem contato'}</span>
 
                         <div className="flex items-center gap-1">
                           {ALL_LEAD_STAGES.indexOf(lead.stage) > 0 && (
                             <button
                               onClick={() => handleStepStage(lead, 'backward')}
-                              className="p-1 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 rounded cursor-pointer"
+                              className="p-1 text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED] hover:bg-neutral-100 dark:hover:bg-[#20242A] rounded cursor-pointer"
                               title="Voltar estágio anterior"
                             >
                               <ChevronLeft className="w-3.5 h-3.5" />
@@ -358,7 +358,7 @@ export const PipelineView: React.FC = () => {
                           {ALL_LEAD_STAGES.indexOf(lead.stage) < ALL_LEAD_STAGES.length - 1 && (
                             <button
                               onClick={() => handleStepStage(lead, 'forward')}
-                              className="p-1 text-neutral-400 hover:text-emerald-400 hover:bg-neutral-800 rounded cursor-pointer"
+                              className="p-1 text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#3F6FB5] dark:hover:text-blue-300 hover:bg-neutral-100 dark:hover:bg-[#20242A] rounded cursor-pointer"
                               title="Avançar próximo estágio"
                             >
                               <ChevronRight className="w-3.5 h-3.5" />
@@ -371,7 +371,7 @@ export const PipelineView: React.FC = () => {
                 })}
 
                 {stageLeads.length === 0 && (
-                  <div className="p-8 text-center text-xs text-neutral-500 border border-dashed border-neutral-800/80 rounded-xl">
+                  <div className="p-8 text-center text-xs text-[#80868B] border border-dashed border-[#DADDE1] dark:border-[#2D3139] rounded-lg">
                     Nenhum lead nesta etapa
                   </div>
                 )}

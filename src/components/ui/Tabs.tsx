@@ -21,27 +21,32 @@ export function Tabs<T extends string = string>({
   className = '',
 }: TabsProps<T>) {
   return (
-    <div className={`flex items-center gap-1 p-1 bg-slate-900/90 dark:bg-slate-900/90 light:bg-slate-100 border border-slate-800 dark:border-slate-800 light:border-slate-200 rounded-xl overflow-x-auto no-scrollbar ${className}`}>
+    <div
+      className={`flex items-center gap-1 p-1 bg-[#ECEEF1] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] rounded-xl overflow-x-auto no-scrollbar ${className}`}
+    >
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
           <button
             key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
             onClick={() => onChange(tab.id)}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer whitespace-nowrap select-none ${
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm transition-colors cursor-pointer whitespace-nowrap select-none min-h-[34px] ${
               isActive
-                ? 'bg-slate-800 text-slate-100 dark:bg-slate-800 dark:text-slate-100 light:bg-white light:text-slate-900 light:border-slate-200 shadow-xs border border-slate-700/80 font-semibold'
-                : 'text-slate-400 dark:text-slate-400 light:text-slate-600 hover:text-slate-200 dark:hover:text-slate-200 light:hover:text-slate-900 hover:bg-slate-800/40 dark:hover:bg-slate-800/40 light:hover:bg-slate-200/60'
+                ? 'bg-white dark:bg-[#282D36] text-[#202124] dark:text-[#E8EAED] shadow-xs font-semibold'
+                : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED] font-medium'
             }`}
           >
             {tab.icon && <span className="shrink-0">{tab.icon}</span>}
             <span>{tab.label}</span>
             {tab.count !== undefined && (
               <span
-                className={`text-[11px] px-1.5 py-0.2 rounded-full font-mono ${
+                className={`text-[11px] px-1.5 py-0.2 rounded-full font-mono font-medium ${
                   isActive
-                    ? 'bg-emerald-500/20 text-emerald-400 dark:text-emerald-400 light:text-emerald-700 font-bold'
-                    : 'bg-slate-800 text-slate-400 dark:bg-slate-800 dark:text-slate-400 light:bg-slate-200 light:text-slate-600'
+                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                    : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400'
                 }`}
               >
                 {tab.count}

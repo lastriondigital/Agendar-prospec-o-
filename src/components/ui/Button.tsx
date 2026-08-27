@@ -20,23 +20,38 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props
 }) => {
-  const baseStyles = 'inline-flex items-center justify-center font-medium transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 whitespace-nowrap cursor-pointer select-none';
+  const baseStyles =
+    'inline-flex items-center justify-center font-medium transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-1 whitespace-nowrap cursor-pointer select-none';
 
   const sizeStyles = {
-    xs: 'text-xs px-2.5 py-1 rounded-md gap-1.5 min-h-[28px]',
+    xs: 'text-xs px-2.5 py-1 rounded-md gap-1.5 min-h-[30px]',
     sm: 'text-xs sm:text-sm px-3 py-1.5 rounded-lg gap-2 min-h-[36px]',
     md: 'text-sm px-4 py-2 rounded-lg gap-2 min-h-[42px]',
-    lg: 'text-base px-5 py-2.5 rounded-xl gap-2.5 min-h-[48px] font-semibold',
+    lg: 'text-base px-5 py-2.5 rounded-lg gap-2.5 min-h-[46px] font-semibold',
   };
 
   const variantStyles = {
-    primary: 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs shadow-emerald-950/30 border border-emerald-500/40',
-    secondary: 'bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700/80 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 dark:text-slate-100 light:bg-slate-100 light:text-slate-800 light:hover:bg-slate-200 light:border-slate-300',
-    outline: 'bg-transparent border border-slate-700 text-slate-300 hover:bg-slate-800/80 hover:text-white dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/70 light:border-slate-300 light:text-slate-700 light:hover:bg-slate-100',
-    ghost: 'bg-transparent text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 dark:hover:bg-slate-800/60 light:text-slate-600 light:hover:text-slate-900 light:hover:bg-slate-100',
-    danger: 'bg-rose-600 hover:bg-rose-500 text-white shadow-xs shadow-rose-950/30 border border-rose-500/30',
-    success: 'bg-teal-600 hover:bg-teal-500 text-white shadow-xs border border-teal-500/30',
-    execution: 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-sm shadow-emerald-900/40 font-semibold tracking-wide border border-emerald-400/40',
+    // Primary: Soft professional blue (#3F6FB5)
+    primary:
+      'bg-[#3F6FB5] hover:bg-[#345d99] active:bg-[#2b4e82] text-white shadow-xs',
+    // Secondary: Light neutral with clean subtle border
+    secondary:
+      'bg-white hover:bg-neutral-100 active:bg-neutral-200 text-[#202124] border border-[#E6E8EB] dark:bg-[#1E2228] dark:hover:bg-[#252A32] dark:text-[#E8EAED] dark:border-[#2D3139] shadow-xs',
+    // Outline: Transparent with clean border
+    outline:
+      'bg-transparent hover:bg-neutral-100 active:bg-neutral-200 text-[#202124] border border-[#E6E8EB] dark:hover:bg-[#20242A] dark:text-[#E8EAED] dark:border-[#2D3139]',
+    // Ghost: No border or background
+    ghost:
+      'bg-transparent text-[#5F6368] hover:text-[#202124] hover:bg-neutral-100 active:bg-neutral-200 dark:text-[#9AA0A6] dark:hover:text-[#E8EAED] dark:hover:bg-[#20242A]',
+    // Danger: Soft red
+    danger:
+      'bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-xs',
+    // Success: Soft green
+    success:
+      'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-xs',
+    // Execution: Solid clear CTA button (no heavy gradients or neon)
+    execution:
+      'bg-[#3F6FB5] hover:bg-[#345d99] active:bg-[#2b4e82] text-white font-semibold shadow-xs',
   };
 
   return (

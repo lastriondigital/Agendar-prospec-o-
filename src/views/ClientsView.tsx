@@ -18,6 +18,7 @@ import {
   MessageSquare,
   Phone,
   Plus,
+  RotateCcw,
   Search,
   Sparkles,
   Thermometer,
@@ -38,14 +39,17 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { CompanyDetailsDrawer } from '../components/clients/CompanyDetailsDrawer';
 import { CompanyModal } from '../components/clients/CompanyModal';
 import { ScoreBadge } from '../components/qualification/ScoreBadge';
+import { QualificationModal } from '../components/qualification/QualificationModal';
 import { calculateLeadScore } from '../utils/leadScoring';
+import { QuickFilterBar, QuickFilterType } from '../components/common/QuickFilterBar';
 
 export const ClientsView: React.FC = () => {
-  const { companies, contacts, leads, services, icps, history, settings, deleteCompany } = useApp();
+  const { companies, contacts, leads, services, icps, history, settings, deleteCompany, setActiveRoute } = useApp();
   const confirm = useConfirm();
 
-  // Estados de busca e filtros
+  // Estados de busca e filtros rápidos
   const [search, setSearch] = useState('');
+  const [quickFilter, setQuickFilter] = useState<QuickFilterType>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'lead' | 'client' | 'archived'>('all');
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [nicheFilter, setNicheFilter] = useState<string>('all');
@@ -57,6 +61,13 @@ export const ClientsView: React.FC = () => {
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+
+  // Modal de Qualificação
+  const [qualifyingData, setQualifyingData] = useState<{
+    company: Company;
+    contact?: Contact | null;
+    lead: Lead;
+  } | null>(null);
 
   // Mapeamento rápido de contatos e leads por companyId para renderização instantânea
   const contactsMap = useMemo(() => {
@@ -77,24 +88,113 @@ export const ClientsView: React.FC = () => {
     return map;
   }, [leads]);
 
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  // Contadores para Filtros Rápidos
+  const quickFilterCounts = useMemo(() => {
+    let hojeCount = 0;
+    let atrasadosCount = 0;
+    let prioridadeMaximaCount = 0;
+    let quentesCount = 0;
+    let semRespostaCount = 0;
+    let followUpCount = 0;
+    let reativacaoCount = 0;
+    let propostasCount = 0;
+    let reunioesCount = 0;
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
+
+    companies.forEach((comp) => {
+      if (comp.status === 'archived') return;
+
+      const compLead = leadsMap.get(comp.id);
+      const stage = compLead?.stage || 'NOVO';
+      const score = compLead?.score || 50;
+
+      // Hoje
+      if (compLead?.nextActionDate === todayStr) hojeCount++;
+
+      // Atrasados
+      if (compLead?.nextActionDate && compLead.nextActionDate < todayStr && stage !== 'CLIENTE' && stage !== 'PERDIDO') {
+        atrasadosCount++;
+      }
+
+      // Prioridade Máxima
+      if (score >= 80) prioridadeMaximaCount++;
+
+      // Quentes
+      if (compLead?.temperature === 'quente') quentesCount++;
+
+      // Sem Resposta
+      if (stage === 'SEM_RESPOSTA' || stage === 'SEM_RESPOSTA_2' || stage === 'SEM_RESPOSTA_3') {
+        semRespostaCount++;
+      }
+
+      // Follow-up
+      if (
+        stage === 'PRIMEIRO_CONTACTO' ||
+        stage === 'RESPONDEU' ||
+        stage === 'INTERESSADO' ||
+        stage === 'OBJEÇÃO'
+      ) {
+        followUpCount++;
+      }
+
+      // Reativação
+      const lastDate = compLead?.updatedAt || comp.updatedAt || comp.createdAt;
+      if (
+        stage === 'REATIVAÇÃO' ||
+        stage === 'ADIADO' ||
+        (lastDate && lastDate < thirtyDaysAgoStr && stage !== 'CLIENTE' && stage !== 'PERDIDO')
+      ) {
+        reativacaoCount++;
+      }
+
+      // Propostas
+      if (stage === 'PROPOSTA' || stage === 'NEGOCIAÇÃO') propostasCount++;
+
+      // Reuniões
+      if (stage === 'REUNIÃO') reunioesCount++;
+    });
+
+    return {
+      all: companies.filter((c) => c.status !== 'archived').length,
+      hoje: hojeCount,
+      atrasados: atrasadosCount,
+      prioridade_maxima: prioridadeMaximaCount,
+      quentes: quentesCount,
+      sem_resposta: semRespostaCount,
+      follow_up: followUpCount,
+      reativacao: reativacaoCount,
+      propostas: propostasCount,
+      reunioes: reunioesCount,
+    };
+  }, [companies, leadsMap, todayStr]);
+
   // Contadores para Métricas do Topo
   const stats = useMemo(() => {
     const total = companies.length;
     const activeLeads = companies.filter((c) => c.status === 'lead' || !c.status).length;
     const closedClients = companies.filter((c) => c.status === 'client').length;
     const archived = companies.filter((c) => c.status === 'archived').length;
-    const today = new Date().toISOString().slice(0, 10);
-    const todayActions = leads.filter((l) => l.nextActionDate === today).length;
+    const todayActions = leads.filter((l) => l.nextActionDate === todayStr).length;
 
     return { total, activeLeads, closedClients, archived, todayActions };
-  }, [companies, leads]);
+  }, [companies, leads, todayStr]);
 
   // Filtro Universal
   const filteredCompanies = useMemo(() => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
+
     return companies.filter((comp) => {
       const compContacts = contactsMap.get(comp.id) || [];
-      const primary = compContacts.find((c) => c.isPrimary) || compContacts[0];
       const compLead = leadsMap.get(comp.id);
+      const stage = compLead?.stage || 'NOVO';
+      const score = compLead?.score || 50;
 
       // Status filter
       if (statusFilter !== 'all') {
@@ -102,8 +202,44 @@ export const ClientsView: React.FC = () => {
         if (statusFilter === 'client' && comp.status !== 'client') return false;
         if (statusFilter === 'lead' && (comp.status === 'archived' || comp.status === 'client')) return false;
       } else {
-        // Por padrão não exibe arquivados em "todos" a menos que filtre explicitamente por arquivados
-        if (comp.status === 'archived') return false;
+        if (comp.status === 'archived' && quickFilter !== 'all') return false;
+      }
+
+      // Quick Filter Bar logic
+      if (quickFilter !== 'all') {
+        if (quickFilter === 'hoje' && compLead?.nextActionDate !== todayStr) return false;
+        if (quickFilter === 'atrasados') {
+          if (!compLead?.nextActionDate || compLead.nextActionDate >= todayStr || stage === 'CLIENTE' || stage === 'PERDIDO') {
+            return false;
+          }
+        }
+        if (quickFilter === 'prioridade_maxima' && score < 80) return false;
+        if (quickFilter === 'quentes' && compLead?.temperature !== 'quente') return false;
+        if (quickFilter === 'sem_resposta') {
+          if (stage !== 'SEM_RESPOSTA' && stage !== 'SEM_RESPOSTA_2' && stage !== 'SEM_RESPOSTA_3') return false;
+        }
+        if (quickFilter === 'follow_up') {
+          if (
+            stage !== 'PRIMEIRO_CONTACTO' &&
+            stage !== 'RESPONDEU' &&
+            stage !== 'INTERESSADO' &&
+            stage !== 'OBJEÇÃO'
+          ) {
+            return false;
+          }
+        }
+        if (quickFilter === 'reativacao') {
+          const lastDate = compLead?.updatedAt || comp.updatedAt || comp.createdAt;
+          const isOlder = lastDate && lastDate < thirtyDaysAgoStr;
+          if (stage !== 'REATIVAÇÃO' && stage !== 'ADIADO' && !isOlder) return false;
+          if (stage === 'CLIENTE' || stage === 'PERDIDO') return false;
+        }
+        if (quickFilter === 'propostas') {
+          if (stage !== 'PROPOSTA' && stage !== 'NEGOCIAÇÃO') return false;
+        }
+        if (quickFilter === 'reunioes') {
+          if (stage !== 'REUNIÃO') return false;
+        }
       }
 
       // Estágio
@@ -134,7 +270,19 @@ export const ClientsView: React.FC = () => {
 
       return true;
     });
-  }, [companies, contactsMap, leadsMap, statusFilter, stageFilter, nicheFilter, temperatureFilter, priorityFilter, search]);
+  }, [
+    companies,
+    contactsMap,
+    leadsMap,
+    statusFilter,
+    quickFilter,
+    todayStr,
+    stageFilter,
+    nicheFilter,
+    temperatureFilter,
+    priorityFilter,
+    search,
+  ]);
 
   const handleOpenAddCompany = () => {
     setEditingCompany(null);
@@ -150,17 +298,28 @@ export const ClientsView: React.FC = () => {
     setSelectedCompany(comp);
   };
 
-  const handleDelete = (comp: Company) => {
-    confirm({
-      title: `Excluir ${comp.name}?`,
-      message: 'Esta ação excluirá a empresa, contatos associados e histórico.',
-      confirmText: 'Excluir definitivamente',
-      cancelText: 'Cancelar',
-      isDestructive: true,
-      onConfirm: async () => {
-        await deleteCompany(comp.id);
-      },
-    });
+  const handleOpenQualify = (comp: Company) => {
+    const compContacts = contactsMap.get(comp.id) || [];
+    const primary = compContacts.find((c) => c.isPrimary) || compContacts[0] || null;
+    let compLead = leadsMap.get(comp.id);
+
+    if (!compLead) {
+      compLead = {
+        id: `lead-${comp.id}`,
+        companyId: comp.id,
+        contactId: primary?.id || '',
+        stage: 'NOVO',
+        status: 'active',
+        priority: 'média',
+        score: 50,
+        temperature: 'morno',
+        entryDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    setQualifyingData({ company: comp, contact: primary, lead: compLead });
   };
 
   const cleanPhone = (phoneStr?: string) => {
@@ -169,118 +328,144 @@ export const ClientsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 animate-in fade-in duration-200">
       {/* Header com Título e Ação Primária */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2.5">
-            <Building2 className="w-6 h-6 text-slate-300" />
-            Base de Empresas & Contatos
+          <h1 className="text-2xl font-bold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2.5">
+            <Building2 className="w-6 h-6 text-[#3F6FB5]" />
+            Empresas & Contatos
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Gestão relacional completa de empresas, múltiplos contatos e leads com anti-duplicação e histórico.
+          <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6] mt-0.5">
+            Gestão de empresas, múltiplos contatos, qualificação e histórico.
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          onClick={handleOpenAddCompany}
-          leftIcon={<Plus className="w-4 h-4" />}
-          className="shadow-sm"
-        >
-          Nova Empresa / Prospect
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="primary"
+            onClick={handleOpenAddCompany}
+            leftIcon={<Plus className="w-4 h-4" />}
+          >
+            Nova Empresa / Prospect
+          </Button>
+        </div>
       </div>
 
       {/* Métricas do Topo */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-slate-400 font-medium block">Total de Empresas</span>
-            <span className="text-2xl font-bold text-slate-100 font-mono mt-0.5 block">{stats.total}</span>
+            <span className="text-xs text-[#5F6368] dark:text-[#9AA0A6] font-medium block">Total de Empresas</span>
+            <span className="text-2xl font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5 block">{stats.total}</span>
           </div>
-          <div className="p-2.5 rounded-lg bg-slate-800/80 text-slate-300">
+          <div className="p-2.5 rounded-lg bg-[#F7F8FA] dark:bg-[#20242A] text-[#5F6368] dark:text-[#9AA0A6]">
             <Building2 className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-slate-400 font-medium block">Leads Ativos</span>
-            <span className="text-2xl font-bold text-amber-400 font-mono mt-0.5 block">{stats.activeLeads}</span>
+            <span className="text-xs text-[#5F6368] dark:text-[#9AA0A6] font-medium block">Leads Ativos</span>
+            <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-0.5 block">{stats.activeLeads}</span>
           </div>
-          <div className="p-2.5 rounded-lg bg-amber-500/10 text-amber-400">
+          <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400">
             <Flame className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-slate-400 font-medium block">Clientes Fechados</span>
-            <span className="text-2xl font-bold text-emerald-400 font-mono mt-0.5 block">{stats.closedClients}</span>
+            <span className="text-xs text-[#5F6368] dark:text-[#9AA0A6] font-medium block">Clientes Fechados</span>
+            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">{stats.closedClients}</span>
           </div>
-          <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+          <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-slate-400 font-medium block">Ações para Hoje</span>
-            <span className="text-2xl font-bold text-blue-400 font-mono mt-0.5 block">{stats.todayActions}</span>
+            <span className="text-xs text-[#5F6368] dark:text-[#9AA0A6] font-medium block">Ações para Hoje</span>
+            <span className="text-2xl font-bold text-[#3F6FB5] mt-0.5 block">{stats.todayActions}</span>
           </div>
-          <div className="p-2.5 rounded-lg bg-blue-500/10 text-blue-400">
+          <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300">
             <Clock className="w-5 h-5" />
           </div>
         </div>
       </div>
 
-      {/* Barra de Ferramentas e Filtros */}
-      <Card className="space-y-4">
+      {/* FILTROS RÁPIDOS (QUICK FILTER BAR) */}
+      <div className="p-3.5 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] space-y-2 shadow-xs">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#5F6368] dark:text-[#9AA0A6]">
+            Segmentação Rápida
+          </span>
+          <span className="text-[11px] font-mono text-[#5F6368] dark:text-[#9AA0A6]">
+            {filteredCompanies.length} empresas exibidas
+          </span>
+        </div>
+        <QuickFilterBar
+          activeFilter={quickFilter}
+          onSelectFilter={setQuickFilter}
+          counts={quickFilterCounts}
+        />
+      </div>
+
+      {/* Barra de Ferramentas e Filtros Secundários */}
+      <Card padding="md" className="space-y-4">
         {/* Linha 1: Busca e Toggle de Visualização */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[#80868B] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por empresa, nome fantasia, contato, telefone, WhatsApp, email ou cidade..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-400"
+              placeholder="Buscar por empresa, contato, telefone, WhatsApp, email ou cidade..."
+              className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] rounded-lg text-xs text-[#202124] dark:text-[#E8EAED] placeholder:text-[#80868B] focus:outline-none focus:border-[#3F6FB5]"
             />
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Filtro de Status Geral */}
-            <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800">
+            <div className="flex rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] p-1 border border-[#E6E8EB] dark:border-[#2D3139] text-xs">
               <button
                 onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  statusFilter === 'all' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                className={`px-3 py-1 font-semibold rounded-md transition-colors cursor-pointer ${
+                  statusFilter === 'all'
+                    ? 'bg-white dark:bg-[#282D36] text-[#202124] dark:text-[#E8EAED] shadow-xs'
+                    : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
                 }`}
               >
                 Todos
               </button>
               <button
                 onClick={() => setStatusFilter('lead')}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  statusFilter === 'lead' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                className={`px-3 py-1 font-semibold rounded-md transition-colors cursor-pointer ${
+                  statusFilter === 'lead'
+                    ? 'bg-white dark:bg-[#282D36] text-[#202124] dark:text-[#E8EAED] shadow-xs'
+                    : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
                 }`}
               >
                 Leads
               </button>
               <button
                 onClick={() => setStatusFilter('client')}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  statusFilter === 'client' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                className={`px-3 py-1 font-semibold rounded-md transition-colors cursor-pointer ${
+                  statusFilter === 'client'
+                    ? 'bg-white dark:bg-[#282D36] text-[#202124] dark:text-[#E8EAED] shadow-xs'
+                    : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
                 }`}
               >
                 Clientes
               </button>
               <button
                 onClick={() => setStatusFilter('archived')}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  statusFilter === 'archived' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                className={`px-3 py-1 font-semibold rounded-md transition-colors cursor-pointer ${
+                  statusFilter === 'archived'
+                    ? 'bg-white dark:bg-[#282D36] text-[#202124] dark:text-[#E8EAED] shadow-xs'
+                    : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
                 }`}
               >
                 Arquivados
@@ -288,11 +473,13 @@ export const ClientsView: React.FC = () => {
             </div>
 
             {/* Toggle de Visualização Grade / Tabela */}
-            <div className="flex rounded-lg bg-slate-950 p-1 border border-slate-800">
+            <div className="flex rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] p-1 border border-[#E6E8EB] dark:border-[#2D3139]">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded-md transition-colors ${
-                  viewMode === 'grid' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                  viewMode === 'grid'
+                    ? 'bg-white dark:bg-[#282D36] text-[#202124] dark:text-[#E8EAED] shadow-xs'
+                    : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
                 }`}
                 title="Visualização em Grade"
               >
@@ -300,8 +487,10 @@ export const ClientsView: React.FC = () => {
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-md transition-colors ${
-                  viewMode === 'table' ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                  viewMode === 'table'
+                    ? 'bg-white dark:bg-[#282D36] text-[#202124] dark:text-[#E8EAED] shadow-xs'
+                    : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
                 }`}
                 title="Visualização em Tabela"
               >
@@ -312,29 +501,29 @@ export const ClientsView: React.FC = () => {
         </div>
 
         {/* Linha 2: Dropdowns de Filtros Refinados */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800/60 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-[#ECEEF1] dark:border-[#2D3139] text-xs">
           <div>
-            <label className="text-[11px] text-slate-400 font-medium block mb-1">Estágio do Funil:</label>
+            <label className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6] font-medium block mb-1">Estágio do Funil:</label>
             <select
               value={stageFilter}
               onChange={(e) => setStageFilter(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400"
+              className="w-full h-9 px-2.5 bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] rounded-lg text-[#202124] dark:text-[#E8EAED] focus:outline-none focus:border-[#3F6FB5]"
             >
               <option value="all">Todos os Estágios</option>
               {ALL_LEAD_STAGES.map((stg) => (
                 <option key={stg} value={stg}>
-                  {STAGES_CONFIG[stg].order}. {STAGES_CONFIG[stg].label}
+                  {STAGES_CONFIG[stg]?.order}. {STAGES_CONFIG[stg]?.label}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 font-medium block mb-1">Nicho de Mercado:</label>
+            <label className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6] font-medium block mb-1">Nicho de Mercado:</label>
             <select
               value={nicheFilter}
               onChange={(e) => setNicheFilter(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400"
+              className="w-full h-9 px-2.5 bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] rounded-lg text-[#202124] dark:text-[#E8EAED] focus:outline-none focus:border-[#3F6FB5]"
             >
               <option value="all">Todos os Nichos</option>
               {DEFAULT_NICHES.map((n) => (
@@ -346,11 +535,11 @@ export const ClientsView: React.FC = () => {
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 font-medium block mb-1">Temperatura:</label>
+            <label className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6] font-medium block mb-1">Temperatura:</label>
             <select
               value={temperatureFilter}
               onChange={(e) => setTemperatureFilter(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400"
+              className="w-full h-9 px-2.5 bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] rounded-lg text-[#202124] dark:text-[#E8EAED] focus:outline-none focus:border-[#3F6FB5]"
             >
               <option value="all">Todas as Temperaturas</option>
               <option value="quente">🔥 Quente</option>
@@ -360,11 +549,11 @@ export const ClientsView: React.FC = () => {
           </div>
 
           <div>
-            <label className="text-[11px] text-slate-400 font-medium block mb-1">Prioridade:</label>
+            <label className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6] font-medium block mb-1">Prioridade:</label>
             <select
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-400"
+              className="w-full h-9 px-2.5 bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] rounded-lg text-[#202124] dark:text-[#E8EAED] focus:outline-none focus:border-[#3F6FB5]"
             >
               <option value="all">Todas as Prioridades</option>
               <option value="alta">Alta</option>
@@ -378,7 +567,7 @@ export const ClientsView: React.FC = () => {
       {/* Lista de Empresas / Prospects */}
       {filteredCompanies.length === 0 ? (
         <EmptyState
-          icon={<Building2 className="w-8 h-8 text-slate-400" />}
+          icon={<Building2 className="w-8 h-8 text-[#80868B]" />}
           title="Nenhuma empresa encontrada"
           description="Tente ajustar os filtros de busca ou cadastre uma nova empresa."
           actionLabel="Cadastrar Empresa"
@@ -403,25 +592,26 @@ export const ClientsView: React.FC = () => {
             return (
               <Card
                 key={comp.id}
-                className="hover:border-slate-700 transition-all flex flex-col justify-between p-5 space-y-4 group"
+                padding="md"
+                className="hover:border-neutral-300 dark:hover:border-neutral-600 transition-colors flex flex-col justify-between space-y-4"
               >
                 <div>
                   {/* Cabeçalho do Card */}
                   <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-200 font-bold text-sm shrink-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 flex items-center justify-center font-bold text-xs shrink-0 border border-blue-100 dark:border-blue-900/40">
                         {comp.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0">
                         <h3
                           onClick={() => handleOpenDetails(comp)}
-                          className="text-base font-bold text-slate-100 truncate hover:text-amber-300 cursor-pointer transition-colors"
+                          className="text-sm font-bold text-[#202124] dark:text-[#E8EAED] truncate hover:underline cursor-pointer"
                           title={comp.name}
                         >
                           {comp.name}
                         </h3>
                         {comp.tradeName && (
-                          <p className="text-xs text-slate-400 truncate">({comp.tradeName})</p>
+                          <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] truncate">({comp.tradeName})</p>
                         )}
                       </div>
                     </div>
@@ -431,14 +621,16 @@ export const ClientsView: React.FC = () => {
                     </Badge>
                   </div>
 
-                  {/* Nicho, Cidade e Temperatura */}
-                  <div className="flex items-center gap-2 text-xs text-slate-400 mb-3 flex-wrap">
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300">{comp.niche}</span>
+                  {/* Nicho, Cidade, Temperatura e Score */}
+                  <div className="flex items-center gap-1.5 text-xs text-[#5F6368] dark:text-[#9AA0A6] mb-3 flex-wrap">
+                    <span className="px-2 py-0.5 rounded bg-[#F7F8FA] dark:bg-[#20242A] text-[#202124] dark:text-[#E8EAED] font-medium text-[11px] border border-[#E6E8EB] dark:border-[#2D3139]">
+                      {comp.niche}
+                    </span>
                     <span>•</span>
-                    <span>{comp.city}</span>
+                    <span>{comp.city || 'Brasil'}</span>
                     {compLead?.temperature === 'quente' && (
-                      <span className="text-amber-400 font-medium flex items-center gap-0.5">
-                        <Flame className="w-3 h-3 fill-amber-400" /> Quente
+                      <span className="text-amber-700 dark:text-amber-400 font-semibold flex items-center gap-0.5 text-[11px]">
+                        <Flame className="w-3 h-3 fill-current" /> Quente
                       </span>
                     )}
                     {leadScoreResult ? (
@@ -450,27 +642,27 @@ export const ClientsView: React.FC = () => {
                         companyName={comp.name}
                       />
                     ) : compLead?.score !== undefined ? (
-                      <span className="font-mono text-slate-300 font-semibold">{compLead.score} pts</span>
+                      <span className="font-mono text-[#202124] dark:text-[#E8EAED] font-semibold">{compLead.score} pts</span>
                     ) : null}
                   </div>
 
                   {/* Informações do Contato Principal */}
-                  <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-1.5 text-xs">
+                  <div className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] space-y-1 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-slate-200 flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="font-semibold text-[#202124] dark:text-[#E8EAED] flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-[#80868B]" />
                         {primary?.name || 'Sem contato principal'}
                       </span>
                       {compContacts.length > 1 && (
-                        <span className="text-[10px] text-slate-500 font-mono">
+                        <span className="text-[10px] text-[#5F6368] dark:text-[#9AA0A6] font-mono">
                           +{compContacts.length - 1} outros
                         </span>
                       )}
                     </div>
-                    {primary?.role && <p className="text-[11px] text-slate-400">{primary.role}</p>}
+                    {primary?.role && <p className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6]">{primary.role}</p>}
 
                     {primary?.phone && (
-                      <p className="font-mono text-slate-300 text-[11px] pt-1">
+                      <p className="font-mono text-[#5F6368] dark:text-[#9AA0A6] text-[11px] pt-0.5">
                         {formatPhoneNumber(primary.phone)}
                       </p>
                     )}
@@ -478,27 +670,27 @@ export const ClientsView: React.FC = () => {
 
                   {/* Próxima Ação */}
                   {compLead?.nextActionTitle && (
-                    <div className="mt-3 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20 text-xs space-y-1">
-                      <div className="flex items-center justify-between text-amber-400 text-[11px] font-semibold">
+                    <div className="mt-2.5 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 text-xs space-y-0.5">
+                      <div className="flex items-center justify-between text-amber-800 dark:text-amber-300 text-[11px] font-semibold">
                         <span className="flex items-center gap-1">
-                          <Zap className="w-3 h-3" /> Próxima ação:
+                          <Zap className="w-3 h-3 fill-current" /> Próxima ação:
                         </span>
-                        <span>{compLead.nextActionDate || 'Hoje'}</span>
+                        <span>{compLead.nextActionDate ? formatRelativeDate(compLead.nextActionDate) : 'Hoje'}</span>
                       </div>
-                      <p className="text-slate-300 text-xs truncate">{compLead.nextActionTitle}</p>
+                      <p className="text-[#202124] dark:text-[#E8EAED] text-xs truncate">{compLead.nextActionTitle}</p>
                     </div>
                   )}
                 </div>
 
                 {/* Ações Rápidas no Rodapé */}
-                <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
+                <div className="pt-3 border-t border-[#ECEEF1] dark:border-[#2D3139] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1">
                     {cleanWa && (
                       <a
                         href={`https://wa.me/55${cleanWa}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-colors"
+                        className="p-1.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 transition-colors"
                         title="Conversar no WhatsApp"
                       >
                         <MessageSquare className="w-4 h-4" />
@@ -508,30 +700,28 @@ export const ClientsView: React.FC = () => {
                     {primary?.phone && (
                       <a
                         href={`tel:${cleanPhone(primary.phone)}`}
-                        className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                        className="p-1.5 rounded-md bg-[#F7F8FA] dark:bg-[#20242A] text-[#5F6368] dark:text-[#9AA0A6] hover:bg-neutral-100 transition-colors"
                         title="Ligar"
                       >
                         <Phone className="w-4 h-4" />
                       </a>
                     )}
-
-                    {primary?.email && (
-                      <a
-                        href={`mailto:${primary.email}`}
-                        className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-                        title="Enviar E-mail"
-                      >
-                        <Mail className="w-4 h-4" />
-                      </a>
-                    )}
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <Button
-                      variant="outline"
-                      size="sm"
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => handleOpenQualify(comp)}
+                      leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-500" />}
+                    >
+                      Qualificar
+                    </Button>
+
+                    <Button
+                      variant="secondary"
+                      size="xs"
                       onClick={() => handleOpenDetails(comp)}
-                      className="text-xs h-8 px-2.5"
                       rightIcon={<ChevronRight className="w-3.5 h-3.5" />}
                     >
                       Detalhes
@@ -544,10 +734,10 @@ export const ClientsView: React.FC = () => {
         </div>
       ) : (
         /* VISUALIZAÇÃO EM TABELA */
-        <Card className="overflow-x-auto p-0">
+        <Card padding="none" className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-slate-800 bg-slate-950/70 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+              <tr className="border-b border-[#E6E8EB] dark:border-[#2D3139] bg-[#F7F8FA] dark:bg-[#1E2228] text-[#5F6368] dark:text-[#9AA0A6] font-semibold text-[11px]">
                 <th className="py-3 px-4">Empresa / Razão</th>
                 <th className="py-3 px-4">Contato Principal</th>
                 <th className="py-3 px-4">Estágio</th>
@@ -557,7 +747,7 @@ export const ClientsView: React.FC = () => {
                 <th className="py-3 px-4 text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-[#ECEEF1] dark:divide-[#2D3139]">
               {filteredCompanies.map((comp) => {
                 const compContacts = contactsMap.get(comp.id) || [];
                 const primary = compContacts.find((c) => c.isPrimary) || compContacts[0];
@@ -572,49 +762,49 @@ export const ClientsView: React.FC = () => {
                 const tableFinalScore = tableLeadScoreResult ? tableLeadScoreResult.score : (compLead?.score || 50);
 
                 return (
-                  <tr key={comp.id} className="hover:bg-slate-900/50 transition-colors group">
-                    <td className="py-3.5 px-4">
+                  <tr key={comp.id} className="hover:bg-neutral-50 dark:hover:bg-[#20242A] transition-colors">
+                    <td className="py-3 px-4">
                       <div
                         onClick={() => handleOpenDetails(comp)}
-                        className="font-bold text-slate-100 hover:text-amber-300 cursor-pointer transition-colors"
+                        className="font-semibold text-[#202124] dark:text-[#E8EAED] hover:underline cursor-pointer"
                       >
                         {comp.name}
                       </div>
-                      {comp.tradeName && <div className="text-[11px] text-slate-400">{comp.tradeName}</div>}
+                      {comp.tradeName && <div className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6]">{comp.tradeName}</div>}
                     </td>
 
-                    <td className="py-3.5 px-4">
-                      <div className="font-medium text-slate-200">{primary?.name || '—'}</div>
-                      <div className="text-[11px] text-slate-400">{primary?.role || primary?.phone || '—'}</div>
+                    <td className="py-3 px-4">
+                      <div className="font-medium text-[#202124] dark:text-[#E8EAED]">{primary?.name || '—'}</div>
+                      <div className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6]">{primary?.role || primary?.phone || '—'}</div>
                     </td>
 
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-4">
                       <Badge variant={stageDef.badgeVariant} size="sm">
                         {stageDef.label}
                       </Badge>
                     </td>
 
-                    <td className="py-3.5 px-4">
-                      <div className="text-slate-200">{comp.niche}</div>
-                      <div className="text-[11px] text-slate-400">{comp.city}</div>
+                    <td className="py-3 px-4">
+                      <div className="text-[#202124] dark:text-[#E8EAED] font-medium">{comp.niche}</div>
+                      <div className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6]">{comp.city}</div>
                     </td>
 
-                    <td className="py-3.5 px-4">
+                    <td className="py-3 px-4">
                       {compLead?.nextActionTitle ? (
                         <div>
-                          <div className="text-slate-200 font-medium truncate max-w-[180px]">
+                          <div className="text-[#202124] dark:text-[#E8EAED] font-medium truncate max-w-[180px]">
                             {compLead.nextActionTitle}
                           </div>
-                          <div className="text-[11px] text-amber-400 font-mono">
-                            {compLead.nextActionDate || 'Hoje'}
+                          <div className="text-[11px] text-amber-700 dark:text-amber-400 font-mono">
+                            {compLead.nextActionDate ? formatRelativeDate(compLead.nextActionDate) : 'Hoje'}
                           </div>
                         </div>
                       ) : (
-                        <span className="text-slate-500">—</span>
+                        <span className="text-[#80868B]">—</span>
                       )}
                     </td>
 
-                    <td className="py-3.5 px-4 font-mono font-semibold">
+                    <td className="py-3 px-4 font-mono font-semibold">
                       {tableLeadScoreResult ? (
                         <ScoreBadge
                           score={tableFinalScore}
@@ -624,20 +814,29 @@ export const ClientsView: React.FC = () => {
                           companyName={comp.name}
                         />
                       ) : compLead?.score ? (
-                        <span className="text-slate-300">{compLead.score} pts</span>
+                        <span className="text-[#202124] dark:text-[#E8EAED]">{compLead.score} pts</span>
                       ) : (
-                        <span className="text-slate-500">—</span>
+                        <span className="text-[#80868B]">—</span>
                       )}
                     </td>
 
-                    <td className="py-3.5 px-4 text-right">
+                    <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => handleOpenQualify(comp)}
+                          leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-500" />}
+                        >
+                          Qualificar
+                        </Button>
+
                         {cleanWa && (
                           <a
                             href={`https://wa.me/55${cleanWa}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                            className="p-1.5 rounded-md text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 transition-colors"
                             title="WhatsApp"
                           >
                             <MessageSquare className="w-4 h-4" />
@@ -646,7 +845,7 @@ export const ClientsView: React.FC = () => {
 
                         <button
                           onClick={() => handleOpenDetails(comp)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                          className="p-1.5 rounded-md text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED] hover:bg-neutral-100 dark:hover:bg-[#20242A] transition-colors cursor-pointer"
                           title="Abrir Detalhes"
                         >
                           <Eye className="w-4 h-4" />
@@ -654,7 +853,7 @@ export const ClientsView: React.FC = () => {
 
                         <button
                           onClick={() => handleOpenEditCompany(comp)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                          className="p-1.5 rounded-md text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED] hover:bg-neutral-100 dark:hover:bg-[#20242A] transition-colors cursor-pointer"
                           title="Editar"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -689,6 +888,18 @@ export const ClientsView: React.FC = () => {
           handleOpenEditCompany(comp);
         }}
       />
+
+      {/* Modal de Qualificação Interativa */}
+      {qualifyingData && (
+        <QualificationModal
+          isOpen={true}
+          onClose={() => setQualifyingData(null)}
+          company={qualifyingData.company}
+          contact={qualifyingData.contact}
+          lead={qualifyingData.lead}
+          onStartExecution={() => setActiveRoute('prospecting')}
+        />
+      )}
     </div>
   );
 };

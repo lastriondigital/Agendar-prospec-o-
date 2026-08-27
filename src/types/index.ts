@@ -33,12 +33,19 @@ export type TemplateCategory =
 
 export type TemplateType = TemplateCategory;
 
-// Os 14 Estágios do PROSPECT OS
+// Os 14+ Estágios do PROSPECT OS
 export type LeadStage =
   | 'NOVO'
   | 'QUALIFICADO'
   | 'PRIMEIRO_CONTACTO'
+  | 'SEM_RESPOSTA_2'
+  | 'SEM_RESPOSTA_3'
+  | 'SEM_RESPOSTA_OUTRO_HORARIO'
+  | 'SEM_RESPOSTA_OUTRO_DIA'
+  | 'RESPOSTA_RECEBIDA'
   | 'RESPONDEU'
+  | 'RESPOSTA_POSITIVA'
+  | 'RESPOSTA_NEGATIVA'
   | 'INTERESSADO'
   | 'REUNIÃO'
   | 'PROPOSTA'
@@ -53,6 +60,49 @@ export type LeadStage =
 export type LeadPriority = 'alta' | 'média' | 'media' | 'baixa' | 'high' | 'medium' | 'low';
 export type LeadTemperature = 'quente' | 'morno' | 'frio' | 'hot' | 'warm' | 'cold';
 export type CompanyStatus = 'active' | 'archived' | 'lead' | 'client';
+
+export type LostReasonType =
+  | 'sem_orcamento'
+  | 'concorrente'
+  | 'nao_interessado'
+  | 'sem_resposta'
+  | 'servico_inadequado'
+  | 'outro';
+
+export type ResponseOutcomeType =
+  | 'interessado'
+  | 'nao_interessado'
+  | 'pediu_informacoes'
+  | 'pediu_orcamento'
+  | 'pediu_falar_depois'
+  | 'reuniao'
+  | 'outro';
+
+export type WhatsAppScriptType =
+  | 'primeiro_contacto'
+  | 'follow_up'
+  | 'follow_up_2'
+  | 'follow_up_3'
+  | 'outro_horario'
+  | 'outro_dia'
+  | 'diagnostico'
+  | 'proposta'
+  | 'reativacao'
+  | 'outro';
+
+/**
+ * Perfil do Usuário Autenticado
+ */
+export interface UserProfile {
+  uid: string;
+  nome: string;
+  email: string;
+  foto?: string | null;
+  provider: 'password' | 'google' | 'anonymous';
+  createdAt: string;
+  updatedAt: string;
+  onboardingCompleted: boolean;
+}
 
 /**
  * Modelo completo de Empresa
@@ -69,6 +119,10 @@ export interface Company {
   address?: string; // endereço
   website?: string; // website
   websiteQuality?: 'modern' | 'outdated' | 'slow' | 'broken' | 'good' | 'poor' | 'boa' | 'media' | 'ruim' | 'nenhuma' | string;
+  companyWhatsApp?: string; // WhatsApp da empresa
+  companyPhone?: string; // Telefone da empresa
+  companyEmail?: string; // Email da empresa
+  companyWhatsAppVerified?: boolean; // WhatsApp verificado
   googleRating?: number;
   googleReviewsCount?: number;
   googleBusiness?: string; // Google Business
@@ -80,6 +134,8 @@ export interface Company {
   numberOfUnits?: number; // alias
   apparentNeed?: string;
   notes?: string; // observações
+  isFavorite?: boolean; // favorito
+  serviceQualifications?: Record<string, QualificationResult>; // Score e diagnósticos calculados por serviço (ex: Website: 87, Design: 54, Google: 92)
   createdAt: string; // data de criação
   updatedAt: string; // data de atualização
   status: CompanyStatus; // status
@@ -93,13 +149,91 @@ export interface Contact {
   companyId: string;
   name: string; // nome
   role?: string; // cargo
+  department?: string; // departamento
   phone?: string; // telefone
   whatsapp?: string; // WhatsApp
   email?: string; // email
+  instagram?: string; // Instagram
+  linkedin?: string; // LinkedIn
   notes?: string; // observações
-  isPrimary?: boolean;
+  isPrimary?: boolean; // principal: boolean
+  status?: 'active' | 'archived'; // status
+  referredByContactId?: string; // indicado por (ID do contacto)
+  referredByName?: string; // indicado por (Nome do contacto)
+  attemptCount?: number; // contador de tentativas
+  lastInteractionAt?: string; // última interação
+  isFavorite?: boolean; // prospect prioritário
   createdAt?: string;
   updatedAt?: string;
+}
+
+/**
+ * Estrutura de Perguntas de Qualificação por Serviço
+ */
+export interface QualificationQuestion {
+  id: string;
+  question: string;
+  type: 'SIM_NAO';
+  weightYes: number;
+  weightNo: number;
+  positiveCriterionIf?: 'SIM' | 'NAO';
+  negativeCriterionIf?: 'SIM' | 'NAO';
+  positiveLabel?: string;
+  negativeLabel?: string;
+  active?: boolean;
+  order?: number;
+}
+
+export interface ServiceQualificationConfig {
+  id: string;
+  serviceId: string;
+  serviceName: string;
+  questions: QualificationQuestion[];
+  updatedAt?: string;
+}
+
+export interface QualificationAnswer {
+  questionId: string;
+  questionText: string;
+  answer: 'SIM' | 'NÃO' | 'NAO';
+  pointsAwarded: number;
+}
+
+export interface QualificationBreakdownItem {
+  questionText: string;
+  points: number;
+  matched: boolean;
+  reason: string;
+}
+
+export interface QualificationResult {
+  score: number; // 0 a 100 normalizado
+  rawScore: number;
+  maxPossibleScore: number;
+  classification: 'baixa' | 'media' | 'alta' | 'prioridade_maxima';
+  classificationLabel: string;
+  positivePoints: string[];
+  negativePoints: string[];
+  missingData?: string[];
+  breakdown?: QualificationBreakdownItem[];
+  recommendation: string;
+  answers: QualificationAnswer[];
+  serviceId?: string;
+  serviceName?: string;
+  answeredAt: string;
+}
+
+/**
+ * Meta de Prospecção
+ */
+export interface ProspectingGoals {
+  daily: number; // ex: 10
+  weekly: number; // ex: 50
+  monthly: number; // ex: 200
+  annual: number; // ex: 2400
+  workingDaysPerMonth?: number; // ex: 20
+  maxDailyCap?: number; // ex: 20
+  lastCalculatedAt?: string;
 }
 
 /**
@@ -115,13 +249,23 @@ export interface Lead {
   score?: number; // score (0-100)
   priority: LeadPriority; // prioridade
   temperature: LeadTemperature; // temperatura
-  stage: LeadStage; // estágio (os 14 estágios)
+  stage: LeadStage; // estágio (os estágios do funil)
   status: 'active' | 'won' | 'lost' | 'archived' | 'paused';
   entryDate: string; // data de entrada
   lastContactDate?: string; // último contacto
   nextActionTitle?: string; // próxima ação
   nextActionDate?: string; // próxima ação em
   nextActionChannel?: ContactChannel;
+  attemptCount?: number; // Contador de tentativas (ex: 2/5)
+  plannedAttemptsToday?: number; // Tentativas planejadas para hoje
+  plannedAttemptHours?: string[]; // Horários no mesmo dia ex: ['09:00', '13:00', '18:00']
+  isFollowUpPaused?: boolean; // Sequência pausada quando respondeu
+  followUpPauseReason?: string;
+  responseOutcome?: ResponseOutcomeType;
+  lostReason?: LostReasonType;
+  isFavorite?: boolean;
+  qualificationResult?: QualificationResult;
+  serviceQualifications?: Record<string, QualificationResult>; // Diagnósticos salvos por serviço
   notes?: string; // observações
   preparedMessages?: Record<string, string>;
   createdAt: string;
@@ -132,6 +276,8 @@ export type HistoryEventType =
   | 'stage_change'
   | 'action_completed'
   | 'contact_made'
+  | 'whatsapp_opened'
+  | 'message_prepared'
   | 'message_sent'
   | 'response_received'
   | 'proposal_sent'
@@ -139,6 +285,12 @@ export type HistoryEventType =
   | 'meeting_held'
   | 'note_added'
   | 'follow_up'
+  | 'contact_created'
+  | 'contact_updated'
+  | 'contact_archived'
+  | 'contact_unarchived'
+  | 'contact_deleted'
+  | 'referral_recorded'
   | 'created'
   | 'archived'
   | 'unarchived'
@@ -402,13 +554,23 @@ export interface ExecutionMetrics {
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   dailyGoal: number;
+  goals?: ProspectingGoals;
   estMinutesPerAction: number;
+  actionEstimatedMinutes?: {
+    firstContact: number; // ex: 3 min
+    followUp: number; // ex: 2 min
+    proposal: number; // ex: 15 min
+    meeting: number; // ex: 30 min
+    reactivation: number; // ex: 3 min
+  };
   autoAdvanceOnDone: boolean;
   soundEnabled: boolean;
   showTips: boolean;
   dataStorageType: 'indexeddb_local' | 'cloud_sync_ready';
   lastBackupDate?: string;
   scoringWeights?: ScoringWeightConfig;
+  qualificationConfigs?: ServiceQualificationConfig[];
+  reactivationDaysThreshold?: number; // padrão 30 dias
 }
 
 export interface ToastNotification {

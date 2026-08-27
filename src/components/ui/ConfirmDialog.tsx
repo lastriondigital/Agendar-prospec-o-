@@ -46,11 +46,11 @@ export const ConfirmDialog: React.FC = () => {
     >
       <div className="flex items-start gap-3.5">
         {options.isDestructive && (
-          <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 shrink-0">
+          <div className="p-2.5 rounded-lg bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/40 shrink-0">
             <AlertTriangle className="w-5 h-5" />
           </div>
         )}
-        <div className="text-sm text-slate-300 dark:text-slate-300 light:text-slate-700 leading-relaxed pt-0.5">
+        <div className="text-sm text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed pt-0.5">
           {options.message}
         </div>
       </div>

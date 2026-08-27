@@ -23,19 +23,21 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   onSecondaryAction,
 }) => {
   return (
-    <div className="flex flex-col items-center justify-center p-8 sm:p-12 text-center rounded-2xl border border-dashed border-slate-800 dark:border-slate-800 light:border-slate-300 bg-slate-900/40 dark:bg-slate-900/40 light:bg-slate-50 max-w-lg mx-auto my-6">
-      <div className="p-3.5 rounded-2xl bg-slate-800/80 dark:bg-slate-800/80 light:bg-slate-200 text-slate-400 dark:text-slate-400 light:text-slate-600 border border-slate-700/50 dark:border-slate-700/50 light:border-slate-300 mb-4 flex items-center justify-center">
+    <div className="flex flex-col items-center justify-center p-8 sm:p-12 text-center rounded-xl border border-dashed border-[#DADDE1] dark:border-[#2D3139] bg-white dark:bg-[#181B20] max-w-lg mx-auto my-6">
+      <div className="p-3.5 rounded-full bg-[#F1F3F5] dark:bg-[#20242A] text-[#5F6368] dark:text-[#9AA0A6] mb-4 flex items-center justify-center">
         {icon}
       </div>
-      <h3 className="text-base font-semibold text-slate-100 dark:text-slate-100 light:text-slate-900">{title}</h3>
-      <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-400 light:text-slate-600 mt-1.5 max-w-sm leading-relaxed">
+      <h3 className="text-base font-semibold text-[#202124] dark:text-[#E8EAED]">
+        {title}
+      </h3>
+      <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6] mt-1.5 max-w-sm leading-relaxed">
         {description}
       </p>
 
       {(actionLabel || secondaryActionLabel) && (
-        <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+        <div className="flex flex-wrap items-center justify-center gap-2.5 mt-6">
           {secondaryActionLabel && onSecondaryAction && (
-            <Button variant="outline" size="sm" onClick={onSecondaryAction}>
+            <Button variant="secondary" size="sm" onClick={onSecondaryAction}>
               {secondaryActionLabel}
             </Button>
           )}

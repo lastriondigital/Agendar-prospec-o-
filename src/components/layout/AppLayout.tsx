@@ -9,7 +9,7 @@ import { ConflictResolutionModal } from '../sync/ConflictResolutionModal';
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 dark:bg-slate-950 dark:text-slate-100 light:bg-slate-50 light:text-slate-900 flex flex-row overflow-x-hidden antialiased font-sans transition-colors duration-150">
+    <div className="min-h-screen bg-[#F7F8FA] text-[#202124] dark:bg-[#121417] dark:text-[#E8EAED] flex flex-row overflow-x-hidden antialiased font-sans transition-colors duration-150">
       {/* Desktop Persistent Sidebar */}
       <Sidebar />
 
@@ -33,4 +33,3 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
     </div>
   );
 };
-

@@ -123,6 +123,37 @@ export function validateMessageContent(
 }
 
 /**
+ * Limpa o telefone mantendo estritamente apenas dígitos numéricos válidos para Click-to-Chat WhatsApp
+ */
+export function cleanPhoneNumberDigits(phone?: string): string {
+  if (!phone) return '';
+  let digits = phone.replace(/\D/g, '');
+  if (!digits) return '';
+
+  // Remove zeros iniciais de discagem local (ex: 0841234567 -> 841234567, 011987654321 -> 11987654321)
+  if (digits.startsWith('0') && digits.length >= 9) {
+    digits = digits.replace(/^0+/, '');
+  }
+
+  // Se já possui DDI conhecido (258 Moçambique, 351 Portugal, 55 Brasil, etc.)
+  if (digits.startsWith('258') || digits.startsWith('351') || digits.startsWith('55') || digits.length >= 12) {
+    return digits;
+  }
+
+  // Padrão Moçambique sem DDI (9 dígitos iniciando em 82, 83, 84, 85, 86, 87)
+  if (digits.length === 9 && /^8[2-7]/.test(digits)) {
+    return '258' + digits;
+  }
+
+  // Formato brasileiro padrão com DDD (10 ou 11 dígitos, DDD 11 a 99)
+  if (digits.length === 10 || digits.length === 11) {
+    return '55' + digits;
+  }
+
+  return digits;
+}
+
+/**
  * Formats a phone number for Brazilian formats or international standard
  */
 export function formatPhoneNumber(phone?: string): string {
@@ -134,20 +165,27 @@ export function formatPhoneNumber(phone?: string): string {
   if (digits.length === 10) {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
   }
+  if (digits.startsWith('258') && digits.length === 12) {
+    return `+258 ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8)}`;
+  }
+  if (digits.startsWith('351') && digits.length === 12) {
+    return `+351 ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`;
+  }
   return phone;
 }
 
 /**
  * Generates WhatsApp Web or App link with pre-filled message
+ * Link estrito https://wa.me/NUMERO_DIGITOS?text=URL_ENCODED
  */
 export function generateWhatsAppLink(phone?: string, text?: string): string {
   if (!phone) return '';
-  let cleanDigits = phone.replace(/\D/g, '');
-  if (cleanDigits.length === 10 || cleanDigits.length === 11) {
-    cleanDigits = '55' + cleanDigits;
-  }
-  const encodedText = encodeURIComponent(text || '');
-  return `https://wa.me/${cleanDigits}?text=${encodedText}`;
+  const cleanDigits = cleanPhoneNumberDigits(phone);
+  if (!cleanDigits) return '';
+  const encodedText = text ? encodeURIComponent(text) : '';
+  return encodedText
+    ? `https://wa.me/${cleanDigits}?text=${encodedText}`
+    : `https://wa.me/${cleanDigits}`;
 }
 
 /**
