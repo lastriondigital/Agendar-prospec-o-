@@ -6,7 +6,9 @@ import {
   Mail,
   User,
   X,
-  Cloud,
+  Zap,
+  Eye,
+  EyeOff,
   CheckCircle2,
   AlertCircle,
   ArrowRight,
@@ -32,6 +34,9 @@ export const AuthModal: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -57,12 +62,25 @@ export const AuthModal: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setFormError('Preencha seu endereço de e-mail.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setFormError('Insira um e-mail com formato válido (ex: nome@empresa.com).');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       if (authModalMode === 'login') {
-        if (!email.trim() || !password.trim()) {
-          setFormError('Preencha seu e-mail e senha.');
+        if (!password) {
+          setFormError('Insira sua senha de acesso.');
           setIsSubmitting(false);
           return;
         }
@@ -74,12 +92,7 @@ export const AuthModal: React.FC = () => {
         }
       } else if (authModalMode === 'register') {
         if (!displayName.trim()) {
-          setFormError('Informe o seu nome.');
-          setIsSubmitting(false);
-          return;
-        }
-        if (!email.trim() || !password.trim()) {
-          setFormError('Preencha todos os campos obrigatórios.');
+          setFormError('Informe o seu nome completo.');
           setIsSubmitting(false);
           return;
         }
@@ -100,11 +113,6 @@ export const AuthModal: React.FC = () => {
           setTimeout(() => syncNow(), 500);
         }
       } else if (authModalMode === 'forgot_password') {
-        if (!email.trim()) {
-          setFormError('Informe o e-mail cadastrado para recuperação.');
-          setIsSubmitting(false);
-          return;
-        }
         const res = await resetPassword(email);
         if (!res.success) {
           setFormError(res.error || 'Erro ao solicitar recuperação.');
@@ -120,72 +128,72 @@ export const AuthModal: React.FC = () => {
   return (
     <div
       id="auth-modal-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in select-none"
       onClick={(e) => {
         if (e.target === e.currentTarget) closeAuthModal();
       }}
     >
       <div
         id="auth-modal-card"
-        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[92vh] flex flex-col"
+        className="w-full max-w-md bg-white dark:bg-[#181B20] rounded-2xl shadow-2xl border border-[#E6E8EB] dark:border-[#2D3139] overflow-hidden max-h-[92vh] flex flex-col"
       >
         {/* Modal Header */}
-        <div className="relative p-5 pb-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-start justify-between">
+        <div className="relative p-5 pb-4 border-b border-[#ECEEF1] dark:border-[#2D3139] bg-[#F7F8FA] dark:bg-[#14161A] flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <Cloud className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-[#3F6FB5] text-white flex items-center justify-center shadow-xs">
+              <Zap className="w-5 h-5 fill-white" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                {authModalMode === 'login' && 'Entrar no PROSPECT OS'}
-                {authModalMode === 'register' && 'Criar Conta no PROSPECT OS'}
+              <h3 className="text-base font-bold text-[#202124] dark:text-[#E8EAED]">
+                {authModalMode === 'login' && 'Entrar no Sistema'}
+                {authModalMode === 'register' && 'Criar Conta de Acesso'}
                 {authModalMode === 'forgot_password' && 'Recuperar Senha'}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Acesse sua conta ou sincronize seus prospects na nuvem
+              <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
+                Agendador de Mensagens & PROSPECT OS
               </p>
             </div>
           </div>
           <button
             id="close-auth-modal-button"
             onClick={closeAuthModal}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            className="text-[#80868B] hover:text-[#202124] dark:hover:text-[#E8EAED] p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#252A32] transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto">
+        <div className="p-6 overflow-y-auto space-y-4">
           {/* Mode Switcher Tabs */}
           {authModalMode !== 'forgot_password' && (
-            <div className="grid grid-cols-2 p-1 mb-5 bg-slate-100 dark:bg-slate-800 rounded-xl">
+            <div className="grid grid-cols-2 p-1 bg-[#F1F3F4] dark:bg-[#121417] rounded-xl border border-[#E6E8EB] dark:border-[#2D3139]">
               <button
                 type="button"
-                id="tab-login-btn"
+                id="modal-tab-login-btn"
                 onClick={() => {
                   setFormError(null);
                   openAuthModal('login');
                 }}
-                className={`py-2 text-xs font-semibold rounded-lg transition ${
+                className={`py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                   authModalMode === 'login'
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    ? 'bg-white dark:bg-[#1E2228] text-[#3F6FB5] dark:text-blue-300 shadow-xs'
+                    : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
                 }`}
               >
                 Entrar
               </button>
               <button
                 type="button"
-                id="tab-register-btn"
+                id="modal-tab-register-btn"
                 onClick={() => {
                   setFormError(null);
                   openAuthModal('register');
                 }}
-                className={`py-2 text-xs font-semibold rounded-lg transition ${
+                className={`py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                   authModalMode === 'register'
-                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    ? 'bg-white dark:bg-[#1E2228] text-[#3F6FB5] dark:text-blue-300 shadow-xs'
+                    : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
                 }`}
               >
                 Criar Conta
@@ -195,16 +203,16 @@ export const AuthModal: React.FC = () => {
 
           {/* Google Sign-In Button */}
           {authModalMode !== 'forgot_password' && (
-            <div className="mb-4">
+            <div>
               <button
-                id="auth-google-btn"
+                id="modal-auth-google-btn"
                 type="button"
                 disabled={isGoogleSubmitting || isSubmitting}
                 onClick={handleGoogleLogin}
-                className="w-full py-2.5 px-4 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/80 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs rounded-xl transition flex items-center justify-center gap-2.5 shadow-sm disabled:opacity-50"
+                className="w-full py-2.5 px-4 bg-white dark:bg-[#1E2228] hover:bg-neutral-50 dark:hover:bg-[#252A32] border border-[#D1D5DB] dark:border-[#374151] text-[#374151] dark:text-[#E5E7EB] font-semibold text-xs rounded-xl transition flex items-center justify-center gap-2.5 shadow-xs disabled:opacity-50 cursor-pointer"
               >
                 {isGoogleSubmitting ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-slate-500" />
+                  <RefreshCw className="w-4 h-4 animate-spin text-[#3F6FB5]" />
                 ) : (
                   <svg className="w-4 h-4" viewBox="0 0 24 24">
                     <path
@@ -229,26 +237,26 @@ export const AuthModal: React.FC = () => {
               </button>
 
               <div className="relative flex py-3 items-center">
-                <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
-                <span className="flex-shrink mx-3 text-[11px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                <div className="flex-grow border-t border-[#ECEEF1] dark:border-[#2D3139]"></div>
+                <span className="flex-shrink mx-3 text-[10px] font-bold text-[#80868B] dark:text-[#9AA0A6] uppercase tracking-wider">
                   ou com e-mail
                 </span>
-                <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+                <div className="flex-grow border-t border-[#ECEEF1] dark:border-[#2D3139]"></div>
               </div>
             </div>
           )}
 
           {/* Form Alerts */}
           {formError && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 flex items-start gap-2.5 text-xs text-red-600 dark:text-red-400">
-              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-300">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" />
               <span>{formError}</span>
             </div>
           )}
 
           {resetSent && (
-            <div className="mb-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 flex items-start gap-2.5 text-xs text-emerald-700 dark:text-emerald-300">
-              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 flex items-start gap-2.5 text-xs text-emerald-700 dark:text-emerald-300">
+              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
               <span>E-mail de recuperação enviado com sucesso. Verifique sua caixa de entrada.</span>
             </div>
           )}
@@ -257,38 +265,38 @@ export const AuthModal: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {authModalMode === 'register' && (
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Nome Completo
+                <label className="block text-xs font-semibold text-[#202124] dark:text-[#E8EAED] mb-1">
+                  Nome Completo <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <User className="w-4 h-4 text-[#80868B] absolute left-3.5 top-3" />
                   <input
-                    id="auth-display-name-input"
+                    id="modal-auth-display-name-input"
                     type="text"
                     required
-                    placeholder="Ex: João Silva"
+                    placeholder="Ex: João da Silva"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="w-full pl-10 pr-3.5 py-2 text-xs rounded-xl border border-[#D1D5DB] dark:border-[#374151] bg-white dark:bg-[#1E2228] text-[#202124] dark:text-[#E8EAED] placeholder:text-[#9AA0A6] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#3F6FB5]"
                   />
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                E-mail
+              <label className="block text-xs font-semibold text-[#202124] dark:text-[#E8EAED] mb-1">
+                E-mail <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <Mail className="w-4 h-4 text-[#80868B] absolute left-3.5 top-3" />
                 <input
-                  id="auth-email-input"
+                  id="modal-auth-email-input"
                   type="email"
                   required
-                  placeholder="seu-email@empresa.com"
+                  placeholder="seu.email@empresa.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full pl-10 pr-3.5 py-2 text-xs rounded-xl border border-[#D1D5DB] dark:border-[#374151] bg-white dark:bg-[#1E2228] text-[#202124] dark:text-[#E8EAED] placeholder:text-[#9AA0A6] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#3F6FB5]"
                 />
               </div>
             </div>
@@ -296,75 +304,93 @@ export const AuthModal: React.FC = () => {
             {authModalMode !== 'forgot_password' && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Senha
+                  <label className="block text-xs font-semibold text-[#202124] dark:text-[#E8EAED]">
+                    Senha <span className="text-rose-500">*</span>
                   </label>
                   {authModalMode === 'login' && (
                     <button
                       type="button"
-                      id="forgot-password-link"
+                      id="modal-forgot-password-link"
                       onClick={() => {
                         setFormError(null);
                         setResetSent(false);
                         openAuthModal('forgot_password');
                       }}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      className="text-xs text-[#3F6FB5] dark:text-blue-400 hover:underline cursor-pointer"
                     >
                       Esqueci minha senha
                     </button>
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <Lock className="w-4 h-4 text-[#80868B] absolute left-3.5 top-3" />
                   <input
-                    id="auth-password-input"
-                    type="password"
+                    id="modal-auth-password-input"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="w-full pl-10 pr-10 py-2 text-xs rounded-xl border border-[#D1D5DB] dark:border-[#374151] bg-white dark:bg-[#1E2228] text-[#202124] dark:text-[#E8EAED] placeholder:text-[#9AA0A6] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#3F6FB5]"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 text-[#80868B] hover:text-[#202124] dark:hover:text-[#E8EAED] cursor-pointer"
+                    title={showPassword ? 'Ocultar senha' : 'Exibir senha'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
             )}
 
             {authModalMode === 'register' && (
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Confirmar Senha
+                <label className="block text-xs font-semibold text-[#202124] dark:text-[#E8EAED] mb-1">
+                  Confirmar Senha <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <KeyRound className="w-4 h-4 text-[#80868B] absolute left-3.5 top-3" />
                   <input
-                    id="auth-confirm-password-input"
-                    type="password"
+                    id="modal-auth-confirm-password-input"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="w-full pl-10 pr-10 py-2 text-xs rounded-xl border border-[#D1D5DB] dark:border-[#374151] bg-white dark:bg-[#1E2228] text-[#202124] dark:text-[#E8EAED] placeholder:text-[#9AA0A6] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#3F6FB5]"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-2.5 text-[#80868B] hover:text-[#202124] dark:hover:text-[#E8EAED] cursor-pointer"
+                    title={showConfirmPassword ? 'Ocultar senha' : 'Exibir senha'}
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
             )}
 
             <button
-              id="auth-submit-btn"
+              id="modal-auth-submit-btn"
               type="submit"
               disabled={isSubmitting || isGoogleSubmitting}
-              className="w-full mt-3 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium text-xs rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+              className="w-full mt-3 py-2.5 px-4 bg-[#3F6FB5] hover:bg-[#335A94] disabled:opacity-50 text-white font-semibold text-xs rounded-xl transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
             >
               {isSubmitting ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  Processando...
+                  <span>Processando...</span>
                 </>
               ) : (
                 <>
-                  {authModalMode === 'login' && 'Entrar'}
-                  {authModalMode === 'register' && 'Criar conta'}
-                  {authModalMode === 'forgot_password' && 'Enviar link de recuperação'}
+                  <span>
+                    {authModalMode === 'login' && 'Entrar'}
+                    {authModalMode === 'register' && 'Criar Conta'}
+                    {authModalMode === 'forgot_password' && 'Enviar Link de Recuperação'}
+                  </span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -380,7 +406,7 @@ export const AuthModal: React.FC = () => {
                   setFormError(null);
                   openAuthModal('login');
                 }}
-                className="text-xs text-slate-500 hover:text-blue-600 dark:hover:text-blue-400"
+                className="text-xs text-[#5F6368] hover:text-[#3F6FB5] dark:hover:text-blue-400 cursor-pointer"
               >
                 ← Voltar para o Login
               </button>
@@ -388,10 +414,10 @@ export const AuthModal: React.FC = () => {
           )}
 
           {/* Offline Protection Notice */}
-          <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="mt-5 pt-3.5 border-t border-[#ECEEF1] dark:border-[#2D3139] flex items-center gap-2 text-[11px] text-[#5F6368] dark:text-[#9AA0A6]">
             <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span>
-              Offline-first: seus dados funcionam 100% no seu dispositivo mesmo sem conexão.
+              Isolamento seguro por usuário e persistência com nuvem Firestore.
             </span>
           </div>
         </div>

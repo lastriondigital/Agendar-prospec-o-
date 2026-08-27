@@ -11,11 +11,28 @@ export type RouteId =
   | 'analytics'
   | 'settings';
 
-export type ContactChannel = 'whatsapp' | 'linkedin' | 'email' | 'call' | 'instagram';
+export type ContactChannel =
+  | 'whatsapp'
+  | 'whatsapp_business'
+  | 'instagram'
+  | 'email'
+  | 'linkedin'
+  | 'call'
+  | string;
+
+export type CampaignType =
+  | 'prospeccao'
+  | 'follow_up'
+  | 'reativacao'
+  | 'pos_venda'
+  | 'nutricao'
+  | 'oferta'
+  | 'personalizada'
+  | string;
 
 export type LeadStatus = 'new' | 'in_contact' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost' | 'archived';
 
-export type ActionStatus = 'pending' | 'completed' | 'skipped' | 'rescheduled';
+export type ActionStatus = 'pending' | 'scheduled' | 'completed' | 'skipped' | 'rescheduled' | 'cancelled' | 'failed';
 
 export type ActionPriority = 'high' | 'medium' | 'low';
 
@@ -350,22 +367,32 @@ export interface Client {
   updatedAt: string;
 }
 
-export interface CampaignSequenceStep {
+export interface CadenceStep {
   id: string;
-  dayOffset: number; // e.g. 0, 2, 5, 9, 20, 45
-  hourOffset?: number; // e.g. 0, 4, 24
-  title: string; // e.g. "Primeiro contato", "Follow-up", "Prova", "Reativação"
-  actionType?: string; // Tipo de ação (ex: 'primeiro_contato', 'follow_up_1', 'diagnostico')
-  templateId?: string; // Script de mensagem associado
-  channel?: ContactChannel; // Canal específico deste passo
-  notes?: string; // Observações / gatilho tático
+  stepNumber: number; // 1, 2, 3...
+  actionType: string; // e.g. "Primeiro contato", "Apresentação", "Follow-up 1", "Follow-up 2", "Follow-up 3", "Quebra de objeção", "Oferta", "Reativação", "Encerramento", "Pós-venda"
+  scriptId?: string; // ID do MessageTemplate / Script
+  scriptTitle?: string; // Snapshot do nome do Script
+  channel: ContactChannel;
+  delayDays: number; // ex: 0, 1, 2, 3
+  delayHours: number; // ex: 0, 2, 4, 6, 12
+  delayMinutes?: number; // ex: 0, 15, 30
+  totalDelayMinutes?: number; // delayDays * 1440 + delayHours * 60 + delayMinutes
+  notes?: string;
+  // Retrocompatibilidade
+  dayOffset?: number;
+  title?: string;
+  templateId?: string;
 }
+
+export interface CampaignSequenceStep extends CadenceStep {}
 
 export interface Campaign {
   id: string;
   name: string;
+  type?: CampaignType;
+  campaignType?: CampaignType;
   description?: string;
-  campaignType?: string; // Tipo de campanha
   targetAudience?: string; // ICP
   icpId?: string;
   objective?: string; // e.g. "Gerar Reuniões", "Venda Direta"
@@ -379,6 +406,7 @@ export interface Campaign {
   endDate?: string;
   criteria?: string;
   sequence?: CampaignSequenceStep[];
+  cadence?: CadenceStep[];
   createdAt: string;
   updatedAt: string;
 }
@@ -499,20 +527,21 @@ export interface ScoringWeightConfig {
 
 export interface MessageTemplate {
   id: string;
-  title: string;
-  channel: ContactChannel;
-  category: TemplateCategory;
-  type: TemplateType;
-  actionType?: string; // Tipo de ação associada (ex: 'primeiro_contato', 'follow_up_1', 'diagnostico', etc.)
-  campaignType?: string; // Tipo de campanha recomendada
-  content: string;
-  variables: string[];
+  title: string; // Nome do script
+  actionType?: string; // Tipo de ação associado (ex: "Primeiro contato", "Follow-up 1", "Apresentação")
+  channel: ContactChannel; // Canal principal
+  channels?: ContactChannel[]; // Canais compatíveis
+  category?: TemplateCategory;
+  type?: TemplateType;
+  content: string; // Conteúdo com {{variaveis}}
+  variables: string[]; // Variáveis disponíveis/detectadas
   version: string; // e.g. "v1.0"
   serviceId?: string; // mensagens por serviço
   niche?: string; // mensagens por nicho
   pipelineStage?: LeadStage; // mensagens por etapa do pipeline
   isFavorite?: boolean;
   isArchived?: boolean;
+  status?: 'active' | 'archived';
   notes?: string;
   isDefault?: boolean;
   createdAt: string;
@@ -521,26 +550,25 @@ export interface MessageTemplate {
 
 export interface ProspectAction {
   id: string;
-  clientId: string;
-  companyId?: string;
+  clientId: string; // ID da Empresa ou Cliente
+  leadId?: string;
   contactId?: string;
   campaignId?: string;
-  campaignType?: string; // Tipo de campanha (ex: 'Primeiro contato', 'Follow-up cadenciado')
-  actionType?: string; // Tipo de ação (ex: 'Primeiro contato', 'Apresentação inicial', 'Follow-up 1')
-  templateId?: string; // ID do script de mensagem associado
-  scriptId?: string; // Alias para templateId
-  scriptTitle?: string; // Título do script para exibição rápida
+  campaignName?: string;
+  campaignType?: string;
+  cadenceStepId?: string;
+  templateId?: string;
+  scriptTitle?: string;
+  actionType?: string; // Tipo de ação
   channel: ContactChannel;
   scheduledDate: string; // YYYY-MM-DD
-  scheduledTime?: string; // HH:mm (ex: "10:30")
+  scheduledTime?: string; // HH:mm
   status: ActionStatus;
   priority: ActionPriority;
   estMinutes: number; // default 1-3 min per quick execution
-  customMessage?: string;
-  notes?: string; // Observações gerais
+  customMessage?: string; // Snapshot do texto formatado com variáveis
+  notes?: string; // Observações
   outcomeNotes?: string;
-  cadenceStepIndex?: number;
-  cadenceStepTitle?: string;
   executedAt?: string;
   createdAt: string;
   updatedAt: string;

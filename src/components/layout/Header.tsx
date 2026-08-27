@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Download, HelpCircle, Moon, RefreshCw, Sun, Zap, Sparkles, ShieldCheck } from 'lucide-react';
+import { Download, HelpCircle, Moon, RefreshCw, Sun, Zap, Sparkles, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useExecutionQueue } from '../../hooks/useExecutionQueue';
 import { usePWA } from '../../hooks/usePWA';
@@ -10,10 +11,12 @@ import { ProductionAuditModal } from '../audit/ProductionAuditModal';
 
 export const Header: React.FC = () => {
   const { activeRoute, setActiveRoute, isDemoMode, openTutorial } = useApp();
+  const { user, userProfile, openAuthModal } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { metrics, formattedDuration } = useExecutionQueue();
   const { isInstallable, hasUpdate, promptInstall, applyUpdate } = usePWA();
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+
 
   const currentNav = NAVIGATION_ITEMS.find((n) => n.id === activeRoute) || NAVIGATION_ITEMS[0];
 
@@ -113,6 +116,42 @@ export const Header: React.FC = () => {
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
+
+          {/* User Account / Settings Pill / Login Button */}
+          {user ? (
+            <button
+              id="header-user-profile-btn"
+              onClick={() => setActiveRoute('settings')}
+              className="flex items-center gap-2 p-1 pl-2 pr-2.5 rounded-lg bg-white dark:bg-[#1E2228] hover:bg-neutral-100 dark:hover:bg-[#252A32] border border-[#E6E8EB] dark:border-[#2D3139] text-xs font-medium text-[#202124] dark:text-[#E8EAED] transition cursor-pointer"
+              title={`Conectado como ${user.email} - Clique para abrir Configurações`}
+            >
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName || 'Avatar'}
+                  referrerPolicy="no-referrer"
+                  className="w-5 h-5 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-[#3F6FB5] text-white text-[10px] font-bold flex items-center justify-center shrink-0 shadow-xs">
+                  {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="hidden lg:inline max-w-[110px] truncate font-semibold text-[11px]">
+                {userProfile?.nome || user.displayName || 'Minha Conta'}
+              </span>
+            </button>
+          ) : (
+            <button
+              id="header-login-btn"
+              onClick={() => openAuthModal('login')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#3F6FB5] hover:bg-[#335C99] text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+              title="Entrar ou criar conta no sistema"
+            >
+              <UserIcon className="w-3.5 h-3.5" />
+              <span>Entrar</span>
+            </button>
+          )}
         </div>
       </div>
 

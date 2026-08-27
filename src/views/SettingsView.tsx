@@ -33,6 +33,7 @@ import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
 import { ImportBackupModal } from '../components/settings/ImportBackupModal';
 import { ProductionAuditModal } from '../components/audit/ProductionAuditModal';
+import { AccountPanel } from '../components/account/AccountPanel';
 import {
   exportCompaniesCSV,
   exportActionsCSV,
@@ -246,91 +247,13 @@ export const SettingsView: React.FC = () => {
         </div>
       </Card>
 
-      {/* Cloud Sync & Firebase Card */}
-      <Card padding="md" className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 border border-blue-200 dark:border-blue-800/40">
-              <Cloud className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2">
-                <span>Camada Cloud & Sincronização Firestore</span>
-                {syncState.isAuthenticated ? (
-                  <Badge variant="emerald" size="sm">Conectado</Badge>
-                ) : (
-                  <Badge variant="amber" size="sm">Desconectado</Badge>
-                )}
-              </h3>
-              <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
-                Arquitetura Offline-first: seus dados funcionam offline e sincronizam automaticamente na nuvem.
-              </p>
-            </div>
-          </div>
+      {/* Account, Authentication & Cloud Sync Panel */}
+      <AccountPanel />
 
-          <div className="flex items-center gap-2">
-            {syncState.isAuthenticated ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={syncNow}
-                disabled={syncState.status === 'syncing' || !syncState.isOnline}
-                leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${syncState.status === 'syncing' ? 'animate-spin' : ''}`} />}
-              >
-                Sincronizar Agora
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => openAuthModal('login')}
-                leftIcon={<User className="w-3.5 h-3.5" />}
-              >
-                Conectar Conta Cloud
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Sync Details Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] text-xs">
-          <div>
-            <span className="text-[#80868B]">Status de Rede:</span>
-            <div className="flex items-center gap-1.5 font-semibold text-[#202124] dark:text-[#E8EAED] mt-1">
-              {syncState.isOnline ? (
-                <>
-                  <Wifi className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>Online (Conectado à internet)</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span>Offline — dados salvos neste dispositivo</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <span className="text-[#80868B]">Última Sincronização:</span>
-            <p className="font-semibold text-[#202124] dark:text-[#E8EAED] mt-1">
-              {syncState.lastSyncedAt
-                ? new Date(syncState.lastSyncedAt).toLocaleString('pt-BR')
-                : 'Pendente de primeira sincronização'}
-            </p>
-          </div>
-
-          <div>
-            <span className="text-[#80868B]">Fila Pendente:</span>
-            <p className="font-semibold text-[#202124] dark:text-[#E8EAED] mt-1">
-              {syncState.pendingCount} {syncState.pendingCount === 1 ? 'mutação' : 'mutações'}
-            </p>
-          </div>
-        </div>
-
-        {/* Conflict Alert Banner if any */}
-        {conflicts.length > 0 && (
-          <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 flex items-center justify-between gap-3">
+      {/* Conflict Alert Banner if any */}
+      {conflicts.length > 0 && (
+        <Card padding="md" className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/60">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-300">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
               <span>
@@ -341,24 +264,8 @@ export const SettingsView: React.FC = () => {
               Revisar Conflitos
             </Button>
           </div>
-        )}
-
-        {/* User Account Info */}
-        {syncState.isAuthenticated && user && (
-          <div className="flex items-center justify-between pt-2 border-t border-[#ECEEF1] dark:border-[#2D3139] text-xs">
-            <div className="flex items-center gap-2 text-[#5F6368] dark:text-[#9AA0A6]">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Autenticado como: <strong>{user.email}</strong> ({user.displayName})</span>
-            </div>
-            <button
-              onClick={logout}
-              className="text-xs text-rose-600 dark:text-rose-400 hover:underline font-medium cursor-pointer"
-            >
-              Desconectar
-            </button>
-          </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {/* Backup, Validation & Multi-Format Exports */}
       <Card padding="md" className="space-y-4">

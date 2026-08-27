@@ -1,6 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConfirmDialogProvider } from './context/ConfirmDialogContext';
 import { SyncProvider } from './context/SyncContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -8,6 +8,8 @@ import { ToastProvider } from './context/ToastContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { CardSkeleton } from './components/ui/LoadingSkeleton';
+import { AuthLoadingScreen } from './components/auth/AuthLoadingScreen';
+import { AuthView } from './views/AuthView';
 
 // Lazy Loaded Views for High Performance & Low Initial Payload
 const DashboardView = lazy(() =>
@@ -97,21 +99,40 @@ const MainContent: React.FC = () => {
   );
 };
 
+/**
+ * Root Application Router & Authentication Guard
+ */
+const AppRouter: React.FC = () => {
+  const { isLoadingAuth } = useAuth();
+
+  // Initial authentication verification splash
+  if (isLoadingAuth) {
+    return <AuthLoadingScreen />;
+  }
+
+  // Resilient Offline-First Architecture:
+  // App is fully usable locally and offline without authentication.
+  // Private cloud sync activates automatically when authenticated.
+  return (
+    <SyncProvider>
+      <ConfirmDialogProvider>
+        <AppProvider>
+          <AppLayout>
+            <MainContent />
+          </AppLayout>
+        </AppProvider>
+      </ConfirmDialogProvider>
+    </SyncProvider>
+  );
+};
+
 export default function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
-            <SyncProvider>
-              <ConfirmDialogProvider>
-                <AppProvider>
-                  <AppLayout>
-                    <MainContent />
-                  </AppLayout>
-                </AppProvider>
-              </ConfirmDialogProvider>
-            </SyncProvider>
+            <AppRouter />
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>

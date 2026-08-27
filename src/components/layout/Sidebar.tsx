@@ -15,8 +15,11 @@ import {
   Users,
   Zap,
   Sparkles,
+  LogOut,
+  User as UserIcon,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { useExecutionQueue } from '../../hooks/useExecutionQueue';
 import { RouteId } from '../../types';
 import { NAVIGATION_ITEMS } from '../../utils/constants';
@@ -37,7 +40,9 @@ const ICON_MAP: Record<string, React.ReactNode> = {
 
 export const Sidebar: React.FC = () => {
   const { activeRoute, setActiveRoute, clients, campaigns, isDemoMode, isOnline, openTutorial } = useApp();
+  const { user, userProfile, logout, openAuthModal } = useAuth();
   const { metrics } = useExecutionQueue();
+
 
   const getBadgeForRoute = (routeId: RouteId) => {
     if (routeId === 'prospecting' && metrics.pendingToday > 0) {
@@ -188,6 +193,58 @@ export const Sidebar: React.FC = () => {
             <span className="text-[10px]">{isOnline ? 'Online' : 'Offline'}</span>
           </div>
         </div>
+
+        {/* User Account State & Actions */}
+        {user ? (
+          <div className="pt-2 border-t border-[#ECEEF1] dark:border-[#2D3139] flex items-center justify-between gap-2">
+            <div
+              onClick={() => setActiveRoute('settings')}
+              className="flex items-center gap-2 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+              title="Abrir configurações da conta"
+            >
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName || 'Avatar'}
+                  referrerPolicy="no-referrer"
+                  className="w-7 h-7 rounded-full object-cover shrink-0 border border-[#E6E8EB] dark:border-[#2D3139]"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-[#3F6FB5] text-white text-[11px] font-bold flex items-center justify-center shrink-0 shadow-xs">
+                  {(userProfile?.nome || user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[#202124] dark:text-[#E8EAED] truncate leading-tight">
+                  {userProfile?.nome || user.displayName || 'Usuário'}
+                </p>
+                <p className="text-[10px] text-[#5F6368] dark:text-[#9AA0A6] truncate">
+                  {user.email}
+                </p>
+              </div>
+            </div>
+            <button
+              id="sidebar-logout-button"
+              onClick={logout}
+              className="p-1.5 rounded-lg text-[#5F6368] hover:text-rose-600 dark:text-[#9AA0A6] dark:hover:text-rose-400 hover:bg-neutral-200/60 dark:hover:bg-[#20242A] transition-colors cursor-pointer shrink-0"
+              title="Encerrar sessão (Logout)"
+              aria-label="Sair da conta"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="pt-2 border-t border-[#ECEEF1] dark:border-[#2D3139]">
+            <button
+              id="sidebar-login-button"
+              onClick={() => openAuthModal('login')}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/50 text-[#3F6FB5] dark:text-blue-300 border border-blue-200 dark:border-blue-800/40 text-xs font-semibold transition cursor-pointer"
+            >
+              <UserIcon className="w-3.5 h-3.5" />
+              <span>Conectar Conta Cloud</span>
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   );

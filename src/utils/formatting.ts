@@ -230,14 +230,16 @@ export function getChannelBadgeDetails(channel: ContactChannel): { label: string
   switch (channel) {
     case 'whatsapp':
       return { label: 'WhatsApp', bgClass: 'bg-emerald-500/10 dark:bg-emerald-500/20', textClass: 'text-emerald-700 dark:text-emerald-400', icon: 'MessageCircle' };
+    case 'whatsapp_business':
+      return { label: 'WhatsApp Business', bgClass: 'bg-emerald-600/10 dark:bg-emerald-600/20', textClass: 'text-emerald-800 dark:text-emerald-300', icon: 'MessageSquare' };
     case 'linkedin':
       return { label: 'LinkedIn', bgClass: 'bg-sky-500/10 dark:bg-sky-500/20', textClass: 'text-sky-700 dark:text-sky-400', icon: 'Share2' };
     case 'email':
       return { label: 'E-mail', bgClass: 'bg-blue-500/10 dark:bg-blue-500/20', textClass: 'text-blue-700 dark:text-blue-400', icon: 'Mail' };
     case 'call':
-      return { label: 'Ligação', bgClass: 'bg-amber-500/10 dark:bg-amber-500/20', textClass: 'text-amber-700 dark:text-amber-400', icon: 'Phone' };
+      return { label: 'Ligação / Chamada', bgClass: 'bg-amber-500/10 dark:bg-amber-500/20', textClass: 'text-amber-700 dark:text-amber-400', icon: 'Phone' };
     case 'instagram':
-      return { label: 'Instagram', bgClass: 'bg-pink-500/10 dark:bg-pink-500/20', textClass: 'text-pink-700 dark:text-pink-400', icon: 'Instagram' };
+      return { label: 'Instagram Direct', bgClass: 'bg-pink-500/10 dark:bg-pink-500/20', textClass: 'text-pink-700 dark:text-pink-400', icon: 'Instagram' };
     default:
       return { label: channel, bgClass: 'bg-neutral-500/10', textClass: 'text-neutral-700 dark:text-neutral-300', icon: 'Send' };
   }
