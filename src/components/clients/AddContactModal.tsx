@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Instagram, Linkedin, Mail, MessageSquare, Phone, User, Users } from 'lucide-react';
-import { Contact } from '../../types';
+import { Instagram, Linkedin, Mail, MessageSquare, Phone, User, Users, Shield, Award } from 'lucide-react';
+import { Contact, ContactGender, ContactSalutation, PersonaRole } from '../../types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
@@ -26,6 +26,10 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
+  const [personaRole, setPersonaRole] = useState<PersonaRole>('proprietario');
+  const [gender, setGender] = useState<ContactGender>('nao_informado');
+  const [salutation, setSalutation] = useState<ContactSalutation>('nome_proprio');
+  const [customSalutation, setCustomSalutation] = useState('');
   const [department, setDepartment] = useState('');
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -41,6 +45,10 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
     if (editingContact) {
       setName(editingContact.name || '');
       setRole(editingContact.role || '');
+      setPersonaRole(editingContact.personaRole || 'proprietario');
+      setGender(editingContact.gender || 'nao_informado');
+      setSalutation(editingContact.salutation || 'nome_proprio');
+      setCustomSalutation(editingContact.customSalutation || '');
       setDepartment(editingContact.department || '');
       setPhone(editingContact.phone || '');
       setWhatsapp(editingContact.whatsapp || '');
@@ -53,6 +61,10 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
     } else {
       setName('');
       setRole('');
+      setPersonaRole('proprietario');
+      setGender('nao_informado');
+      setSalutation('nome_proprio');
+      setCustomSalutation('');
       setDepartment('');
       setPhone('');
       setWhatsapp('');
@@ -74,6 +86,10 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
       await onSave({
         name: name.trim(),
         role: role.trim() || undefined,
+        personaRole,
+        gender,
+        salutation,
+        customSalutation: salutation === 'personalizado' ? customSalutation.trim() || undefined : undefined,
         department: department.trim() || undefined,
         phone: phone.trim() || undefined,
         whatsapp: whatsapp.trim() || undefined,
@@ -116,8 +132,84 @@ export const AddContactModal: React.FC<AddContactModalProps> = ({
             label="Cargo / Função"
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            placeholder="Ex: Diretor Comercial / Sócio"
+            placeholder="Ex: Diretor Geral / Sócio"
           />
+        </div>
+
+        {/* Gênero e Forma de Tratamento (Ponto 31) */}
+        <div className="p-3 bg-neutral-900/80 border border-neutral-800 rounded-xl space-y-3">
+          <div className="text-[11px] font-bold text-neutral-300 uppercase tracking-wide flex items-center gap-1.5">
+            <Shield className="w-3.5 h-3.5 text-blue-400" />
+            Personalização por Gênero & Tratamento (Sem Presunção Automática)
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">
+                Gênero
+              </label>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value as ContactGender)}
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-blue-500"
+              >
+                <option value="nao_informado">Não informado</option>
+                <option value="masculino">Masculino</option>
+                <option value="feminino">Feminino</option>
+                <option value="neutro">Neutro</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">
+                Forma de Tratamento
+              </label>
+              <select
+                value={salutation}
+                onChange={(e) => setSalutation(e.target.value as ContactSalutation)}
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-blue-500"
+              >
+                <option value="nome_proprio">Nome próprio (Sem pronome)</option>
+                <option value="senhor">Senhor</option>
+                <option value="senhora">Senhora</option>
+                <option value="doutor">Doutor</option>
+                <option value="doutora">Doutora</option>
+                <option value="personalizado">Personalizado...</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-neutral-300 mb-1">
+                Papel / Persona
+              </label>
+              <select
+                value={personaRole}
+                onChange={(e) => setPersonaRole(e.target.value as PersonaRole)}
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-blue-500"
+              >
+                <option value="proprietario">Proprietário / Dono (Decisor)</option>
+                <option value="socio">Sócio (Decisor)</option>
+                <option value="diretor">Diretor (Decisor)</option>
+                <option value="gerente">Gerente (Decisor)</option>
+                <option value="marketing">Marketing / Vendas</option>
+                <option value="recepcao">Recepção / Atendimento</option>
+                <option value="funcionario">Funcionário / Operacional</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+          </div>
+
+          {salutation === 'personalizado' && (
+            <div>
+              <Input
+                label="Tratamento Personalizado"
+                value={customSalutation}
+                onChange={(e) => setCustomSalutation(e.target.value)}
+                placeholder="Ex: Prezado Colega, Ilustre Dr., Eng."
+              />
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

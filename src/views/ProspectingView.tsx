@@ -57,6 +57,7 @@ import { CopilotAssistantModal } from '../components/copilot/CopilotAssistantMod
 import { ApproachRecommendationCard } from '../components/sales/ApproachRecommendationCard';
 import { ScoreBadge } from '../components/qualification/ScoreBadge';
 import { QualificationModal } from '../components/qualification/QualificationModal';
+import { LeadMessageModal } from '../components/qualification/LeadMessageModal';
 
 export const ProspectingView: React.FC = () => {
   const {
@@ -113,6 +114,9 @@ export const ProspectingView: React.FC = () => {
 
   // Modal de Qualificação
   const [isQualificationOpen, setIsQualificationOpen] = useState(false);
+
+  // Modal do Motor de Personalização (4x3)
+  const [isLeadMessageModalOpen, setIsLeadMessageModalOpen] = useState(false);
 
   // Copiloto Gemini de Prospecção
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
@@ -610,6 +614,15 @@ export const ProspectingView: React.FC = () => {
 
               <div className="flex items-center gap-2">
                 <Button
+                  variant="secondary"
+                  size="xs"
+                  onClick={() => setIsLeadMessageModalOpen(true)}
+                  leftIcon={<Sparkles className="w-3 h-3 text-blue-500" />}
+                  className="font-medium"
+                >
+                  Personalizar (4x3)
+                </Button>
+                <Button
                   variant="ghost"
                   size="xs"
                   onClick={() => setIsEditingMessage(!isEditingMessage)}
@@ -912,6 +925,17 @@ export const ProspectingView: React.FC = () => {
           company={company}
           contact={contact}
           lead={lead}
+        />
+      )}
+
+      {/* MODAL DO MOTOR DE PERSONALIZAÇÃO 4x3 & AUDITORIA */}
+      {company && lead && (
+        <LeadMessageModal
+          isOpen={isLeadMessageModalOpen}
+          onClose={() => setIsLeadMessageModalOpen(false)}
+          company={company}
+          lead={lead}
+          initialContactId={contact?.id}
         />
       )}
 

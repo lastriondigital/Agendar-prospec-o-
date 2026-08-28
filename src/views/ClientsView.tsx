@@ -43,6 +43,7 @@ import { ScoreBadge } from '../components/qualification/ScoreBadge';
 import { QualificationModal } from '../components/qualification/QualificationModal';
 import { calculateLeadScore } from '../utils/leadScoring';
 import { QuickFilterBar, QuickFilterType } from '../components/common/QuickFilterBar';
+import { BulkPersonalizationModal } from '../components/messaging/BulkPersonalizationModal';
 
 export const ClientsView: React.FC = () => {
   const { companies, contacts, leads, services, icps, history, settings, deleteCompany, setActiveRoute } = useApp();
@@ -62,6 +63,7 @@ export const ClientsView: React.FC = () => {
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [isBulkPersonalizationOpen, setIsBulkPersonalizationOpen] = useState(false);
 
   // Modal de Qualificação
   const [qualifyingData, setQualifyingData] = useState<{
@@ -350,6 +352,13 @@ export const ClientsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setIsBulkPersonalizationOpen(true)}
+            leftIcon={<Sparkles className="w-4 h-4 text-blue-500" />}
+          >
+            Personalização em Massa (4x3)
+          </Button>
           <Button
             variant="primary"
             onClick={handleOpenAddCompany}
@@ -943,6 +952,12 @@ export const ClientsView: React.FC = () => {
           onStartExecution={() => setActiveRoute('prospecting')}
         />
       )}
+
+      {/* Modal de Personalização em Massa 4x3 */}
+      <BulkPersonalizationModal
+        isOpen={isBulkPersonalizationOpen}
+        onClose={() => setIsBulkPersonalizationOpen(false)}
+      />
     </div>
   );
 };

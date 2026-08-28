@@ -18,11 +18,13 @@ import {
   FileText,
   Clock,
   Send,
+  Users,
+  ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
-import { ContactChannel, MessageTemplate, TemplateCategory, LeadStage } from '../types';
+import { ContactChannel, MessageTemplate, TemplateCategory, LeadStage, VariationLevel } from '../types';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -30,9 +32,13 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ContextualTip } from '../components/common/ContextualTip';
-import { getChannelBadgeDetails, interpolateMessage, validateMessageContent, ALLOWED_VARIABLES } from '../utils/formatting';
+import { getChannelBadgeDetails } from '../utils/formatting';
 import { ACTION_TYPE_OPTIONS, CAMPAIGN_TYPE_OPTIONS } from '../utils/schedulingConfig';
 import { ScheduleMessageModal } from '../components/scheduling/ScheduleMessageModal';
+import { VariableSelectorModal } from '../components/messaging/VariableSelectorModal';
+import { MessagePreviewDrawer } from '../components/messaging/MessagePreviewDrawer';
+import { BulkPersonalizationModal } from '../components/messaging/BulkPersonalizationModal';
+import { interpolateDynamicTemplate, generateMessageVariation, auditMessageIntegrity } from '../utils/messagePersonalizer';
 
 const CATEGORY_LABELS: Record<TemplateCategory, string> = {
   primeiro_contacto: 'Primeiro Contato',
@@ -48,7 +54,7 @@ const CATEGORY_LABELS: Record<TemplateCategory, string> = {
 };
 
 export const MessagesView: React.FC = () => {
-  const { templates, services, companies, upsertTemplate, deleteTemplate } = useApp();
+  const { templates, services, companies, contacts, leads, upsertTemplate, deleteTemplate } = useApp();
   const confirm = useConfirm();
   const { success, error } = useToast();
 
@@ -61,6 +67,11 @@ export const MessagesView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
+
+  // Modals do Motor de Personalização
+  const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<MessageTemplate | null>(null);
 
   // Scheduling Modal from Script card
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -78,10 +89,13 @@ export const MessagesView: React.FC = () => {
   const [formNiche, setFormNiche] = useState('');
   const [formPipelineStage, setFormPipelineStage] = useState<LeadStage | ''>('');
   const [formNotes, setFormNotes] = useState('');
+  const [formLiveVariationLevel, setFormLiveVariationLevel] = useState<VariationLevel>('none');
 
   // Sample data for live preview
-  const sampleCompany = companies[0] || { name: 'Clínica Alfa', niche: 'Saúde & Estética', city: 'São Paulo', country: 'Brasil' };
-  const sampleService = services[0] || { name: 'Landing Page de Alta Conversão', basePrice: 2500, currency: 'R$' };
+  const sampleCompany = companies[0] || { id: 'c1', name: 'Clínica Alfa', niche: 'Saúde & Estética', city: 'Maputo', country: 'Moçambique', apparentNeed: 'Pouca visibilidade no Google Maps' };
+  const sampleContact = contacts[0] || { id: 'ct1', companyId: 'c1', name: 'Dr. Carlos Mboa', role: 'Diretor Clínico', salutation: 'doutor', gender: 'masculino', isPrimary: true };
+  const sampleService = services[0] || { id: 's1', name: 'Presença Digital & Google Perfil de Empresa', basePrice: 2500, currency: 'MT', benefits: ['aumentar a atração de clientes locais qualificados'], defaultCta: 'Podemos analisar isso juntos em 10 minutos esta semana?' };
+  const sampleLead = leads[0] || { id: 'l1', companyId: 'c1', stage: 'Primeiro Contato', priority: 'alta', temperature: 'quente', status: 'active', entryDate: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
 
   const filteredTemplates = templates.filter((t) => {
     if (showArchived && !t.isArchived) return false;
@@ -108,12 +122,13 @@ export const MessagesView: React.FC = () => {
     setFormCategory('primeiro_contacto');
     setFormActionType('primeiro_contato');
     setFormCampaignType('primeiro_contato');
-    setFormContent('Olá {{primeiro_nome}}, tudo bem?\n\nVi que você lidera a {{empresa}} em {{cidade}}. Analisando seu setor ({{nicho}}), notei que muitos negócios enfrentam desafios com {{problema}}.\n\nNós ajudamos empresas como a sua a {{beneficio}} através do {{servico}}.\n\n{{cta}}');
+    setFormContent('Olá [TRATAMENTO] [PRIMEIRO_NOME], tudo bem?\n\nVi que você lidera a [EMPRESA] em [CIDADE]. Analisando seu setor ([NICHO]), notei que muitos negócios enfrentam desafios com [PROBLEMA].\n\nNós ajudamos empresas como a sua a [BENEFÍCIO] através do [SERVIÇO].\n\n[CTA]');
     setFormVersion('v1.0');
     setFormServiceId('');
     setFormNiche('');
     setFormPipelineStage('');
     setFormNotes('');
+    setFormLiveVariationLevel('none');
     setIsModalOpen(true);
   };
 
@@ -130,6 +145,7 @@ export const MessagesView: React.FC = () => {
     setFormNiche(template.niche || '');
     setFormPipelineStage(template.pipelineStage || '');
     setFormNotes(template.notes || '');
+    setFormLiveVariationLevel('none');
     setIsModalOpen(true);
   };
 
@@ -182,7 +198,7 @@ export const MessagesView: React.FC = () => {
       actionType: formActionType,
       campaignType: formCampaignType,
       content: formContent,
-      variables: ALLOWED_VARIABLES.filter((v) => formContent.includes(`{{${v}}}`)),
+      variables: [],
       version: formVersion || 'v1.0',
       serviceId: formServiceId || undefined,
       niche: formNiche || undefined,
@@ -211,8 +227,10 @@ export const MessagesView: React.FC = () => {
     });
   };
 
-  const insertVariableIntoForm = (varTag: string) => {
-    setFormContent((prev) => prev + ` {{${varTag}}}`);
+  const handleInsertVariable = (tag: string) => {
+    setFormContent((prev) => {
+      return prev ? `${prev} ${tag}` : tag;
+    });
   };
 
   return (
@@ -220,20 +238,31 @@ export const MessagesView: React.FC = () => {
       {/* Dica Contextual */}
       <ContextualTip
         id="messages_view_tip"
-        title="Biblioteca & Scripts Relacionados"
-        message="Vincule cada script a um canal e tipo de ação para que o agendador e o construtor de cadências os sugiram automaticamente."
+        title="Motor de Personalização Dinâmica & Biblioteca de Scripts"
+        message="Utilize variáveis dinâmicas ([NOME], [EMPRESA], [PROBLEMA], [TRATAMENTO]) para compor templates adaptativos e realize personalização em massa sem perder a relevância individual."
       />
 
-      {/* Header */}
+      {/* Header com Ações Rápidas */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-100">Biblioteca de Scripts de Mensagem</h2>
+          <h2 className="text-xl font-bold text-neutral-100">Biblioteca de Scripts & Personalização</h2>
           <p className="text-xs text-neutral-400">
-            Gerencie templates versionados por canal, tipo de ação e nicho com variáveis dinâmicas em tempo real.
+            Crie templates inteligentes com substituição contextual de variáveis e auditoria pré-envio anti-invenção.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Botão de Destaque: Personalização em Massa */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsBulkModalOpen(true)}
+            leftIcon={<Sparkles className="w-4 h-4 text-amber-400" />}
+            className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+          >
+            Personalização em Massa
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -335,8 +364,12 @@ export const MessagesView: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredTemplates.map((template) => {
             const channelBadge = getChannelBadgeDetails(template.channel);
-            const livePreview = interpolateMessage(template.content, null, sampleService, sampleCompany);
-            const validation = validateMessageContent(template.content);
+            const livePreview = interpolateDynamicTemplate(template.content, {
+              company: sampleCompany as any,
+              contact: sampleContact as any,
+              service: sampleService as any,
+              lead: sampleLead as any,
+            });
 
             const matchedService = services.find((s) => s.id === template.serviceId);
             const actionTypeObj = ACTION_TYPE_OPTIONS.find((a) => a.id === template.actionType);
@@ -431,7 +464,7 @@ export const MessagesView: React.FC = () => {
                   </div>
 
                   {/* Content Raw */}
-                  <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 font-sans leading-relaxed whitespace-pre-line select-text max-h-32 overflow-y-auto">
+                  <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 font-sans leading-relaxed whitespace-pre-line select-text max-h-32 overflow-y-auto font-mono text-[11px]">
                     {template.content}
                   </div>
 
@@ -440,26 +473,38 @@ export const MessagesView: React.FC = () => {
                     <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
                       <Eye className="w-3 h-3" /> Exemplo Renderizado ({sampleCompany.name}):
                     </span>
-                    <p className="italic text-neutral-400 line-clamp-2">{livePreview}</p>
+                    <p className="italic text-neutral-300 line-clamp-2">{livePreview}</p>
                   </div>
                 </div>
 
-                {/* Footer notes, validation status & Schedule button */}
+                {/* Footer buttons */}
                 <div className="flex items-center justify-between pt-2 border-t border-neutral-800 text-[11px] text-neutral-500">
-                  <span>{template.notes || 'Pronto para agendamento'}</span>
+                  <span>{template.notes || 'Pronto para uso'}</span>
 
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => {
-                      setSchedulingTemplateId(template.id);
-                      setIsScheduleModalOpen(true);
-                    }}
-                    leftIcon={<Clock className="w-3 h-3 text-blue-400" />}
-                    className="text-xs"
-                  >
-                    Agendar Mensagem
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => setPreviewTemplate(template)}
+                      leftIcon={<Eye className="w-3 h-3 text-emerald-400" />}
+                      className="text-xs text-emerald-400 hover:text-emerald-300"
+                    >
+                      Prévia & Auditoria
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => {
+                        setSchedulingTemplateId(template.id);
+                        setIsScheduleModalOpen(true);
+                      }}
+                      leftIcon={<Clock className="w-3 h-3 text-blue-400" />}
+                      className="text-xs"
+                    >
+                      Agendar
+                    </Button>
+                  </div>
                 </div>
               </Card>
             );
@@ -482,7 +527,7 @@ export const MessagesView: React.FC = () => {
         title={editingTemplate ? 'Editar Script de Mensagem' : 'Novo Script de Mensagem'}
         maxWidth="xl"
       >
-        <form onSubmit={handleSaveTemplate} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+        <form onSubmit={handleSaveTemplate} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
               <Input
@@ -553,49 +598,35 @@ export const MessagesView: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Nicho Específico (Opcional)</label>
-              <input
-                type="text"
-                value={formNiche}
-                onChange={(e) => setFormNiche(e.target.value)}
-                placeholder="Ex: Saúde & Estética"
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+          {/* Botão + VARIÁVEL e Toolbar Rápida (Ponto 30 & 39) */}
+          <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-neutral-200 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                Personalização de Variáveis:
+              </label>
 
-            <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Tipo de Campanha Recomendado</label>
-              <select
-                value={formCampaignType}
-                onChange={(e) => setFormCampaignType(e.target.value)}
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <Button
+                type="button"
+                variant="primary"
+                size="xs"
+                onClick={() => setIsVariableModalOpen(true)}
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
+                className="bg-blue-600 hover:bg-blue-500 text-white font-bold"
               >
-                {CAMPAIGN_TYPE_OPTIONS.map((ct) => (
-                  <option key={ct.id} value={ct.id}>
-                    {ct.label}
-                  </option>
-                ))}
-              </select>
+                + ADICIONAR VARIÁVEL
+              </Button>
             </div>
-          </div>
 
-          {/* Variables Quick Insert Toolbar */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-neutral-300 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-              Inserir Variável Dinâmica no Script:
-            </label>
-            <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-neutral-950 border border-neutral-800 max-h-24 overflow-y-auto">
-              {ALLOWED_VARIABLES.map((v) => (
+            <div className="flex flex-wrap gap-1.5">
+              {['[NOME]', '[EMPRESA]', '[SERVIÇO]', '[PROBLEMA]', '[CIDADE]', '[TRATAMENTO]', '[GÊNERO]', '[RESPONSÁVEL]', '[OFERTA]', '[PREÇO]', '[CTA]'].map((tag) => (
                 <button
-                  key={v}
+                  key={tag}
                   type="button"
-                  onClick={() => insertVariableIntoForm(v)}
-                  className="px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-[11px] font-mono transition-colors cursor-pointer"
+                  onClick={() => handleInsertVariable(tag)}
+                  className="px-2 py-1 rounded bg-neutral-950 border border-neutral-800 hover:border-blue-500/50 hover:bg-neutral-800 text-blue-300 text-[11px] font-mono transition-colors cursor-pointer"
                 >
-                  {`{{${v}}}`}
+                  {tag}
                 </button>
               ))}
             </div>
@@ -606,21 +637,50 @@ export const MessagesView: React.FC = () => {
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-neutral-300">Conteúdo do Script *</label>
               <textarea
-                rows={8}
+                rows={9}
                 value={formContent}
                 onChange={(e) => setFormContent(e.target.value)}
-                placeholder="Escreva a mensagem usando as variáveis..."
+                placeholder="Escreva a mensagem usando variáveis como [NOME], [EMPRESA], [PROBLEMA]..."
                 className="w-full p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 font-sans leading-relaxed focus:outline-none focus:border-blue-500"
                 required
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-neutral-300 flex items-center gap-1">
-                <Eye className="w-3.5 h-3.5 text-blue-400" /> Pré-visualização com Exemplo:
-              </label>
-              <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 font-sans leading-relaxed whitespace-pre-line h-[178px] overflow-y-auto">
-                {interpolateMessage(formContent, null, sampleService, sampleCompany)}
+            <div className="space-y-1.5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-neutral-300 flex items-center gap-1">
+                    <Eye className="w-3.5 h-3.5 text-blue-400" /> Pré-visualização ao Vivo:
+                  </label>
+
+                  <select
+                    value={formLiveVariationLevel}
+                    onChange={(e) => setFormLiveVariationLevel(e.target.value as VariationLevel)}
+                    className="bg-neutral-950 border border-neutral-800 rounded text-[10px] px-1.5 py-0.5 text-neutral-300"
+                  >
+                    <option value="none">Sem Variação</option>
+                    <option value="minor">Pequena Variação</option>
+                    <option value="contextual">Contextual</option>
+                    <option value="ai">Por IA</option>
+                  </select>
+                </div>
+
+                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 font-sans leading-relaxed whitespace-pre-line h-[165px] overflow-y-auto">
+                  {generateMessageVariation(
+                    formContent,
+                    {
+                      company: sampleCompany as any,
+                      contact: sampleContact as any,
+                      service: sampleService as any,
+                      lead: sampleLead as any,
+                    },
+                    formLiveVariationLevel
+                  )}
+                </div>
+              </div>
+
+              <div className="text-[10px] text-neutral-400 italic">
+                Exemplo simulado com o lead {sampleCompany.name} ({sampleContact.name}).
               </div>
             </div>
           </div>
@@ -642,6 +702,41 @@ export const MessagesView: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Modal de Variáveis Dinâmicas (+ VARIÁVEL) */}
+      <VariableSelectorModal
+        isOpen={isVariableModalOpen}
+        onClose={() => setIsVariableModalOpen(false)}
+        onSelectVariable={handleInsertVariable}
+      />
+
+      {/* Drawer de Prévia e Auditoria (Card) */}
+      {previewTemplate && (
+        <MessagePreviewDrawer
+          isOpen={!!previewTemplate}
+          onClose={() => setPreviewTemplate(null)}
+          template={previewTemplate}
+          company={sampleCompany as any}
+          contact={sampleContact as any}
+          service={sampleService as any}
+          lead={sampleLead as any}
+          onScheduleAction={(msg) => {
+            setSchedulingTemplateId(previewTemplate.id);
+            setIsScheduleModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* Modal de Personalização em Massa */}
+      <BulkPersonalizationModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        companies={companies}
+        contacts={contacts}
+        leads={leads}
+        templates={templates}
+        services={services}
+      />
 
       {/* Global Schedule Message Modal */}
       <ScheduleMessageModal

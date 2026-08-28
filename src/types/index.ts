@@ -160,6 +160,66 @@ export interface Company {
   status: CompanyStatus; // status
 }
 
+export type ContactGender = 'masculino' | 'feminino' | 'neutro' | 'nao_informado';
+
+export type ContactSalutation =
+  | 'senhor'
+  | 'senhora'
+  | 'doutor'
+  | 'doutora'
+  | 'nome_proprio'
+  | 'outro'
+  | 'personalizado';
+
+export type PersonaRole =
+  | 'proprietario'
+  | 'socio'
+  | 'diretor'
+  | 'gerente'
+  | 'marketing'
+  | 'recepcao'
+  | 'funcionario'
+  | 'outro';
+
+export type VariationLevel = 'none' | 'minor' | 'contextual' | 'ai';
+
+export interface AuditChecklistItem {
+  id: string;
+  label: string;
+  passed: boolean;
+  status: 'valid' | 'warning' | 'error';
+  message: string;
+  fieldKey?: string;
+}
+
+export interface MessageAuditResult {
+  isValid: boolean;
+  score: number; // 0-100
+  status: 'approved' | 'has_warnings' | 'incomplete';
+  items: AuditChecklistItem[];
+  missingFields: string[];
+  resolvedVariables: Record<string, string>;
+  warnings: string[];
+}
+
+export interface PersonalizedMessageResult {
+  message: string;
+  variationLevel: VariationLevel;
+  audit: MessageAuditResult;
+  metadata: {
+    recipientName: string;
+    recipientRole: string;
+    recipientSalutation: string;
+    recipientGender: string;
+    companyName: string;
+    companyCity: string;
+    serviceName: string;
+    diagnosedProblem: string;
+    stageName: string;
+    scoreIcp?: number;
+  };
+}
+
 /**
  * Modelo completo de Contacto
  */
@@ -174,6 +234,10 @@ export interface Contact {
   email?: string; // email
   instagram?: string; // Instagram
   linkedin?: string; // LinkedIn
+  gender?: ContactGender; // Gênero: masculino, feminino, neutro, nao_informado
+  salutation?: ContactSalutation; // Forma de tratamento: senhor, senhora, doutor, doutora, nome_proprio, outro, personalizado
+  customSalutation?: string; // Forma personalizada de tratamento
+  personaRole?: PersonaRole; // Papel / Persona: proprietario, socio, diretor, gerente, marketing, recepcao, funcionario, outro
   notes?: string; // observações
   isPrimary?: boolean; // principal: boolean
   status?: 'active' | 'archived'; // status
