@@ -1,6 +1,6 @@
 import React from 'react';
 import { ContactChannel } from '../../types';
-import { ScheduleMessageModal } from '../messaging/ScheduleMessageModal';
+import { ScheduleMessageModal } from '../scheduling/ScheduleMessageModal';
 
 interface ScheduleActionModalProps {
   isOpen: boolean;

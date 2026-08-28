@@ -193,6 +193,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
     steps: [
       {
         id: 'step-1',
+        stepNumber: 1,
+        delayDays: 0,
+        delayHours: 0,
         dayOffset: 0,
         title: 'Primeiro contato',
         actionType: 'primeiro_contato',
@@ -201,6 +204,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-2',
+        stepNumber: 2,
+        delayDays: 2,
+        delayHours: 0,
         dayOffset: 2,
         title: 'Follow-up 1 (Verificação)',
         actionType: 'follow_up_1',
@@ -209,6 +215,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-3',
+        stepNumber: 3,
+        delayDays: 3,
+        delayHours: 0,
         dayOffset: 5,
         title: 'Apresentação de Prova Social',
         actionType: 'prova_social',
@@ -217,6 +226,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-4',
+        stepNumber: 4,
+        delayDays: 4,
+        delayHours: 0,
         dayOffset: 9,
         title: 'Follow-up 3 (Mudança de Ângulo)',
         actionType: 'follow_up_3',
@@ -225,6 +237,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-5',
+        stepNumber: 5,
+        delayDays: 11,
+        delayHours: 0,
         dayOffset: 20,
         title: 'Reativação de Contato Inativo',
         actionType: 'reativacao',
@@ -242,6 +257,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
     steps: [
       {
         id: 'step-1',
+        stepNumber: 1,
+        delayDays: 0,
+        delayHours: 0,
         dayOffset: 0,
         title: 'Primeiro contato direto',
         actionType: 'primeiro_contato',
@@ -250,6 +268,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-2',
+        stepNumber: 2,
+        delayDays: 1,
+        delayHours: 0,
         dayOffset: 1,
         title: 'Follow-up rápido (Mesmo dia / 24h)',
         actionType: 'follow_up_1',
@@ -258,6 +279,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-3',
+        stepNumber: 3,
+        delayDays: 2,
+        delayHours: 0,
         dayOffset: 3,
         title: 'Oferta de Diagnóstico Gratuito',
         actionType: 'diagnostico',
@@ -266,6 +290,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-4',
+        stepNumber: 4,
+        delayDays: 4,
+        delayHours: 0,
         dayOffset: 7,
         title: 'Follow-up de Fechamento de Ciclo',
         actionType: 'follow_up_3',
@@ -283,6 +310,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
     steps: [
       {
         id: 'step-1',
+        stepNumber: 1,
+        delayDays: 0,
+        delayHours: 0,
         dayOffset: 0,
         title: 'Diagnóstico & Auditoria Inicial',
         actionType: 'diagnostico',
@@ -291,6 +321,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-2',
+        stepNumber: 2,
+        delayDays: 2,
+        delayHours: 0,
         dayOffset: 2,
         title: 'Follow-up de Feedback do Diagnóstico',
         actionType: 'follow_up_1',
@@ -299,6 +332,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-3',
+        stepNumber: 3,
+        delayDays: 4,
+        delayHours: 0,
         dayOffset: 6,
         title: 'Estudo de Caso & Resultados',
         actionType: 'prova_social',
@@ -307,6 +343,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-4',
+        stepNumber: 4,
+        delayDays: 6,
+        delayHours: 0,
         dayOffset: 12,
         title: 'Convite para Sessão Estratégica',
         actionType: 'reuniao',
@@ -315,6 +354,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-5',
+        stepNumber: 5,
+        delayDays: 13,
+        delayHours: 0,
         dayOffset: 25,
         title: 'Reativação Consultiva',
         actionType: 'reativacao',
@@ -332,6 +374,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
     steps: [
       {
         id: 'step-1',
+        stepNumber: 1,
+        delayDays: 0,
+        delayHours: 0,
         dayOffset: 0,
         title: 'Primeiro contato no WhatsApp',
         actionType: 'primeiro_contato',
@@ -340,6 +385,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-2',
+        stepNumber: 2,
+        delayDays: 2,
+        delayHours: 0,
         dayOffset: 2,
         title: 'E-mail com Diagnóstico Detalhado',
         actionType: 'diagnostico',
@@ -348,6 +396,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-3',
+        stepNumber: 3,
+        delayDays: 3,
+        delayHours: 0,
         dayOffset: 5,
         title: 'Conexão & Mensagem no LinkedIn',
         actionType: 'follow_up_2',
@@ -356,6 +407,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-4',
+        stepNumber: 4,
+        delayDays: 4,
+        delayHours: 0,
         dayOffset: 9,
         title: 'Ligação Telefônica de Alinhamento',
         actionType: 'reuniao',
@@ -373,6 +427,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
     steps: [
       {
         id: 'step-1',
+        stepNumber: 1,
+        delayDays: 0,
+        delayHours: 0,
         dayOffset: 0,
         title: 'Reativação com Novidade / Condição Especial',
         actionType: 'reativacao',
@@ -381,6 +438,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-2',
+        stepNumber: 2,
+        delayDays: 7,
+        delayHours: 0,
         dayOffset: 7,
         title: 'Follow-up de Oportunidade',
         actionType: 'follow_up_1',
@@ -389,6 +449,9 @@ export const CADENCE_PRESETS: CadencePreset[] = [
       },
       {
         id: 'step-3',
+        stepNumber: 3,
+        delayDays: 14,
+        delayHours: 0,
         dayOffset: 21,
         title: 'Última Chamada de Atualização',
         actionType: 'follow_up_3',

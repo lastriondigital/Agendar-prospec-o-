@@ -32,7 +32,9 @@ export type CampaignType =
 
 export type LeadStatus = 'new' | 'in_contact' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost' | 'archived';
 
-export type ActionStatus = 'pending' | 'scheduled' | 'completed' | 'skipped' | 'rescheduled' | 'cancelled' | 'failed';
+export type ActionStatus = 'pending' | 'scheduled' | 'agendada' | 'completed' | 'skipped' | 'rescheduled' | 'cancelled' | 'failed';
+
+export type ScheduledMessageStatus = ActionStatus;
 
 export type ActionPriority = 'high' | 'medium' | 'low';
 
@@ -369,16 +371,20 @@ export interface Client {
 
 export interface CadenceStep {
   id: string;
-  stepNumber: number; // 1, 2, 3...
+  stepNumber?: number; // 1, 2, 3...
   actionType: string; // e.g. "Primeiro contato", "Apresentação", "Follow-up 1", "Follow-up 2", "Follow-up 3", "Quebra de objeção", "Oferta", "Reativação", "Encerramento", "Pós-venda"
   scriptId?: string; // ID do MessageTemplate / Script
   scriptTitle?: string; // Snapshot do nome do Script
   channel: ContactChannel;
-  delayDays: number; // ex: 0, 1, 2, 3
-  delayHours: number; // ex: 0, 2, 4, 6, 12
+  delayDays?: number; // ex: 0, 1, 2, 3
+  delayHours?: number; // ex: 0, 2, 4, 6, 12
   delayMinutes?: number; // ex: 0, 15, 30
   totalDelayMinutes?: number; // delayDays * 1440 + delayHours * 60 + delayMinutes
+  waitDays?: number;
+  waitHours?: number;
+  waitMinutes?: number;
   notes?: string;
+  order?: number;
   // Retrocompatibilidade
   dayOffset?: number;
   title?: string;
@@ -403,6 +409,7 @@ export interface Campaign {
   dailyGoal: number; // limite diário
   totalTarget: number; // meta total
   startDate?: string;
+  startTime?: string;
   endDate?: string;
   criteria?: string;
   sequence?: CampaignSequenceStep[];
@@ -529,6 +536,7 @@ export interface MessageTemplate {
   id: string;
   title: string; // Nome do script
   actionType?: string; // Tipo de ação associado (ex: "Primeiro contato", "Follow-up 1", "Apresentação")
+  campaignType?: string; // Tipo de campanha associada
   channel: ContactChannel; // Canal principal
   channels?: ContactChannel[]; // Canais compatíveis
   category?: TemplateCategory;
@@ -551,14 +559,20 @@ export interface MessageTemplate {
 export interface ProspectAction {
   id: string;
   clientId: string; // ID da Empresa ou Cliente
+  companyId?: string; // alias para compatibilidade com Company
   leadId?: string;
   contactId?: string;
   campaignId?: string;
   campaignName?: string;
   campaignType?: string;
+  cadenceId?: string;
   cadenceStepId?: string;
+  cadenceStepTitle?: string;
+  cadenceStepIndex?: number;
   templateId?: string;
+  scriptId?: string;
   scriptTitle?: string;
+  scriptName?: string;
   actionType?: string; // Tipo de ação
   channel: ContactChannel;
   scheduledDate: string; // YYYY-MM-DD
@@ -567,6 +581,7 @@ export interface ProspectAction {
   priority: ActionPriority;
   estMinutes: number; // default 1-3 min per quick execution
   customMessage?: string; // Snapshot do texto formatado com variáveis
+  originalScriptContent?: string;
   notes?: string; // Observações
   outcomeNotes?: string;
   executedAt?: string;

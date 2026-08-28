@@ -57,6 +57,8 @@ interface ScheduleMessageModalProps {
   onClose: () => void;
   initialProspectId?: string; // Company ID, Lead ID, or Client ID
   initialClientId?: string; // Alias for initialProspectId
+  initialLeadId?: string; // Alias for initialProspectId
+  initialCompanyId?: string; // Alias for initialProspectId
   initialCampaignId?: string;
   initialTemplateId?: string;
   initialChannel?: ContactChannel;
@@ -66,6 +68,7 @@ interface ScheduleMessageModalProps {
   initialNotes?: string;
   editingAction?: ProspectAction | null;
   onSaved?: (action: ProspectAction) => void;
+  onSuccess?: (action: ProspectAction) => void;
 }
 
 export const ScheduleMessageModal: React.FC<ScheduleMessageModalProps> = ({
@@ -73,6 +76,8 @@ export const ScheduleMessageModal: React.FC<ScheduleMessageModalProps> = ({
   onClose,
   initialProspectId,
   initialClientId,
+  initialLeadId,
+  initialCompanyId,
   initialCampaignId,
   initialTemplateId,
   initialChannel,
@@ -82,8 +87,10 @@ export const ScheduleMessageModal: React.FC<ScheduleMessageModalProps> = ({
   initialNotes,
   editingAction,
   onSaved,
+  onSuccess,
 }) => {
-  const effectiveInitialProspectId = initialProspectId || initialClientId;
+  const effectiveInitialProspectId =
+    initialProspectId || initialClientId || initialLeadId || initialCompanyId;
 
   const {
     companies,
@@ -453,6 +460,9 @@ export const ScheduleMessageModal: React.FC<ScheduleMessageModalProps> = ({
 
       if (onSaved) {
         onSaved(actionToSave);
+      }
+      if (onSuccess) {
+        onSuccess(actionToSave);
       }
 
       success('Mensagem agendada com sucesso!', `${selectedProspect?.name} em ${scheduledDate} às ${scheduledTime}`);

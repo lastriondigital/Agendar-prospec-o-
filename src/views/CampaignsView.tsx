@@ -137,11 +137,14 @@ export const CampaignsView: React.FC = () => {
   };
 
   const handleAddSequenceStep = () => {
-    const lastOffset = sequence.length > 0 ? sequence[sequence.length - 1].dayOffset + 3 : 0;
+    const lastOffset = sequence.length > 0 ? (sequence[sequence.length - 1].dayOffset || 0) + 3 : 0;
     setSequence([
       ...sequence,
       {
         id: `seq-${Date.now()}`,
+        stepNumber: sequence.length + 1,
+        delayDays: 3,
+        delayHours: 0,
         dayOffset: lastOffset,
         title: 'Novo Follow-up',
         actionType: 'follow_up_1',
