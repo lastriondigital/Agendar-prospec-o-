@@ -4,6 +4,10 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInAnonymously,
+  linkWithCredential,
+  linkWithPopup,
+  EmailAuthProvider,
   GoogleAuthProvider,
   sendPasswordResetEmail,
   signOut,
@@ -12,10 +16,13 @@ import {
   deleteUser,
   setPersistence,
   browserLocalPersistence,
+  indexedDBLocalPersistence,
   User as FirebaseUser,
 } from 'firebase/auth';
 import {
   initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   getFirestore,
   doc,
   collection,
@@ -45,18 +52,20 @@ export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfi
 // Initialize Firebase Auth with Local Persistence
 export const auth = getAuth(app);
 
-// Configure local persistence across browser reloads and restarts
+// Configure local persistence across browser reloads, restarts and offline states
 if (typeof window !== 'undefined') {
-  setPersistence(auth, browserLocalPersistence).catch((err) => {
-    console.warn('Falha ao configurar persistência local do Firebase Auth:', err);
-  });
+  setPersistence(auth, indexedDBLocalPersistence)
+    .catch(() => setPersistence(auth, browserLocalPersistence))
+    .catch((err) => {
+      console.info('Configuração de persistência de autenticação:', err?.message || err);
+    });
 }
 
 // Google Auth Provider setup with select_account prompt
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-// Initialize Firestore with custom databaseId and resilient Long Polling transport
+// Initialize Firestore with modern persistent local cache for resilient offline and online sync
 const rawDbId = metaEnv?.VITE_FIREBASE_DATABASE_ID || firebaseConfigData.firestoreDatabaseId;
 const targetDbId = rawDbId && rawDbId !== '(default)' ? rawDbId : undefined;
 
@@ -65,13 +74,20 @@ try {
   firestoreInstance = initializeFirestore(
     app,
     {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
       experimentalAutoDetectLongPolling: true,
-      experimentalForceLongPolling: true,
     },
     targetDbId
   );
 } catch {
-  firestoreInstance = targetDbId ? getFirestore(app, targetDbId) : getFirestore(app);
+  try {
+    firestoreInstance = targetDbId ? getFirestore(app, targetDbId) : getFirestore(app);
+  } catch (err) {
+    console.warn('Fallback de inicialização do Firestore:', err);
+    firestoreInstance = getFirestore(app);
+  }
 }
 
 export const db = firestoreInstance;
@@ -88,6 +104,10 @@ export {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInAnonymously,
+  linkWithCredential,
+  linkWithPopup,
+  EmailAuthProvider,
   GoogleAuthProvider,
   sendPasswordResetEmail,
   signOut,
@@ -96,6 +116,7 @@ export {
   deleteUser,
   setPersistence,
   browserLocalPersistence,
+  indexedDBLocalPersistence,
   doc,
   collection,
   setDoc,

@@ -17,7 +17,7 @@ import {
 
 export const SyncStatusIndicator: React.FC = () => {
   const { syncState, conflicts, openConflictModal, syncNow } = useSync();
-  const { user, openAuthModal, logout } = useAuth();
+  const { user, isAnonymous, openAuthModal, logout } = useAuth();
 
   const formatLastSync = (ts: string | null) => {
     if (!ts) return 'Nunca sincronizado';
@@ -46,35 +46,38 @@ export const SyncStatusIndicator: React.FC = () => {
         </button>
       )}
 
-      {/* Sync Status Badge & Action */}
+      {/* Offline Badge */}
       {!syncState.isOnline ? (
         <div
           id="sync-offline-badge"
-          className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900"
-          title="Offline — dados salvos neste dispositivo"
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900"
+          title="Offline — todos os dados salvos localmente"
         >
           <WifiOff className="w-3.5 h-3.5 shrink-0" />
-          <span className="hidden sm:inline">Offline — dados salvos neste dispositivo</span>
+          <span className="hidden sm:inline">Offline (Salvo no dispositivo)</span>
           <span className="sm:hidden">Offline</span>
         </div>
-      ) : !syncState.isAuthenticated ? (
+      ) : isAnonymous || !syncState.isAuthenticated ? (
+        /* Modo Local / Anônimo */
         <button
           id="cloud-connect-btn"
-          onClick={() => openAuthModal('login')}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition"
+          onClick={() => openAuthModal('register')}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 border border-blue-200 dark:border-blue-800/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition cursor-pointer"
+          title="Você está usando o Modo Local. Clique para vincular uma conta gratuita e sincronizar na nuvem."
         >
           <Cloud className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Conectar Nuvem</span>
-          <span className="sm:hidden">Conectar</span>
+          <span className="hidden sm:inline">Modo Local (Salvar na Nuvem)</span>
+          <span className="sm:hidden">Modo Local</span>
         </button>
       ) : (
+        /* Usuário com Conta Permanente Autenticada */
         <div className="flex items-center gap-2">
           {/* Active Synced Badge */}
           <button
             id="sync-now-btn"
             onClick={syncNow}
             disabled={syncState.status === 'syncing'}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition cursor-pointer"
             title={`Última sincronização: ${formatLastSync(syncState.lastSyncedAt)}`}
           >
             <RefreshCw
@@ -87,32 +90,9 @@ export const SyncStatusIndicator: React.FC = () => {
                 ? 'Sincronizando...'
                 : syncState.pendingCount > 0
                 ? `${syncState.pendingCount} pendente(s)`
-                : `Última sinc: ${formatLastSync(syncState.lastSyncedAt)}`}
+                : `Sincronizado: ${formatLastSync(syncState.lastSyncedAt)}`}
             </span>
           </button>
-
-          {/* User Profile Mini Badge & Signout */}
-          <div className="flex items-center gap-1.5 pl-1.5 border-l border-slate-200 dark:border-slate-700">
-            <div
-              className="flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 px-1.5 py-1 rounded-md"
-              title={`Conectado como: ${user?.email}`}
-            >
-              <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
-                {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
-              </div>
-              <span className="hidden lg:inline max-w-[120px] truncate">
-                {user?.displayName || user?.email}
-              </span>
-            </div>
-            <button
-              id="auth-logout-btn"
-              onClick={logout}
-              className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-              title="Encerrar sessão Cloud"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
-          </div>
         </div>
       )}
     </div>

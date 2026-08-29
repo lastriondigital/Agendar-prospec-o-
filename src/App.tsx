@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConfirmDialogProvider } from './context/ConfirmDialogContext';
@@ -11,40 +11,18 @@ import { CardSkeleton } from './components/ui/LoadingSkeleton';
 import { AuthLoadingScreen } from './components/auth/AuthLoadingScreen';
 import { AuthView } from './views/AuthView';
 
-// Lazy Loaded Views for High Performance & Low Initial Payload
-const DashboardView = lazy(() =>
-  import('./views/DashboardView').then((m) => ({ default: m.DashboardView }))
-);
-const ProspectingView = lazy(() =>
-  import('./views/ProspectingView').then((m) => ({ default: m.ProspectingView }))
-);
-const ClientsView = lazy(() =>
-  import('./views/ClientsView').then((m) => ({ default: m.ClientsView }))
-);
-const PipelineView = lazy(() =>
-  import('./views/PipelineView').then((m) => ({ default: m.PipelineView }))
-);
-const PlannerView = lazy(() =>
-  import('./views/PlannerView').then((m) => ({ default: m.PlannerView }))
-);
-const MessagesView = lazy(() =>
-  import('./views/MessagesView').then((m) => ({ default: m.MessagesView }))
-);
-const CampaignsView = lazy(() =>
-  import('./views/CampaignsView').then((m) => ({ default: m.CampaignsView }))
-);
-const ServicesView = lazy(() =>
-  import('./views/ServicesView').then((m) => ({ default: m.ServicesView }))
-);
-const SalesEngineView = lazy(() =>
-  import('./views/SalesEngineView').then((m) => ({ default: m.SalesEngineView }))
-);
-const AnalyticsView = lazy(() =>
-  import('./views/AnalyticsView').then((m) => ({ default: m.AnalyticsView }))
-);
-const SettingsView = lazy(() =>
-  import('./views/SettingsView').then((m) => ({ default: m.SettingsView }))
-);
+// Unified synchronous view imports — eliminates chunk mismatches and React dispatcher null errors
+import { DashboardView } from './views/DashboardView';
+import { ProspectingView } from './views/ProspectingView';
+import { ClientsView } from './views/ClientsView';
+import { PipelineView } from './views/PipelineView';
+import { PlannerView } from './views/PlannerView';
+import { MessagesView } from './views/MessagesView';
+import { CampaignsView } from './views/CampaignsView';
+import { ServicesView } from './views/ServicesView';
+import { SalesEngineView } from './views/SalesEngineView';
+import { AnalyticsView } from './views/AnalyticsView';
+import { SettingsView } from './views/SettingsView';
 
 const ViewLoadingFallback: React.FC = () => (
   <div className="space-y-6 max-w-5xl mx-auto py-8 animate-pulse">
@@ -65,54 +43,50 @@ const MainContent: React.FC = () => {
     return <ViewLoadingFallback />;
   }
 
-  return (
-    <Suspense fallback={<ViewLoadingFallback />}>
-      {(() => {
-        switch (activeRoute) {
-          case 'dashboard':
-            return <DashboardView />;
-          case 'prospecting':
-            return <ProspectingView />;
-          case 'clients':
-            return <ClientsView />;
-          case 'pipeline':
-            return <PipelineView />;
-          case 'sales-engine':
-            return <SalesEngineView />;
-          case 'planner':
-            return <PlannerView />;
-          case 'messages':
-            return <MessagesView />;
-          case 'campaigns':
-            return <CampaignsView />;
-          case 'services':
-            return <ServicesView />;
-          case 'analytics':
-            return <AnalyticsView />;
-          case 'settings':
-            return <SettingsView />;
-          default:
-            return <DashboardView />;
-        }
-      })()}
-    </Suspense>
-  );
+  switch (activeRoute) {
+    case 'dashboard':
+      return <DashboardView />;
+    case 'prospecting':
+      return <ProspectingView />;
+    case 'clients':
+      return <ClientsView />;
+    case 'pipeline':
+      return <PipelineView />;
+    case 'sales-engine':
+      return <SalesEngineView />;
+    case 'planner':
+      return <PlannerView />;
+    case 'messages':
+      return <MessagesView />;
+    case 'campaigns':
+      return <CampaignsView />;
+    case 'services':
+      return <ServicesView />;
+    case 'analytics':
+      return <AnalyticsView />;
+    case 'settings':
+      return <SettingsView />;
+    default:
+      return <DashboardView />;
+  }
 };
 
 /**
  * Root Application Router & Authentication Guard
  */
 const AppRouter: React.FC = () => {
-  const { isLoadingAuth } = useAuth();
+  const { isLoadingAuth, user } = useAuth();
 
   // Initial authentication verification splash
   if (isLoadingAuth) {
     return <AuthLoadingScreen />;
   }
 
-  // Resilient Offline-First Architecture:
-  // App is fully usable locally and offline without authentication.
-  // Private cloud sync activates automatically when authenticated.
+  // Se não estiver autenticado, exibe a tela de login e criação de conta por email e senha
+  if (!user) {
+    return <AuthView />;
+  }
+
   return (
     <SyncProvider>
       <ConfirmDialogProvider>

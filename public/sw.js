@@ -1,9 +1,9 @@
 /**
  * PROSPECT OS - Production Service Worker
- * Offline-first app shell, asset caching, and offline fallback strategy.
+ * Offline-first app shell, immutable asset caching, and offline fallback strategy.
  */
 
-const CACHE_NAME = 'prospect-os-v5.0.0';
+const CACHE_NAME = 'prospect-os-v6.0.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -58,12 +58,12 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Fetch Event: Network-First for HTML/APIs, Cache-First for static bundles
+// Fetch Event: Network-First for HTML, Cache-First for hashed assets
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET and chrome-extension / external API requests (e.g. firestore/google APIs)
+  // Skip non-GET and external API / Firebase requests
   if (request.method !== 'GET') return;
   if (!url.protocol.startsWith('http')) return;
   if (url.hostname.includes('googleapis.com') || url.hostname.includes('firebase')) return;
@@ -93,7 +93,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static Assets (JS, CSS, SVGs, Fonts, Images) -> Stale-while-revalidate
+  // Immutable hashed Vite assets (/assets/...) -> Cache-First with network fallback
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+          }
+          return networkResponse;
+        });
+      })
+    );
+    return;
+  }
+
+  // Other static assets (icons, manifest) -> Stale-while-revalidate
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       const fetchPromise = fetch(request)
@@ -104,10 +123,7 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => {
-          // If network fails and no cache, return empty/safe fallback
-          return cachedResponse;
-        });
+        .catch(() => cachedResponse);
 
       return cachedResponse || fetchPromise;
     })

@@ -31,6 +31,7 @@ export const AccountPanel: React.FC = () => {
   const {
     user,
     userProfile,
+    isAnonymous,
     authState,
     authStateLabel,
     openAuthModal,
@@ -96,8 +97,8 @@ export const AccountPanel: React.FC = () => {
     }
   };
 
-  // 1. Visão de Usuário NÃO AUTENTICADO (Modo Local Offline)
-  if (!user) {
+  // 1. Visão de Usuário no MODO SEM CONTA / LOCAL (Anônimo ou não autenticado)
+  if (!user || isAnonymous) {
     return (
       <Card padding="md" className="space-y-4 border-[#3F6FB5]/30 dark:border-blue-500/20">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -108,14 +109,14 @@ export const AccountPanel: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED]">
-                  Conta & Acesso Cloud
+                  Conta & Acesso
                 </h3>
                 <Badge variant="blue" size="sm">
-                  Modo Local Ativo
+                  Modo Sem Conta (Local)
                 </Badge>
               </div>
               <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] mt-0.5">
-                Status Atual: <strong className="text-[#202124] dark:text-[#E8EAED]">{authStateLabel}</strong>. O sistema funciona 100% offline com persistência IndexedDB.
+                Você está utilizando o aplicativo livremente. Seus dados estão salvos localmente no navegador (IndexedDB).
               </p>
             </div>
           </div>
@@ -127,7 +128,7 @@ export const AccountPanel: React.FC = () => {
               onClick={() => openAuthModal('login')}
               leftIcon={<User className="w-3.5 h-3.5" />}
             >
-              Entrar
+              Já tenho Conta
             </Button>
             <Button
               variant="primary"
@@ -135,15 +136,26 @@ export const AccountPanel: React.FC = () => {
               onClick={() => openAuthModal('register')}
               leftIcon={<Sparkles className="w-3.5 h-3.5" />}
             >
-              Criar Conta Grátis
+              Vincular / Criar Conta
             </Button>
           </div>
+        </div>
+
+        {/* Upgrade / Account Linking Card */}
+        <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50/70 to-indigo-50/50 dark:from-blue-950/30 dark:to-indigo-950/20 border border-blue-200 dark:border-blue-800/40 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#3F6FB5] dark:text-blue-300">
+            <ShieldCheck className="w-4 h-4 text-[#3F6FB5]" />
+            <span>Sincronização em Nuvem Gratuita</span>
+          </div>
+          <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed">
+            Ao vincular uma conta de e-mail/senha ou Google, todas as empresas, prospects e modelos que você já criou serão transferidos automaticamente para a sua conta na nuvem, garantindo backup contínuo e acesso em outros dispositivos.
+          </p>
         </div>
 
         <div className="p-3.5 rounded-xl bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-[#5F6368] dark:text-[#9AA0A6] flex items-start gap-2.5">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
           <div>
-            <strong className="text-[#202124] dark:text-[#E8EAED]">Privacidade & Operação Local:</strong> Você pode criar empresas, qualificar leads, agendar mensagens no WhatsApp e gerenciar follow-ups sem precisar criar uma conta. Seus dados são armazenados diretamente no seu dispositivo. Ao entrar com o Google ou e-mail, seus dados são sincronizados com a nuvem de forma segura.
+            <strong className="text-[#202124] dark:text-[#E8EAED]">Privacidade & Operação 100% Funcional:</strong> O aplicativo está completamente habilitado e desbloqueado para uso imediato em modo offline.
           </div>
         </div>
       </Card>

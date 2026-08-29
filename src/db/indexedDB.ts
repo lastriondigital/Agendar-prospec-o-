@@ -25,6 +25,7 @@ import {
   ValueArgumentItem,
 } from '../types';
 import { DB_NAME, DB_VERSION, DEFAULT_PIPELINE_STAGES } from '../utils/constants';
+import { validateBackupJSON } from '../services/backupService';
 import {
   INITIAL_SETTINGS,
   SEED_ACTIONS,
@@ -591,7 +592,6 @@ export async function importDatabaseFromJSON(
   options: { mode?: 'overwrite' | 'merge' } = { mode: 'overwrite' }
 ): Promise<{ success: boolean; message: string; details?: string }> {
   try {
-    const { validateBackupJSON } = await import('../services/backupService');
     const validation = validateBackupJSON(jsonStr);
 
     if (!validation.valid || !validation.sanitizedPayload) {

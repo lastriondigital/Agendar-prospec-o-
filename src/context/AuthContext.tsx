@@ -4,6 +4,10 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInAnonymously,
+  linkWithCredential,
+  linkWithPopup,
+  EmailAuthProvider,
   googleProvider,
   sendPasswordResetEmail,
   signOut,
@@ -26,13 +30,16 @@ export type AuthState =
   | 'unauthenticated'
   | 'authenticating'
   | 'authenticated'
+  | 'anonymous'
   | 'auth_error'
   | 'offline';
 
 export function getAuthStateLabel(state: AuthState): string {
   switch (state) {
     case 'authenticated':
-      return 'Autenticado';
+      return 'Conta Conectada';
+    case 'anonymous':
+      return 'Modo Local';
     case 'authenticating':
       return 'Autenticando...';
     case 'unauthenticated':
@@ -40,7 +47,7 @@ export function getAuthStateLabel(state: AuthState): string {
     case 'auth_error':
       return 'Erro de autenticação';
     case 'offline':
-      return 'Offline';
+      return 'Offline — Modo Local';
     default:
       return 'Não autenticado';
   }
@@ -56,7 +63,8 @@ export function mapFirebaseAuthError(err: any): string {
     case 'auth/user-not-found':
       return 'Nenhuma conta encontrada com este endereço de e-mail.';
     case 'auth/email-already-in-use':
-      return 'Este endereço de e-mail já está cadastrado em outra conta.';
+    case 'auth/credential-already-in-use':
+      return 'Este endereço de e-mail já está cadastrado em outra conta. Faça login para acessar seus dados.';
     case 'auth/invalid-email':
       return 'O formato do e-mail inserido é inválido. Exemplo: nome@empresa.com.';
     case 'auth/weak-password':
@@ -72,13 +80,13 @@ export function mapFirebaseAuthError(err: any): string {
     case 'auth/popup-blocked':
       return 'O navegador bloqueou a janela pop-up do Google. Permita pop-ups neste site para continuar.';
     case 'auth/unauthorized-domain':
-      return 'Domínio atual não autorizado no Firebase Authentication. Adicione aos Domínios Autorizados no Firebase Console.';
+      return 'Domínio atual em autorização. Você pode usar e-mail/senha ou o modo local.';
     case 'auth/operation-not-allowed':
       return 'Este método de autenticação não está ativado no Firebase Console.';
     case 'auth/account-exists-with-different-credential':
       return 'Já existe uma conta associada a este e-mail através de outro método de login.';
     case 'auth/network-request-failed':
-      return 'Falha de conexão com a rede. Verifique sua conexão com a internet.';
+      return 'Você está sem conexão com a internet. O modo local continua funcionando normalmente.';
     case 'auth/requires-recent-login':
       return 'Esta operação é sensível e requer login recente. Saia e entre novamente antes de prosseguir.';
     default:
@@ -90,6 +98,7 @@ interface AuthContextType {
   user: AuthUser | null;
   userProfile: UserProfile | null;
   isLoadingAuth: boolean;
+  isAnonymous: boolean;
   authState: AuthState;
   authStateLabel: string;
   authError: string | null;
@@ -98,6 +107,7 @@ interface AuthContextType {
   openAuthModal: (mode?: AuthModalMode) => void;
   closeAuthModal: () => void;
   setAuthModalMode: (mode: AuthModalMode) => void;
+  startWithoutAccount: () => Promise<void>;
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   register: (email: string, pass: string, displayName: string) => Promise<{ success: boolean; error?: string }>;
@@ -110,6 +120,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const LOCAL_USER_PROFILE_KEY = 'prospect_os_user_profile';
+const LOCAL_ENTERED_KEY = 'prospect_os_has_entered';
+const LOCAL_GUEST_UID_KEY = 'prospect_os_local_uid';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -128,17 +140,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { success, error, info } = useToast();
 
   const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  const isAnonymous = Boolean(user?.isAnonymous);
 
   // Deriva o estado semântico de autenticação
   const authState: AuthState = (() => {
     if (!isOnline && !user) return 'offline';
     if (isLoadingAuth) return 'authenticating';
     if (authError) return 'auth_error';
+    if (user?.isAnonymous) return 'anonymous';
     if (user) return 'authenticated';
     return 'unauthenticated';
   })();
 
   const authStateLabel = getAuthStateLabel(authState);
+
+  const getOrCreateLocalGuestUid = (): string => {
+    let localUid = localStorage.getItem(LOCAL_GUEST_UID_KEY);
+    if (!localUid) {
+      localUid = 'local_' + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+      localStorage.setItem(LOCAL_GUEST_UID_KEY, localUid);
+    }
+    return localUid;
+  };
 
   const syncOrCreateUserProfile = async (firebaseUser: any, explicitName?: string): Promise<UserProfile> => {
     const providerType =
@@ -151,7 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const now = new Date().toISOString();
     let currentProfile: UserProfile = {
       uid: firebaseUser.uid,
-      nome: explicitName || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário',
+      nome: explicitName || firebaseUser.displayName || (firebaseUser.isAnonymous ? 'Visitante (Modo Local)' : firebaseUser.email?.split('@')[0]) || 'Usuário',
       email: firebaseUser.email || '',
       foto: firebaseUser.photoURL || null,
       provider: providerType,
@@ -160,7 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       onboardingCompleted: true,
     };
 
-    // Cache local imediato para resiliência
+    // Cache local imediato para resiliência offline
     try {
       const localCached = localStorage.getItem(LOCAL_USER_PROFILE_KEY);
       if (localCached) {
@@ -180,26 +203,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Aviso de armazenamento local de perfil:', e);
     }
 
-    // Persistência e sincronização com Firestore (sem senhas, apenas perfil público)
-    try {
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDocSnap = await getDoc(userDocRef);
-      if (userDocSnap.exists()) {
-        const remoteData = userDocSnap.data() as Partial<UserProfile>;
-        currentProfile = {
-          ...currentProfile,
-          ...remoteData,
-          nome: explicitName || remoteData.nome || currentProfile.nome,
-          updatedAt: now,
-        };
-        await setDoc(userDocRef, currentProfile, { merge: true });
-      } else {
-        await setDoc(userDocRef, currentProfile);
+    // Persistência e sincronização com Firestore (sempre protegida por uid)
+    if (isOnline && firebaseUser.uid && !firebaseUser.uid.startsWith('local_')) {
+      try {
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const remoteData = userDocSnap.data() as Partial<UserProfile>;
+          currentProfile = {
+            ...currentProfile,
+            ...remoteData,
+            nome: explicitName || remoteData.nome || currentProfile.nome,
+            updatedAt: now,
+          };
+          await setDoc(userDocRef, currentProfile, { merge: true });
+        } else {
+          await setDoc(userDocRef, currentProfile);
+        }
+        localStorage.setItem(LOCAL_USER_PROFILE_KEY, JSON.stringify(currentProfile));
+        setUserProfile(currentProfile);
+      } catch (e) {
+        console.info('Perfil mantido em cache local / Firestore:', e);
       }
-      localStorage.setItem(LOCAL_USER_PROFILE_KEY, JSON.stringify(currentProfile));
-      setUserProfile(currentProfile);
-    } catch (e) {
-      console.info('Perfil mantido em cache local / Firestore:', e);
     }
 
     return currentProfile;
@@ -212,24 +237,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const mappedUser: AuthUser = {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
-            displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuário',
+            displayName: firebaseUser.displayName || (firebaseUser.isAnonymous ? 'Modo Local' : firebaseUser.email?.split('@')[0]) || 'Usuário',
             photoURL: firebaseUser.photoURL,
             isAnonymous: firebaseUser.isAnonymous,
           };
           setUser(mappedUser);
           setAuthError(null);
           syncEngine.setUserId(firebaseUser.uid);
+          localStorage.setItem(LOCAL_ENTERED_KEY, 'true');
 
           // Sincronizar o UserProfile no Firestore
           await syncOrCreateUserProfile(firebaseUser);
         } else {
-          setUser(null);
-          setUserProfile(null);
-          syncEngine.setUserId(null);
-          localStorage.removeItem(LOCAL_USER_PROFILE_KEY);
+          const hasEntered = localStorage.getItem(LOCAL_ENTERED_KEY) === 'true';
+          if (hasEntered) {
+            // Se o usuário já tinha entrado no app anteriormente, restaura a sessão local para não bloquear no refresh ou offline
+            if (isOnline) {
+              try {
+                const anonCred = await signInAnonymously(auth);
+                // onAuthStateChanged irá disparar novamente com anonCred.user
+                return;
+              } catch (anonErr) {
+                console.info('Entrando em modo local offline resiliente:', anonErr);
+              }
+            }
+
+            // Modo local offline
+            const localUid = getOrCreateLocalGuestUid();
+            const localUser: AuthUser = {
+              uid: localUid,
+              email: null,
+              displayName: 'Modo Local',
+              isAnonymous: true,
+            };
+            setUser(localUser);
+            syncEngine.setUserId(localUid);
+          } else {
+            setUser(null);
+            setUserProfile(null);
+            syncEngine.setUserId(null);
+          }
         }
       } catch (err) {
-        console.warn('Erro ao processar estado de autenticação:', err);
+        console.warn('Processamento de estado de autenticação:', err);
       } finally {
         setIsLoadingAuth(false);
       }
@@ -248,13 +298,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthModalOpen(false);
   };
 
+  /**
+   * MODO 1 — Começar Sem Conta / Modo Local
+   */
+  const startWithoutAccount = async () => {
+    setIsLoadingAuth(true);
+    setAuthError(null);
+    localStorage.setItem(LOCAL_ENTERED_KEY, 'true');
+
+    if (isOnline) {
+      try {
+        const cred = await signInAnonymously(auth);
+        await syncOrCreateUserProfile(cred.user, 'Visitante (Modo Local)');
+        info('Modo Local Ativado', 'Você pode começar a usar o Prospect OS imediatamente. Todas as alterações são salvas localmente.');
+        setIsLoadingAuth(false);
+        return;
+      } catch (err) {
+        console.info('Fallback para sessão local puramente offline:', err);
+      }
+    }
+
+    // Sessão offline caso não haja conexão com Firebase
+    const localUid = getOrCreateLocalGuestUid();
+    const guestUser: AuthUser = {
+      uid: localUid,
+      email: null,
+      displayName: 'Modo Local',
+      isAnonymous: true,
+    };
+    setUser(guestUser);
+    syncEngine.setUserId(localUid);
+    setIsLoadingAuth(false);
+    info('Modo Local Offline', 'Bem-vindo ao Prospect OS! Trabalhando localmente no navegador.');
+  };
+
+  /**
+   * Login com E-mail e Senha
+   */
   const login = async (emailStr: string, pass: string) => {
     setAuthError(null);
     try {
+      localStorage.setItem(LOCAL_ENTERED_KEY, 'true');
       const cred = await signInWithEmailAndPassword(auth, emailStr.trim(), pass);
       await syncOrCreateUserProfile(cred.user);
       success('Sessão iniciada com sucesso!', `Bem-vindo de volta, ${cred.user.displayName || cred.user.email}!`);
       setIsAuthModalOpen(false);
+      setTimeout(() => syncEngine.triggerSync(), 500);
       return { success: true };
     } catch (err: any) {
       const message = mapFirebaseAuthError(err);
@@ -264,13 +353,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  /**
+   * Login ou Vinculação com Google
+   */
   const loginWithGoogle = async () => {
     setAuthError(null);
     try {
+      localStorage.setItem(LOCAL_ENTERED_KEY, 'true');
+
+      // Se o usuário atual estiver em uma sessão anônima, vinculamos para MANTER O MESMO UID e todos os dados criados!
+      if (auth.currentUser && auth.currentUser.isAnonymous) {
+        try {
+          const cred = await linkWithPopup(auth.currentUser, googleProvider);
+          await syncOrCreateUserProfile(cred.user);
+          success('Conta Vinculada com Sucesso!', 'Sua conta Google foi vinculada. Todos os seus dados foram preservados e agora estão salvos na nuvem.');
+          setIsAuthModalOpen(false);
+          setTimeout(() => syncEngine.triggerSync(), 500);
+          return { success: true };
+        } catch (linkErr: any) {
+          if (
+            linkErr?.code === 'auth/credential-already-in-use' ||
+            linkErr?.code === 'auth/account-exists-with-different-credential' ||
+            linkErr?.code === 'auth/email-already-in-use'
+          ) {
+            // A conta Google já existe separadamente -> Realiza o login direto na conta existente
+            const cred = await signInWithPopup(auth, googleProvider);
+            await syncOrCreateUserProfile(cred.user);
+            success('Autenticado com o Google!', `Bem-vindo de volta, ${cred.user.displayName || cred.user.email}!`);
+            setIsAuthModalOpen(false);
+            setTimeout(() => syncEngine.triggerSync(), 500);
+            return { success: true };
+          }
+          throw linkErr;
+        }
+      }
+
+      // Login Google padrão
       const cred = await signInWithPopup(auth, googleProvider);
       await syncOrCreateUserProfile(cred.user);
       success('Autenticado com o Google!', `Bem-vindo, ${cred.user.displayName || cred.user.email}!`);
       setIsAuthModalOpen(false);
+      setTimeout(() => syncEngine.triggerSync(), 500);
       return { success: true };
     } catch (err: any) {
       const message = mapFirebaseAuthError(err);
@@ -280,11 +403,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  /**
+   * Registro com E-mail e Senha (com suporte a linkWithCredential para usuários anônimos)
+   */
   const register = async (emailStr: string, pass: string, displayName: string) => {
     setAuthError(null);
     try {
       const trimmedEmail = emailStr.trim();
       const trimmedName = displayName.trim();
+      localStorage.setItem(LOCAL_ENTERED_KEY, 'true');
+
+      // Se o usuário já estiver em sessão anônima, vinculamos a credencial para preservar 100% dos dados no mesmo UID
+      if (auth.currentUser && auth.currentUser.isAnonymous) {
+        try {
+          const credential = EmailAuthProvider.credential(trimmedEmail, pass);
+          const cred = await linkWithCredential(auth.currentUser, credential);
+          if (trimmedName && auth.currentUser) {
+            await updateProfile(auth.currentUser, { displayName: trimmedName });
+          }
+          await syncOrCreateUserProfile(cred.user, trimmedName);
+          success('Conta criada e vinculada!', 'Seus dados locais foram mantidos e sincronizados com a nuvem.');
+          setIsAuthModalOpen(false);
+          setTimeout(() => syncEngine.triggerSync(), 500);
+          return { success: true };
+        } catch (linkErr: any) {
+          if (
+            linkErr?.code === 'auth/credential-already-in-use' ||
+            linkErr?.code === 'auth/email-already-in-use'
+          ) {
+            const message = 'Este e-mail já possui uma conta no sistema. Faça login para acessar seus dados na nuvem.';
+            setAuthError(message);
+            error('E-mail em uso', message);
+            return { success: false, error: message };
+          }
+          throw linkErr;
+        }
+      }
+
+      // Registro padrão de novo usuário
       const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, pass);
       if (trimmedName && auth.currentUser) {
         await updateProfile(auth.currentUser, { displayName: trimmedName });
@@ -292,6 +448,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await syncOrCreateUserProfile(cred.user, trimmedName);
       success('Conta criada com sucesso!', 'Seu acesso ao sistema foi configurado.');
       setIsAuthModalOpen(false);
+      setTimeout(() => syncEngine.triggerSync(), 500);
       return { success: true };
     } catch (err: any) {
       const message = mapFirebaseAuthError(err);
@@ -320,11 +477,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
+      localStorage.removeItem(LOCAL_ENTERED_KEY);
+      localStorage.removeItem(LOCAL_GUEST_UID_KEY);
+      localStorage.removeItem(LOCAL_USER_PROFILE_KEY);
       await signOut(auth);
       setUser(null);
       setUserProfile(null);
       syncEngine.setUserId(null);
-      localStorage.removeItem(LOCAL_USER_PROFILE_KEY);
       info('Sessão encerrada', 'Você saiu com segurança. Seus dados locais continuam preservados neste navegador.');
     } catch (err: any) {
       const message = mapFirebaseAuthError(err);
@@ -351,10 +510,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await deleteUser(auth.currentUser);
 
       // 3. Limpa referências locais de sessão
+      localStorage.removeItem(LOCAL_ENTERED_KEY);
+      localStorage.removeItem(LOCAL_GUEST_UID_KEY);
+      localStorage.removeItem(LOCAL_USER_PROFILE_KEY);
       setUser(null);
       setUserProfile(null);
       syncEngine.setUserId(null);
-      localStorage.removeItem(LOCAL_USER_PROFILE_KEY);
 
       success('Conta excluída com sucesso', 'Sua conta de autenticação em nuvem foi removida.');
       return { success: true };
@@ -373,7 +534,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       nome: user.displayName || 'Usuário',
       email: user.email || '',
       foto: user.photoURL || null,
-      provider: 'password' as const,
+      provider: (user.isAnonymous ? 'anonymous' : 'password') as any,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       onboardingCompleted: true,
@@ -387,7 +548,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(updated);
     localStorage.setItem(LOCAL_USER_PROFILE_KEY, JSON.stringify(updated));
 
-    if (data.nome && auth.currentUser) {
+    if (data.nome && auth.currentUser && !auth.currentUser.isAnonymous) {
       try {
         await updateProfile(auth.currentUser, { displayName: data.nome });
       } catch (e) {
@@ -395,12 +556,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    try {
-      const userDocRef = doc(db, 'users', user.uid);
-      await setDoc(userDocRef, updated, { merge: true });
-      success('Perfil atualizado', 'Suas informações foram salvas com sucesso.');
-    } catch (e) {
-      console.warn('Erro ao atualizar perfil no Firestore:', e);
+    if (isOnline && !user.uid.startsWith('local_')) {
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        await setDoc(userDocRef, updated, { merge: true });
+        success('Perfil atualizado', 'Suas informações foram salvas com sucesso.');
+      } catch (e) {
+        console.warn('Erro ao atualizar perfil no Firestore:', e);
+      }
+    } else {
+      success('Perfil atualizado localmente', 'Suas informações foram salvas neste dispositivo.');
     }
   };
 
@@ -410,6 +575,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         userProfile,
         isLoadingAuth,
+        isAnonymous,
         authState,
         authStateLabel,
         authError,
@@ -418,6 +584,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         openAuthModal,
         closeAuthModal,
         setAuthModalMode,
+        startWithoutAccount,
         login,
         loginWithGoogle,
         register,

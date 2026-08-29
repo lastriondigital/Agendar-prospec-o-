@@ -15,10 +15,13 @@ import {
   RefreshCw,
   ShieldCheck,
   KeyRound,
+  Sparkles,
 } from 'lucide-react';
 
 export const AuthModal: React.FC = () => {
   const {
+    user,
+    isAnonymous,
     isAuthModalOpen,
     authModalMode,
     openAuthModal,
@@ -44,13 +47,13 @@ export const AuthModal: React.FC = () => {
 
   if (!isAuthModalOpen) return null;
 
-  const handleGoogleLogin = async () => {
-    setFormError(null);
+  const handleGoogleSubmit = async () => {
     setIsGoogleSubmitting(true);
+    setFormError(null);
     try {
       const res = await loginWithGoogle();
       if (!res.success) {
-        setFormError(res.error || 'Não foi possível autenticar com o Google.');
+        setFormError(res.error || 'Erro ao autenticar com o Google.');
       } else {
         setTimeout(() => syncNow(), 500);
       }
@@ -145,12 +148,15 @@ export const AuthModal: React.FC = () => {
             </div>
             <div>
               <h3 className="text-base font-bold text-[#202124] dark:text-[#E8EAED]">
-                {authModalMode === 'login' && 'Entrar no Sistema'}
-                {authModalMode === 'register' && 'Criar Conta de Acesso'}
+                {isAnonymous && authModalMode === 'register' && 'Vincular Conta & Sincronizar'}
+                {(!isAnonymous || authModalMode === 'login') && authModalMode === 'login' && 'Entrar na Conta'}
+                {!isAnonymous && authModalMode === 'register' && 'Criar Conta de Acesso'}
                 {authModalMode === 'forgot_password' && 'Recuperar Senha'}
               </h3>
               <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
-                Agendador de Mensagens & PROSPECT OS
+                {isAnonymous
+                  ? 'Seus dados atuais serão mantidos e salvos na nuvem'
+                  : 'PROSPECT OS • Prospecção Comercial'}
               </p>
             </div>
           </div>
@@ -170,6 +176,21 @@ export const AuthModal: React.FC = () => {
             <div className="grid grid-cols-2 p-1 bg-[#F1F3F4] dark:bg-[#121417] rounded-xl border border-[#E6E8EB] dark:border-[#2D3139]">
               <button
                 type="button"
+                id="modal-tab-register-btn"
+                onClick={() => {
+                  setFormError(null);
+                  openAuthModal('register');
+                }}
+                className={`py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  authModalMode === 'register'
+                    ? 'bg-white dark:bg-[#1E2228] text-[#3F6FB5] dark:text-blue-300 shadow-xs'
+                    : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
+                }`}
+              >
+                {isAnonymous ? 'Criar / Vincular' : 'Criar Conta'}
+              </button>
+              <button
+                type="button"
                 id="modal-tab-login-btn"
                 onClick={() => {
                   setFormError(null);
@@ -183,38 +204,23 @@ export const AuthModal: React.FC = () => {
               >
                 Entrar
               </button>
-              <button
-                type="button"
-                id="modal-tab-register-btn"
-                onClick={() => {
-                  setFormError(null);
-                  openAuthModal('register');
-                }}
-                className={`py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                  authModalMode === 'register'
-                    ? 'bg-white dark:bg-[#1E2228] text-[#3F6FB5] dark:text-blue-300 shadow-xs'
-                    : 'text-[#5F6368] dark:text-[#9AA0A6] hover:text-[#202124] dark:hover:text-[#E8EAED]'
-                }`}
-              >
-                Criar Conta
-              </button>
             </div>
           )}
 
-          {/* Google Sign-In Button */}
+          {/* GOOGLE SIGN IN BUTTON */}
           {authModalMode !== 'forgot_password' && (
-            <div>
+            <div className="space-y-3">
               <button
                 id="modal-auth-google-btn"
                 type="button"
+                onClick={handleGoogleSubmit}
                 disabled={isGoogleSubmitting || isSubmitting}
-                onClick={handleGoogleLogin}
-                className="w-full py-2.5 px-4 bg-white dark:bg-[#1E2228] hover:bg-neutral-50 dark:hover:bg-[#252A32] border border-[#D1D5DB] dark:border-[#374151] text-[#374151] dark:text-[#E5E7EB] font-semibold text-xs rounded-xl transition flex items-center justify-center gap-2.5 shadow-xs disabled:opacity-50 cursor-pointer"
+                className="w-full py-2.5 px-4 bg-white dark:bg-[#1C2026] hover:bg-[#F8F9FA] dark:hover:bg-[#252A32] text-[#202124] dark:text-[#E8EAED] border border-[#D1D5DB] dark:border-[#374151] font-semibold text-xs rounded-xl transition flex items-center justify-center gap-2.5 shadow-xs cursor-pointer disabled:opacity-50"
               >
                 {isGoogleSubmitting ? (
                   <RefreshCw className="w-4 h-4 animate-spin text-[#3F6FB5]" />
                 ) : (
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                     <path
                       fill="#4285F4"
                       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -233,15 +239,21 @@ export const AuthModal: React.FC = () => {
                     />
                   </svg>
                 )}
-                <span>Continuar com Google</span>
+                <span>
+                  {isAnonymous
+                    ? 'Vincular com o Google'
+                    : authModalMode === 'register'
+                    ? 'Criar conta com o Google'
+                    : 'Entrar com o Google'}
+                </span>
               </button>
 
-              <div className="relative flex py-3 items-center">
-                <div className="flex-grow border-t border-[#ECEEF1] dark:border-[#2D3139]"></div>
-                <span className="flex-shrink mx-3 text-[10px] font-bold text-[#80868B] dark:text-[#9AA0A6] uppercase tracking-wider">
+              <div className="flex items-center gap-3 my-1">
+                <div className="flex-1 h-px bg-[#ECEEF1] dark:bg-[#2D3139]"></div>
+                <span className="text-[11px] font-medium text-[#80868B] uppercase tracking-wider">
                   ou com e-mail
                 </span>
-                <div className="flex-grow border-t border-[#ECEEF1] dark:border-[#2D3139]"></div>
+                <div className="flex-1 h-px bg-[#ECEEF1] dark:bg-[#2D3139]"></div>
               </div>
             </div>
           )}
@@ -274,7 +286,7 @@ export const AuthModal: React.FC = () => {
                     id="modal-auth-display-name-input"
                     type="text"
                     required
-                    placeholder="Ex: João da Silva"
+                    placeholder="Ex: Carlos Silva"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     className="w-full pl-10 pr-3.5 py-2 text-xs rounded-xl border border-[#D1D5DB] dark:border-[#374151] bg-white dark:bg-[#1E2228] text-[#202124] dark:text-[#E8EAED] placeholder:text-[#9AA0A6] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#3F6FB5]"
@@ -387,8 +399,8 @@ export const AuthModal: React.FC = () => {
               ) : (
                 <>
                   <span>
-                    {authModalMode === 'login' && 'Entrar'}
-                    {authModalMode === 'register' && 'Criar Conta'}
+                    {authModalMode === 'login' && 'Entrar na Conta'}
+                    {authModalMode === 'register' && (isAnonymous ? 'Vincular Conta & Salvar na Nuvem' : 'Criar Conta de Acesso')}
                     {authModalMode === 'forgot_password' && 'Enviar Link de Recuperação'}
                   </span>
                   <ArrowRight className="w-4 h-4" />
@@ -417,7 +429,9 @@ export const AuthModal: React.FC = () => {
           <div className="mt-5 pt-3.5 border-t border-[#ECEEF1] dark:border-[#2D3139] flex items-center gap-2 text-[11px] text-[#5F6368] dark:text-[#9AA0A6]">
             <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span>
-              Isolamento seguro por usuário e persistência com nuvem Firestore.
+              {isAnonymous
+                ? 'Ao vincular sua conta, todos os dados já cadastrados serão transferidos automaticamente.'
+                : 'Isolamento seguro por usuário e persistência com nuvem Firestore.'}
             </span>
           </div>
         </div>
