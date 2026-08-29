@@ -1,19 +1,20 @@
 import React, { useState } from 'react';
 import {
-  AlertTriangle,
   Building2,
   CheckCircle2,
   Globe,
   MapPin,
-  MinusCircle,
   Plus,
-  PlusCircle,
   Sparkles,
   Tag,
   Trash2,
   X,
+  AlertTriangle,
+  Flame,
+  ShieldCheck,
+  TrendingUp,
 } from 'lucide-react';
-import { IdealCustomerProfile, Service } from '../../types';
+import { IdealCustomerProfile, ProspectingMode, Service } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -33,37 +34,56 @@ export const IcpFormModal: React.FC<IcpFormModalProps> = ({
   availableServices,
   onSave,
 }) => {
-  const [activeTab, setActiveTab] = useState<'geral' | 'demografico' | 'criterios'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral' | 'demografico' | 'sinais' | 'pesos'>('geral');
 
   // Basic Info
   const [name, setName] = useState(icp?.name || '');
   const [description, setDescription] = useState(icp?.description || '');
+  const [prospectingMode, setProspectingMode] = useState<ProspectingMode | 'AMBOS'>(
+    icp?.prospectingMode || 'AMBOS'
+  );
+  const [segment, setSegment] = useState(icp?.segment || icp?.niches?.[0] || '');
   const [nichesInput, setNichesInput] = useState(icp?.niches?.join(', ') || '');
-  const [countriesInput, setCountriesInput] = useState(icp?.countries?.join(', ') || 'Brasil');
-  const [citiesInput, setCitiesInput] = useState(icp?.cities?.join(', ') || '');
-  const [companySize, setCompanySize] = useState(icp?.companySize || '');
+  const [country, setCountry] = useState(icp?.country || icp?.countries?.[0] || 'Brasil');
+  const [regionOrCity, setRegionOrCity] = useState(icp?.regionOrCity || icp?.cities?.join(', ') || '');
+  const [employeeCountRange, setEmployeeCountRange] = useState(icp?.employeeCountRange || '');
+  const [unitsRange, setUnitsRange] = useState(icp?.unitsRange || '');
   const [minUnits, setMinUnits] = useState<number | ''>(icp?.minUnits ?? '');
   const [maxUnits, setMaxUnits] = useState<number | ''>(icp?.maxUnits ?? '');
   const [minPriceRange, setMinPriceRange] = useState<number | ''>(icp?.priceRange?.min ?? '');
   const [maxPriceRange, setMaxPriceRange] = useState<number | ''>(icp?.priceRange?.max ?? '');
-  const [problemsInput, setProblemsInput] = useState(icp?.commonProblems?.join('\n') || '');
 
   // Selected Services
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(
     icp?.suitableServiceIds || []
   );
 
-  // Positive & Negative Criteria
-  const [positiveCriteria, setPositiveCriteria] = useState<string[]>(
-    icp?.positiveCriteria && icp.positiveCriteria.length > 0
-      ? icp.positiveCriteria
-      : ['Possui WhatsApp Comercial Ativo', 'Tem presença no Google com avaliações']
+  // Sinais Estruturados
+  const [positiveSignalsInput, setPositiveSignalsInput] = useState(
+    icp?.positiveSignals?.join('\n') ||
+      'Instagram ativo\nGoogle Business ativo\n+100 avaliações\nNota 4.5+ no Google\n2+ unidades físicas\nServiços de maior ticket'
   );
-  const [negativeCriteria, setNegativeCriteria] = useState<string[]>(
-    icp?.negativeCriteria && icp.negativeCriteria.length > 0
-      ? icp.negativeCriteria
-      : ['Sem número de telefone direto', 'Empresa inativa na Receita']
+
+  const [problemSignalsInput, setProblemSignalsInput] = useState(
+    icp?.problemSignals?.join('\n') ||
+      'Sem site institucional\nSite antigo / não adaptado para celular\nPerfil do Google incompleto\nAusência de WhatsApp direto no site'
   );
+
+  const [buyingPotentialSignalsInput, setBuyingPotentialSignalsInput] = useState(
+    icp?.buyingPotentialSignals?.join('\n') ||
+      'Múltiplas filiais ou unidades\nInveste em anúncios online\nEquipe de atendimento dedicada'
+  );
+
+  const [lowPrioritySignalsInput, setLowPrioritySignalsInput] = useState(
+    icp?.lowPrioritySignals?.join('\n') ||
+      'Sem número de WhatsApp direto\nEmpresa inativa na Receita\nSem decisor identificado'
+  );
+
+  // Pesos de Critérios
+  const [weightIcp, setWeightIcp] = useState<number>(icp?.criteriaWeights?.icp ?? 30);
+  const [weightProblem, setWeightProblem] = useState<number>(icp?.criteriaWeights?.problem ?? 30);
+  const [weightPotential, setWeightPotential] = useState<number>(icp?.criteriaWeights?.potential ?? 25);
+  const [weightIntent, setWeightIntent] = useState<number>(icp?.criteriaWeights?.intent ?? 15);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -85,29 +105,33 @@ export const IcpFormModal: React.FC<IcpFormModalProps> = ({
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      const cleanCountries = countriesInput
+      if (segment.trim() && !cleanNiches.includes(segment.trim())) {
+        cleanNiches.unshift(segment.trim());
+      }
+
+      const cleanCities = regionOrCity
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      const cleanCities = citiesInput
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const cleanProblems = problemsInput
-        .split('\n')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const cleanPositives = positiveCriteria.map((c) => c.trim()).filter(Boolean);
-      const cleanNegatives = negativeCriteria.map((c) => c.trim()).filter(Boolean);
+
+      const cleanPositives = positiveSignalsInput.split('\n').map((s) => s.trim()).filter(Boolean);
+      const cleanProblems = problemSignalsInput.split('\n').map((s) => s.trim()).filter(Boolean);
+      const cleanPotential = buyingPotentialSignalsInput.split('\n').map((s) => s.trim()).filter(Boolean);
+      const cleanLowPriority = lowPrioritySignalsInput.split('\n').map((s) => s.trim()).filter(Boolean);
 
       const payload: IdealCustomerProfile = {
         id: icp?.id || `icp-${Date.now()}`,
         name: name.trim(),
         description: description.trim() || undefined,
-        niches: cleanNiches,
-        countries: cleanCountries,
+        prospectingMode,
+        segment: segment.trim() || undefined,
+        niches: cleanNiches.length > 0 ? cleanNiches : [segment.trim() || 'Geral'],
+        country: country.trim() || 'Brasil',
+        countries: [country.trim() || 'Brasil'],
+        regionOrCity: regionOrCity.trim() || undefined,
         cities: cleanCities,
-        companySize: companySize ? (companySize as any) : undefined,
+        employeeCountRange: employeeCountRange || undefined,
+        unitsRange: unitsRange || undefined,
         minUnits: minUnits !== '' ? Number(minUnits) : undefined,
         maxUnits: maxUnits !== '' ? Number(maxUnits) : undefined,
         priceRange:
@@ -118,10 +142,20 @@ export const IcpFormModal: React.FC<IcpFormModalProps> = ({
                 currency: 'BRL',
               }
             : undefined,
-        commonProblems: cleanProblems,
         suitableServiceIds: selectedServiceIds,
         positiveCriteria: cleanPositives,
-        negativeCriteria: cleanNegatives,
+        negativeCriteria: cleanLowPriority,
+        positiveSignals: cleanPositives,
+        problemSignals: cleanProblems,
+        buyingPotentialSignals: cleanPotential,
+        lowPrioritySignals: cleanLowPriority,
+        criteriaWeights: {
+          icp: weightIcp,
+          problem: weightProblem,
+          potential: weightPotential,
+          intent: weightIntent,
+        },
+        active: true,
         createdAt: icp?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -140,145 +174,167 @@ export const IcpFormModal: React.FC<IcpFormModalProps> = ({
       title={icp ? 'Editar Perfil de Cliente Ideal (ICP)' : 'Novo Perfil de Cliente Ideal (ICP)'}
       size="lg"
       footer={
-        <>
+        <div className="flex items-center justify-end gap-2 w-full">
           <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
             Cancelar
           </Button>
           <Button variant="primary" size="sm" onClick={handleSubmit} isLoading={isSubmitting}>
             {icp ? 'Salvar Alterações' : 'Criar Perfil ICP'}
           </Button>
-        </>
+        </div>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Navegação por Abas */}
-        <div className="flex items-center gap-1 border-b border-neutral-800 pb-2 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1 border-b border-[#E2E6EC] dark:border-[#272B33] pb-2 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab('geral')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'geral'
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                : 'text-neutral-400 hover:text-neutral-200'
+                ? 'bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                : 'text-[#64748B] hover:text-[#1E293B]'
             }`}
           >
-            1. Perfil, Nichos & Dores
+            1. Perfil & Segmento
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('demografico')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'demografico'
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                : 'text-neutral-400 hover:text-neutral-200'
+                ? 'bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                : 'text-[#64748B] hover:text-[#1E293B]'
             }`}
           >
-            2. Localização & Porte
+            2. Localização, Porte & Serviços
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('criterios')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'criterios'
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                : 'text-neutral-400 hover:text-neutral-200'
+            onClick={() => setActiveTab('sinais')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'sinais'
+                ? 'bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                : 'text-[#64748B] hover:text-[#1E293B]'
             }`}
           >
-            3. Critérios Positivos/Negativos & Serviços
+            3. Sinais Positivos & de Problema
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('pesos')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'pesos'
+                ? 'bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                : 'text-[#64748B] hover:text-[#1E293B]'
+            }`}
+          >
+            4. Pesos & Qualificação
           </button>
         </div>
 
-        {/* TAB 1: GERAL, NICHOS & DORES */}
+        {/* TAB 1: GERAL & SEGMENTO */}
         {activeTab === 'geral' && (
           <div className="space-y-4 animate-in fade-in duration-150">
             <Input
               label="Nome do Perfil ICP *"
-              placeholder="Ex: Clínicas Médicas e Odontológicas"
+              placeholder="Ex: Clínicas particulares — Brasil"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
 
-            <div>
-              <label className="block text-xs font-bold text-neutral-300 mb-1">
-                Descrição & Objetivo do ICP
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Ex: Empresas de saúde de médio porte que investem em captação de pacientes particulares..."
-                rows={2}
-                className="w-full rounded-xl bg-neutral-950 border border-neutral-800 p-3 text-xs text-neutral-100 placeholder-neutral-500 focus:border-emerald-500 focus:outline-none"
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#1E293B] dark:text-[#E2E8F0] mb-1">
+                  Modo de Prospecção Alvo
+                </label>
+                <select
+                  value={prospectingMode}
+                  onChange={(e) => setProspectingMode(e.target.value as any)}
+                  className="w-full text-xs px-3 py-2 rounded-lg bg-white dark:bg-[#1E222A] border border-[#CBD5E1] dark:border-[#334155] text-[#1E293B] dark:text-white"
+                >
+                  <option value="AMBOS">Ambos os Modos</option>
+                  <option value="DEMANDA_IDENTIFICADA">Demanda Identificada (Sites, Design, GMB)</option>
+                  <option value="OPORTUNIDADE_LATENTE">Oportunidade Latente (App, SaaS)</option>
+                </select>
+              </div>
+
+              <Input
+                label="Segmento / Nicho Principal *"
+                placeholder="Ex: Clínicas Médicas, Estética, Restaurantes"
+                value={segment}
+                onChange={(e) => setSegment(e.target.value)}
               />
             </div>
 
             <div>
               <Input
-                label="Nichos e Segmentos (separados por vírgula)"
+                label="Subnichos e Variações (separados por vírgula)"
                 placeholder="Ex: Odontologia, Dermatologia, Cirurgia Plástica, Oftalmologia"
                 value={nichesInput}
                 onChange={(e) => setNichesInput(e.target.value)}
               />
-              <p className="text-[11px] text-neutral-500 mt-1">
-                O motor de scoring compara esses nichos com a categoria cadastrada da empresa.
+              <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8] mt-1">
+                Utilizado para verificar a aderência automática da empresa ao perfil.
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-neutral-300 mb-1">
-                Problemas e Dores Comuns deste Perfil (1 por linha)
+              <label className="block text-xs font-semibold text-[#1E293B] dark:text-[#E2E8F0] mb-1">
+                Descrição e Contexto do ICP
               </label>
               <textarea
-                value={problemsInput}
-                onChange={(e) => setProblemsInput(e.target.value)}
-                placeholder={'Site não adaptado para celular\nBaixa posição na busca do Google\nFalta de agendamento online automático'}
-                rows={3}
-                className="w-full rounded-xl bg-neutral-950 border border-neutral-800 p-3 text-xs text-neutral-100 placeholder-neutral-500 focus:border-emerald-500 focus:outline-none font-mono"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Ex: Clínicas com alto volume de pacientes particulares que necessitam de presença digital de alto padrão..."
+                rows={2}
+                className="w-full text-xs p-3 rounded-lg bg-white dark:bg-[#1E222A] border border-[#CBD5E1] dark:border-[#334155] text-[#1E293B] dark:text-white placeholder-[#94A3B8] focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
               />
             </div>
           </div>
         )}
 
-        {/* TAB 2: LOCALIZAÇÃO & PORTE */}
+        {/* TAB 2: DEMOGRAFIA, PORTE & SERVIÇOS */}
         {activeTab === 'demografico' && (
           <div className="space-y-4 animate-in fade-in duration-150">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
-                label="Países Alvo (separados por vírgula)"
+                label="País *"
                 placeholder="Ex: Brasil, Portugal"
-                value={countriesInput}
-                onChange={(e) => setCountriesInput(e.target.value)}
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
               />
               <Input
-                label="Cidades Alvo (separados por vírgula)"
+                label="Região ou Cidades Alvo"
                 placeholder="Ex: São Paulo, Rio de Janeiro, Curitiba"
-                value={citiesInput}
-                onChange={(e) => setCitiesInput(e.target.value)}
+                value={regionOrCity}
+                onChange={(e) => setRegionOrCity(e.target.value)}
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-bold text-neutral-300 mb-1">
-                  Porte / Tamanho da Empresa
+                <label className="block text-xs font-semibold text-[#1E293B] dark:text-[#E2E8F0] mb-1">
+                  Faixa de Funcionários
                 </label>
                 <select
-                  value={companySize}
-                  onChange={(e) => setCompanySize(e.target.value)}
-                  className="w-full rounded-xl bg-neutral-950 border border-neutral-800 p-2.5 text-xs text-neutral-100 focus:border-emerald-500 focus:outline-none"
+                  value={employeeCountRange}
+                  onChange={(e) => setEmployeeCountRange(e.target.value)}
+                  className="w-full text-xs px-3 py-2 rounded-lg bg-white dark:bg-[#1E222A] border border-[#CBD5E1] dark:border-[#334155] text-[#1E293B] dark:text-white"
                 >
                   <option value="">Qualquer porte</option>
-                  <option value="1-10">1 a 10 funcionários (Pequena)</option>
-                  <option value="11-50">11 a 50 funcionários (Média)</option>
-                  <option value="51-200">51 a 200 funcionários (Grande)</option>
-                  <option value="200+">200+ funcionários (Enterprise)</option>
+                  <option value="1-5">1 a 5 colaboradores</option>
+                  <option value="6-20">6 a 20 colaboradores</option>
+                  <option value="21-50">21 a 50 colaboradores</option>
+                  <option value="50+">50+ colaboradores (Grande)</option>
                 </select>
               </div>
 
               <Input
-                label="Mínimo de Unidades / Filiais"
+                label="Mínimo de Unidades Físicas"
                 type="number"
-                placeholder="Ex: 1"
+                placeholder="Ex: 1 ou 2"
                 value={minUnits}
                 onChange={(e) => setMinUnits(e.target.value ? Number(e.target.value) : '')}
               />
@@ -291,147 +347,145 @@ export const IcpFormModal: React.FC<IcpFormModalProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
-                label="Faixa de Preço / Ticket Mínimo (R$)"
+                label="Ticket / Faixa de Preço Mínima (R$)"
                 type="number"
-                placeholder="Ex: 2000"
+                placeholder="Ex: 1500"
                 value={minPriceRange}
                 onChange={(e) => setMinPriceRange(e.target.value ? Number(e.target.value) : '')}
               />
               <Input
-                label="Faixa de Preço / Ticket Máximo (R$)"
+                label="Ticket Máximo Esperado (R$)"
                 type="number"
                 placeholder="Ex: 15000"
                 value={maxPriceRange}
                 onChange={(e) => setMaxPriceRange(e.target.value ? Number(e.target.value) : '')}
               />
             </div>
-          </div>
-        )}
 
-        {/* TAB 3: CRITÉRIOS & SERVIÇOS ADEQUADOS */}
-        {activeTab === 'criterios' && (
-          <div className="space-y-5 animate-in fade-in duration-150">
             {/* Serviços Adequados */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-neutral-200 block">
-                Serviços Adequados para este ICP (Cross-sell & Up-sell)
+            <div className="space-y-2 pt-2 border-t border-[#E2E6EC] dark:border-[#272B33]">
+              <label className="block text-xs font-semibold text-[#1E293B] dark:text-[#E2E8F0]">
+                Serviços Adequados para este Perfil
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto p-2 rounded-xl bg-neutral-950 border border-neutral-800">
+              <div className="flex flex-wrap gap-2">
                 {availableServices.map((srv) => {
                   const isChecked = selectedServiceIds.includes(srv.id);
                   return (
-                    <label
+                    <button
                       key={srv.id}
-                      className={`flex items-center gap-2 p-2 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                      type="button"
+                      onClick={() => handleToggleService(srv.id)}
+                      className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
                         isChecked
-                          ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
-                          : 'text-neutral-400 hover:bg-neutral-900 border border-transparent'
+                          ? 'bg-[#2563EB] text-white border-[#2563EB] font-semibold'
+                          : 'bg-white dark:bg-[#1E222A] text-[#64748B] border-[#CBD5E1] dark:border-[#334155]'
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handleToggleService(srv.id)}
-                        className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-neutral-900 border-neutral-700"
-                      />
-                      <span className="truncate">{srv.name}</span>
-                    </label>
+                      {srv.name}
+                    </button>
                   );
                 })}
-                {availableServices.length === 0 && (
-                  <p className="text-xs text-neutral-500 col-span-2 p-2">
-                    Nenhum serviço cadastrado no catálogo.
-                  </p>
-                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: SINAIS POSITIVOS, DE PROBLEMA & POTENCIAL */}
+        {activeTab === 'sinais' && (
+          <div className="space-y-4 animate-in fade-in duration-150">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#1E293B] dark:text-[#E2E8F0] mb-1">
+                  Sinais Positivos (1 por linha)
+                </label>
+                <textarea
+                  value={positiveSignalsInput}
+                  onChange={(e) => setPositiveSignalsInput(e.target.value)}
+                  rows={4}
+                  className="w-full text-xs p-3 rounded-lg bg-white dark:bg-[#1E222A] border border-[#CBD5E1] dark:border-[#334155] text-[#1E293B] dark:text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#1E293B] dark:text-[#E2E8F0] mb-1">
+                  Sinais de Problema (1 por linha)
+                </label>
+                <textarea
+                  value={problemSignalsInput}
+                  onChange={(e) => setProblemSignalsInput(e.target.value)}
+                  rows={4}
+                  className="w-full text-xs p-3 rounded-lg bg-white dark:bg-[#1E222A] border border-[#CBD5E1] dark:border-[#334155] text-[#1E293B] dark:text-white font-mono"
+                />
               </div>
             </div>
 
-            {/* Critérios Positivos */}
-            <div className="space-y-2 pt-3 border-t border-neutral-800">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  Critérios Positivos (Bonificam o Lead Score)
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#1E293B] dark:text-[#E2E8F0] mb-1">
+                  Sinais de Potencial de Compra
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setPositiveCriteria([...positiveCriteria, ''])}
-                  className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Adicionar
-                </button>
+                <textarea
+                  value={buyingPotentialSignalsInput}
+                  onChange={(e) => setBuyingPotentialSignalsInput(e.target.value)}
+                  rows={3}
+                  className="w-full text-xs p-3 rounded-lg bg-white dark:bg-[#1E222A] border border-[#CBD5E1] dark:border-[#334155] text-[#1E293B] dark:text-white font-mono"
+                />
               </div>
-              <div className="space-y-1.5">
-                {positiveCriteria.map((crit, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={crit}
-                      onChange={(e) => {
-                        const updated = [...positiveCriteria];
-                        updated[idx] = e.target.value;
-                        setPositiveCriteria(updated);
-                      }}
-                      placeholder={`Critério Positivo ${idx + 1}`}
-                      className="flex-1 rounded-xl bg-neutral-950 border border-neutral-800 p-2 text-xs text-neutral-100 placeholder-neutral-500 focus:border-emerald-500 focus:outline-none"
-                    />
-                    {positiveCriteria.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setPositiveCriteria(positiveCriteria.filter((_, i) => i !== idx))}
-                        className="p-1.5 text-neutral-500 hover:text-rose-400 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
+
+              <div>
+                <label className="block text-xs font-semibold text-[#1E293B] dark:text-[#E2E8F0] mb-1">
+                  Sinais de Baixa Prioridade (Red Flags)
+                </label>
+                <textarea
+                  value={lowPrioritySignalsInput}
+                  onChange={(e) => setLowPrioritySignalsInput(e.target.value)}
+                  rows={3}
+                  className="w-full text-xs p-3 rounded-lg bg-white dark:bg-[#1E222A] border border-[#CBD5E1] dark:border-[#334155] text-[#1E293B] dark:text-white font-mono"
+                />
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Critérios Negativos */}
-            <div className="space-y-2 pt-3 border-t border-neutral-800">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
-                  <MinusCircle className="w-3.5 h-3.5" />
-                  Critérios Negativos (Penalizam o Lead Score)
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setNegativeCriteria([...negativeCriteria, ''])}
-                  className="text-xs text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Adicionar
-                </button>
-              </div>
-              <div className="space-y-1.5">
-                {negativeCriteria.map((crit, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={crit}
-                      onChange={(e) => {
-                        const updated = [...negativeCriteria];
-                        updated[idx] = e.target.value;
-                        setNegativeCriteria(updated);
-                      }}
-                      placeholder={`Critério Negativo ${idx + 1}`}
-                      className="flex-1 rounded-xl bg-neutral-950 border border-neutral-800 p-2 text-xs text-neutral-100 placeholder-neutral-500 focus:border-rose-500 focus:outline-none"
-                    />
-                    {negativeCriteria.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setNegativeCriteria(negativeCriteria.filter((_, i) => i !== idx))}
-                        className="p-1.5 text-neutral-500 hover:text-rose-400 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+        {/* TAB 4: PESOS & QUALIFICAÇÃO */}
+        {activeTab === 'pesos' && (
+          <div className="space-y-4 animate-in fade-in duration-150">
+            <div className="p-3 bg-[#FAFBFD] dark:bg-[#16191F] border border-[#E2E6EC] dark:border-[#272B33] rounded-xl">
+              <span className="text-xs font-semibold text-[#1E293B] dark:text-[#E2E8F0] block mb-1">
+                Configuração dos Pesos no Score (Demanda Identificada: Total 100)
+              </span>
+              <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+                Ajuste os pesos dos 4 pilares de qualificação para este perfil.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Input
+                label="Adequação ao ICP (30)"
+                type="number"
+                value={weightIcp}
+                onChange={(e) => setWeightIcp(Number(e.target.value))}
+              />
+              <Input
+                label="Intensidade do Problema (30)"
+                type="number"
+                value={weightProblem}
+                onChange={(e) => setWeightProblem(Number(e.target.value))}
+              />
+              <Input
+                label="Potencial de Compra (25)"
+                type="number"
+                value={weightPotential}
+                onChange={(e) => setWeightPotential(Number(e.target.value))}
+              />
+              <Input
+                label="Intenção / Contato (15)"
+                type="number"
+                value={weightIntent}
+                onChange={(e) => setWeightIntent(Number(e.target.value))}
+              />
             </div>
           </div>
         )}

@@ -9,7 +9,10 @@ import {
   CopilotLeadContext,
   CopilotRequest,
   CopilotResult,
+  IdealCustomerProfile,
+  CommercialPersonalizationSettings,
 } from '../types';
+import { resolveCommercialContext } from '../utils/commercialPersonalization';
 
 /**
  * Constrói o contexto padronizado e auditável do prospect para o Copiloto
@@ -20,22 +23,38 @@ export function buildCopilotLeadContext(params: {
   lead?: Lead;
   service?: Service;
   campaign?: Campaign;
+  icp?: IdealCustomerProfile;
+  settings?: CommercialPersonalizationSettings;
   recentEvents?: HistoryEvent[];
 }): CopilotLeadContext {
-  const { company, contact, lead, service, campaign, recentEvents } = params;
+  const { company, contact, lead, service, campaign, icp, settings, recentEvents } = params;
+
+  const resolved = resolveCommercialContext({
+    company,
+    contact,
+    lead,
+    service,
+    campaign,
+    icp,
+    settings,
+  });
 
   return {
     companyName: company?.name || lead?.companyId || 'Empresa Prospectada',
     niche: company?.niche,
-    city: company?.city,
-    country: company?.country,
-    website: company?.website,
-    websiteQuality: company?.websiteQuality,
-    unitsCount: company?.unitsCount || company?.numberOfUnits,
-    apparentNeed: company?.apparentNeed,
-    notes: [company?.notes, lead?.notes].filter(Boolean).join(' | '),
+    city: resolved.city !== 'Configuração não definida' ? resolved.city : company?.city,
+    country: resolved.country,
+    currency: resolved.currency,
+    priceFormatted: resolved.priceFormatted,
+    anchorPriceFormatted: resolved.anchorPriceFormatted,
+    paymentMethod: resolved.paymentMethod,
+    paymentTerms: resolved.paymentTerms,
+    language: resolved.language,
+    formalityLevel: resolved.formalityLevel,
     contactName: contact?.name,
-    contactRole: contact?.role,
+    contactRole: contact?.personaRole || contact?.role,
+    contactGender: contact?.gender,
+    roleStrategyAngle: resolved.personaAngle,
     contactPhone: contact?.phone,
     contactWhatsapp: contact?.whatsapp,
     contactEmail: contact?.email,
@@ -43,7 +62,7 @@ export function buildCopilotLeadContext(params: {
     temperature: lead?.temperature,
     priority: lead?.priority,
     score: lead?.score,
-    serviceName: service?.name,
+    serviceName: resolved.serviceName,
     serviceDescription: service?.description,
     serviceBenefits: service?.benefits,
     serviceProblemsSolved: service?.problemsSolved,

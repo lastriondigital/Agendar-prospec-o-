@@ -43,17 +43,23 @@ app.get("/api/copilot/status", (req, res) => {
   });
 });
 
-const SYSTEM_INSTRUCTION = `Você é o COPILOTO DE PROSPECÇÃO B2B do PROSPECT OS.
-Sua missão é estritamente analítica, consultiva e de assistência para equipes comerciais e de vendas.
+const SYSTEM_INSTRUCTION = `Você é o COPILOTO DE PERSONALIZAÇÃO COMERCIAL E PROSPECÇÃO B2B do PROSPECT OS.
+Sua missão é estritamente analítica, consultiva e de assistência para equipes de vendas, adaptando a comunicação ao contexto cultural, geográfico, monetário e hierárquico do lead.
 
 DIRETRIZES FUNDAMENTAIS & REGRAS RÍGIDAS DE CONDUTA:
 1. A IA NUNCA deve tentar enviar mensagens nem disparar fluxos automatizados. Você apenas analisa, recomenda, personaliza e prepara textos para revisão humana.
-2. NÃO INVENTE FATOS: É estritamente proibido inventar nomes, números de funcionários, receita, histórico não relatado, depoimentos, avaliações no Google ou prêmios.
-3. SEPARE FATO DE INFERÊNCIA: Tudo que foi explicitamente fornecido nos dados é FATO. Conclusões baseadas no nicho ou padrões de mercado são INFERÊNCIAS e devem ser rotuladas como tal.
-4. USE SOMENTE OS DADOS FORNECIDOS: Trabalhe exclusivamente com o objeto de contexto do prospect fornecido (empresa, contato, notas, serviços, histórico, etc.).
-5. MARQUE INFORMAÇÕES AUSENTES: Se faltar site, cargo do decisor, objeção clara ou nicho detalhado, liste explicitamente como "DADOS AUSENTES".
-6. NÃO ALEGUE TER NAVEGADO NA INTERNET: Nunca diga "consultei o site de vocês" ou "vi no Instagram de vocês" a menos que a informação conste explicitamente nas notas fornecidas.
-7. NÃO CRIE RESULTADOS FALSOS: Não prometa aumentos percentuais falsos (ex: "vamos aumentar suas vendas em 300%") nem cite clientes falsos.
+2. ADAPTAÇÃO CULTURAL & GEOGRÁFICA:
+   - Respeite o país e vocabulário regional do cliente (ex: Portugal: "sítio/website", "telemóvel", "equipa", Moeda: €; Moçambique: "página web/site", "contacto", Moeda: MT; Brasil: "site", "celular", "equipe", Moeda: R$).
+   - Nunca faça conversão de moedas por taxas cambiais fictícias. Use apenas os valores reais e moedas fornecidos no contexto.
+3. RESPEITO A CARGO & GÊNERO:
+   - Nunca presuma o gênero apenas pelo nome se não houver confirmação expressa (use comunicação neutra e profissional como "Olá [Nome]").
+   - Adapte o ângulo de abordagem ao cargo (Proprietário -> ROI, receita e clientes; Gerente -> processos, prazos e produtividade; Recepção -> mensagem ultra-curta e polida solicitando encaminhamento ao responsável comercial).
+4. NÃO INVENTE FATOS: É estritamente proibido inventar nomes, número de funcionários, receita, depoimentos, falsas avaliações ou falsas estatísticas.
+5. COMUNICAÇÃO NATURAL & HUMANA:
+   - A mensagem deve parecer escrita por uma pessoa real, não por uma IA.
+   - Proibido: excesso de emojis, frases artificiais, elogios exagerados, falsas urgências ("só até hoje"), falsas provas sociais ("temos 1000 clientes no seu bairro").
+6. SEPARE FATO DE INFERÊNCIA: Fatos são dados expressos do cadastro; padrões de mercado são INFERÊNCIAS e devem ser rotulados como tal.
+7. MARQUE INFORMAÇÕES AUSENTES: Se faltar preço, cidade, cargo ou dor específica, indique "DADOS AUSENTES" ou "Configuração não definida".
 
 FORMATO DE RESPOSTA:
 Sempre retorne estritamente um JSON estruturado com os campos solicitados.`;
@@ -244,6 +250,106 @@ Instruções: ${inputMessage || "Gere uma análise completa."}`;
     console.error("Erro no Copiloto Gemini:", error);
     return res.status(500).json({
       error: error.message || "Falha ao processar solicitação com Gemini.",
+      fallback: true,
+    });
+  }
+});
+
+// Endpoint dedicado para Análise Completa de Lead com IA
+app.post("/api/copilot/analyze-lead", async (req, res) => {
+  try {
+    const { leadContext, icps, availableServices } = req.body;
+    const ai = getGeminiClient();
+
+    if (!ai) {
+      return res.status(503).json({
+        error: "GEMINI_API_KEY não configurada no servidor. O sistema utiliza análise determinística.",
+        fallback: true,
+      });
+    }
+
+    const prompt = `Analise este lead B2B estritamente com base nos dados fornecidos, sem inventar nenhuma informação não existente.
+
+Contexto do Lead:
+${JSON.stringify(leadContext)}
+
+ICPs Cadastrados:
+${JSON.stringify(icps || [])}
+
+Serviços Disponíveis:
+${JSON.stringify(availableServices || [])}
+
+Retorne uma análise estruturada contendo:
+1. icpAdequacy: Texto claro sobre a adequação ao ICP;
+2. icpScore: Nota de adequação ao ICP (0 a 100);
+3. problemsAndSignals: Lista de problemas ou sinais detectados;
+4. commercialPotential: Avaliação do potencial comercial;
+5. opportunityState: Estado da oportunidade (HIPOTESE, PROVAVEL, PROBLEMA_CONFIRMADO);
+6. opportunityScore: Score de Oportunidade (0 a 100);
+7. qualificationScore: Score de Qualificação (0 a 100);
+8. recommendedService: Nome do serviço mais compatível;
+9. analysisRiskOrLimitations: Riscos ou limitações da análise;
+10. recommendedNextAction: Próxima ação recomendada;
+11. recommendedChannel: Canal recomendado (whatsapp, call, linkedin, email);
+12. recommendedScript: Script curto, humano e personalizado para a próxima ação;
+13. confidence: "alta" (se houver dados suficientes) ou "baixa" (se faltarem dados essenciais);
+14. confidenceReason: Justificativa da confiança;
+15. factsUsed: Fatos confirmados utilizados;
+16. missingData: Dados importantes ausentes no cadastro.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.7-flash",
+      contents: prompt,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            icpAdequacy: { type: Type.STRING },
+            icpScore: { type: Type.NUMBER },
+            problemsAndSignals: { type: Type.ARRAY, items: { type: Type.STRING } },
+            commercialPotential: { type: Type.STRING },
+            opportunityState: { type: Type.STRING },
+            opportunityScore: { type: Type.NUMBER },
+            qualificationScore: { type: Type.NUMBER },
+            recommendedService: { type: Type.STRING },
+            analysisRiskOrLimitations: { type: Type.ARRAY, items: { type: Type.STRING } },
+            recommendedNextAction: { type: Type.STRING },
+            recommendedChannel: { type: Type.STRING },
+            recommendedScript: { type: Type.STRING },
+            confidence: { type: Type.STRING },
+            confidenceReason: { type: Type.STRING },
+            factsUsed: { type: Type.ARRAY, items: { type: Type.STRING } },
+            missingData: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: [
+            "icpAdequacy",
+            "icpScore",
+            "problemsAndSignals",
+            "commercialPotential",
+            "opportunityScore",
+            "qualificationScore",
+            "recommendedService",
+            "recommendedNextAction",
+            "recommendedScript",
+            "confidence",
+            "factsUsed",
+            "missingData",
+          ],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || "{}");
+    return res.json({
+      success: true,
+      data: parsed,
+    });
+  } catch (error: any) {
+    console.error("Erro na Análise de Lead Gemini:", error);
+    return res.status(500).json({
+      error: error.message || "Falha ao analisar lead.",
       fallback: true,
     });
   }

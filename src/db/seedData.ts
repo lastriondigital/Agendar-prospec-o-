@@ -14,6 +14,7 @@ import {
 } from '../types';
 import { DEFAULT_PIPELINE_STAGES } from '../utils/constants';
 import { DEFAULT_SCORING_WEIGHTS } from '../utils/leadScoring';
+import { DEFAULT_COMMERCIAL_SETTINGS, DEFAULT_CORE_SERVICES_PRICING } from '../utils/commercialPersonalization';
 
 export const INITIAL_SETTINGS: AppSettings = {
   theme: 'dark',
@@ -25,6 +26,7 @@ export const INITIAL_SETTINGS: AppSettings = {
   dataStorageType: 'indexeddb_local',
   lastBackupDate: undefined,
   scoringWeights: DEFAULT_SCORING_WEIGHTS,
+  commercialPersonalization: DEFAULT_COMMERCIAL_SETTINGS,
 };
 
 export const SEED_SERVICES: Service[] = [
@@ -77,6 +79,7 @@ export const SEED_SERVICES: Service[] = [
     ticketValue: 2500,
     valueProposition: 'Multiplicar a conversão dos seus anúncios com páginas rápidas e persuasivas.',
     keyDifferentiators: ['Copywriting persuasivo', 'Ultra-velocidade', 'Rastreamento avançado'],
+    marketPrices: DEFAULT_CORE_SERVICES_PRICING['criacao_sites'] || [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -129,6 +132,7 @@ export const SEED_SERVICES: Service[] = [
     ticketValue: 6000,
     valueProposition: 'Construir autoridade inquestionável no mercado com um portal institucional de alto nível.',
     keyDifferentiators: ['SEO Técnico', 'Design Exclusivo', 'Painel Simplificado'],
+    marketPrices: DEFAULT_CORE_SERVICES_PRICING['criacao_sites'] || [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -179,6 +183,7 @@ export const SEED_SERVICES: Service[] = [
     ticketValue: 18000,
     valueProposition: 'Fidelizar clientes e automatizar sua operação com um aplicativo proprietário veloz.',
     keyDifferentiators: ['PWA sem atrito', 'Notificações Push', 'Zero taxas de marketplace'],
+    marketPrices: DEFAULT_CORE_SERVICES_PRICING['desenvolvimento_app'] || [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -224,6 +229,7 @@ export const SEED_SERVICES: Service[] = [
     ticketValue: 1500,
     valueProposition: 'Colocar seu negócio nas primeiras posições do Google Maps para atrair clientes locais prontos para comprar.',
     keyDifferentiators: ['SEO Local Georreferenciado', 'Protocolo de Avaliações', 'Auditoria Inicial Gratuita'],
+    marketPrices: DEFAULT_CORE_SERVICES_PRICING['gmb_seo'] || [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -269,6 +275,7 @@ export const SEED_SERVICES: Service[] = [
     ticketValue: 3500,
     valueProposition: 'Elevar a percepção de valor da sua marca para cobrar mais caro e fechar mais contratos.',
     keyDifferentiators: ['Branding focado em conversão', 'Manual Completo', 'Templates Prontos'],
+    marketPrices: DEFAULT_CORE_SERVICES_PRICING['design_grafico'] || [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -314,6 +321,7 @@ export const SEED_SERVICES: Service[] = [
     ticketValue: 800,
     valueProposition: 'Garantir estabilidade total, segurança e atualizações constantes para o seu site nunca parar de vender.',
     keyDifferentiators: ['SLA 2h', 'Backups Diários', 'Relatórios Mensais'],
+    marketPrices: DEFAULT_CORE_SERVICES_PRICING['atualizacao_sites'] || [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },

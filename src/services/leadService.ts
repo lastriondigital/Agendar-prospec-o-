@@ -27,6 +27,7 @@ export interface CreateCompanyPayload {
     category: string;
     niche: string;
     country: string;
+    region?: string;
     city: string;
     address?: string;
     companyPhone?: string;
@@ -39,6 +40,10 @@ export interface CreateCompanyPayload {
     googleBusiness?: string;
     unitsCount?: number;
     notes?: string;
+    marketProfile?: any;
+    currency?: string;
+    language?: string;
+    formalityLevel?: any;
     status?: 'active' | 'archived' | 'lead' | 'client';
   };
   contact: {
@@ -49,6 +54,10 @@ export interface CreateCompanyPayload {
     whatsapp?: string;
     email?: string;
     notes?: string;
+    gender?: any;
+    salutation?: any;
+    customSalutation?: string;
+    personaRole?: any;
     isPrimary?: boolean;
   };
   lead: {
@@ -133,6 +142,11 @@ export class LeadService {
       linkedin: payload.company.linkedin?.trim() || undefined,
       googleBusiness: payload.company.googleBusiness?.trim() || undefined,
       unitsCount: payload.company.unitsCount ?? 1,
+      region: payload.company.region?.trim() || undefined,
+      marketProfile: payload.company.marketProfile || undefined,
+      currency: payload.company.currency || undefined,
+      language: payload.company.language || undefined,
+      formalityLevel: payload.company.formalityLevel || undefined,
       notes: payload.company.notes?.trim() || undefined,
       status: payload.company.status || 'lead',
       createdAt: now,
@@ -149,6 +163,10 @@ export class LeadService {
       whatsapp: payload.contact.whatsapp?.trim() || undefined,
       email: payload.contact.email?.trim() || undefined,
       notes: payload.contact.notes?.trim() || undefined,
+      gender: payload.contact.gender || 'nao_informado',
+      salutation: payload.contact.salutation || 'nome_proprio',
+      customSalutation: payload.contact.customSalutation?.trim() || undefined,
+      personaRole: payload.contact.personaRole || 'outro',
       isPrimary: true,
       createdAt: now,
       updatedAt: now,

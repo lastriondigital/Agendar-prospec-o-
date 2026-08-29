@@ -34,6 +34,7 @@ import { Input } from '../components/ui/Input';
 import { ImportBackupModal } from '../components/settings/ImportBackupModal';
 import { ProductionAuditModal } from '../components/audit/ProductionAuditModal';
 import { AccountPanel } from '../components/account/AccountPanel';
+import { CommercialPersonalizationPanel } from '../components/settings/CommercialPersonalizationPanel';
 import {
   exportCompaniesCSV,
   exportActionsCSV,
@@ -249,6 +250,11 @@ export const SettingsView: React.FC = () => {
 
       {/* Account, Authentication & Cloud Sync Panel */}
       <AccountPanel />
+
+      {/* Personalização Comercial & Mercados */}
+      <Card padding="md">
+        <CommercialPersonalizationPanel />
+      </Card>
 
       {/* Conflict Alert Banner if any */}
       {conflicts.length > 0 && (

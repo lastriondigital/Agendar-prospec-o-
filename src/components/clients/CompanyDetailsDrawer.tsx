@@ -42,6 +42,7 @@ import { ScheduleActionModal } from './ScheduleActionModal';
 import { LogInteractionModal } from './LogInteractionModal';
 import { ScoreBadge } from '../qualification/ScoreBadge';
 import { calculateLeadScore } from '../../utils/leadScoring';
+import { resolveCommercialContext } from '../../utils/commercialPersonalization';
 import { LeadMessageModal } from '../qualification/LeadMessageModal';
 import { QualificationModal } from '../qualification/QualificationModal';
 import { CopilotActionButtons } from '../copilot/CopilotActionButtons';
@@ -113,6 +114,17 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
   const leadScoreResult = companyLead
     ? calculateLeadScore(company, primaryContact, companyLead, icps, services, companyHistory, settings.scoringWeights)
     : null;
+
+  // Resolve contexto comercial em 6 níveis hierárquicos
+  const commercialContext = resolveCommercialContext({
+    company,
+    contact: primaryContact,
+    lead: companyLead,
+    service: services.find((s) => s.id === companyLead?.serviceId) || null,
+    campaign: null,
+    icp: icps.find((i) => i.id === companyLead?.icpId) || null,
+    settings: settings.commercialPersonalization || null,
+  });
 
   const stageKey: LeadStage = companyLead?.stage || 'NOVO';
   const stageDef = STAGES_CONFIG[stageKey] || STAGES_CONFIG['NOVO'];
@@ -555,6 +567,69 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                     <p className="text-[#202124] dark:text-[#E8EAED] whitespace-pre-wrap">{companyLead.notes}</p>
                   </div>
                 )}
+              </div>
+
+              {/* Perfil de Mercado & Personalização Comercial */}
+              <div className="p-4 rounded-xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] space-y-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-[#3F6FB5] dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5" />
+                    Perfil de Mercado & Estratégia Comercial
+                  </h3>
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => onEditCompany(company)}
+                    leftIcon={<Edit2 className="w-3 h-3" />}
+                    className="text-[11px]"
+                  >
+                    Editar Perfil
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">País / Moeda:</span>
+                    <span className="font-medium text-[#202124] dark:text-[#E8EAED]">
+                      {commercialContext.country} • {commercialContext.currency} ({commercialContext.currencySymbol})
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">Idioma de Abordagem:</span>
+                    <span className="font-medium text-[#202124] dark:text-[#E8EAED]">
+                      {commercialContext.language}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">Nível de Formalidade:</span>
+                    <span className="font-medium text-[#202124] dark:text-[#E8EAED] capitalize">
+                      {commercialContext.formalityLevel}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">Tratamento do Contacto:</span>
+                    <span className="font-medium text-[#202124] dark:text-[#E8EAED]">
+                      {commercialContext.salutation} ({commercialContext.contactFirstName})
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">Preço do Serviço Alvo:</span>
+                    <span className="font-medium text-emerald-700 dark:text-emerald-400 font-mono">
+                      {commercialContext.priceFormatted}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[#5F6368] dark:text-[#9AA0A6] block">Origem da Regra:</span>
+                    <span className="font-mono text-[11px] bg-neutral-100 dark:bg-neutral-800 text-[#5F6368] dark:text-[#9AA0A6] px-1.5 py-0.5 rounded">
+                      Fonte: {commercialContext.hierarchySource.priceSource.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Presença Digital & Contato Corporativo */}

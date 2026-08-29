@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -9,7 +9,6 @@ import {
   Copy,
   Edit2,
   ExternalLink,
-  FastForward,
   Flame,
   Globe,
   Instagram,
@@ -27,9 +26,15 @@ import {
   Share2,
   ShieldCheck,
   Sparkles,
+  Target,
   Trophy,
   User,
   Zap,
+  ListOrdered,
+  Eye,
+  SlidersHorizontal,
+  ChevronRight,
+  Plus,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
@@ -42,22 +47,49 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { ContextualTip } from '../components/common/ContextualTip';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
-import { Select } from '../components/ui/Select';
 import {
   generateWhatsAppLink,
   getChannelBadgeDetails,
   formatPhoneNumber,
   formatRelativeDate,
 } from '../utils/formatting';
-import { ALL_LEAD_STAGES, STAGES_CONFIG } from '../utils/constants';
-import { ContactChannel, HistoryEventType, LeadStage, CopilotActionType } from '../types';
+import {
+  Company,
+  Contact,
+  ContactChannel,
+  CopilotActionType,
+  HistoryEventType,
+  IdealCustomerProfile,
+  Lead,
+  LeadStage,
+  OpportunityState,
+  ProspectingMode,
+} from '../types';
 import { CompanyDetailsDrawer } from '../components/clients/CompanyDetailsDrawer';
-import { CopilotActionButtons } from '../components/copilot/CopilotActionButtons';
 import { CopilotAssistantModal } from '../components/copilot/CopilotAssistantModal';
-import { ApproachRecommendationCard } from '../components/sales/ApproachRecommendationCard';
-import { ScoreBadge } from '../components/qualification/ScoreBadge';
 import { QualificationModal } from '../components/qualification/QualificationModal';
 import { LeadMessageModal } from '../components/qualification/LeadMessageModal';
+import { ProspectingModeToggle } from '../components/prospecting/ProspectingModeToggle';
+import { OpportunityScoreCard } from '../components/prospecting/OpportunityScoreCard';
+import { SignalSelectorModal } from '../components/prospecting/SignalSelectorModal';
+import { OpportunityDetailModal } from '../components/prospecting/OpportunityDetailModal';
+import { PrioritizedItem, PrioritizedLeadList } from '../components/prospecting/PrioritizedLeadList';
+import { IcpManagementDrawer } from '../components/prospecting/IcpManagementDrawer';
+import { WhatToDoNowHub } from '../components/assistant/WhatToDoNowHub';
+import { AiLeadAnalysisModal } from '../components/assistant/AiLeadAnalysisModal';
+import { AdaptiveFunnelModal } from '../components/assistant/AdaptiveFunnelModal';
+import { CommercialPlaybookModal } from '../components/assistant/CommercialPlaybookModal';
+import { AiAuthorizedActionsModal } from '../components/assistant/AiAuthorizedActionsModal';
+import { SystemLearningModal } from '../components/assistant/SystemLearningModal';
+import {
+  calculateDemandaIdentificadaScore,
+  calculateOportunidadeLatenteScore,
+  DEMANDA_FUNNEL_STEPS,
+  getLeadSignals,
+  getRecommendedScript,
+  LATENTE_FUNNEL_STEPS,
+  resolveProspectingMode,
+} from '../utils/prospectingEngine';
 
 export const ProspectingView: React.FC = () => {
   const {
@@ -66,12 +98,17 @@ export const ProspectingView: React.FC = () => {
     contacts,
     leads,
     services,
+    icps,
     history,
     completeAction,
     skipAction,
     rescheduleAction,
     logInteractionAndAdvance,
     scheduleNextAction,
+    updateCompany,
+    updateLead,
+    upsertIcp,
+    deleteIcp,
     setActiveRoute,
     openAddCompanyModal,
   } = useApp();
@@ -87,6 +124,40 @@ export const ProspectingView: React.FC = () => {
   } = useExecutionQueue();
   const { success, info } = useToast();
 
+  // Modo Principal de Prospecção (Demanda Identificada vs Oportunidade Latente)
+  const [activeMode, setActiveMode] = useState<ProspectingMode>('DEMANDA_IDENTIFICADA');
+
+  // Tipo de Visualização: 'acoes' (Central O que Fazer Agora), 'foco' (1 a 1) ou 'lista' (Priorizada)
+  const [viewType, setViewType] = useState<'acoes' | 'foco' | 'lista'>('acoes');
+
+  // Filtros da Lista Priorizada
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStateFilter, setSelectedStateFilter] = useState('todos');
+  const [selectedNicheFilter, setSelectedNicheFilter] = useState('todos');
+
+  // Modais de Controle
+  const [selectedPrioritizedLead, setSelectedPrioritizedLead] = useState<PrioritizedItem | null>(null);
+  const [isSignalsModalOpen, setIsSignalsModalOpen] = useState(false);
+  const [targetCompanyForSignals, setTargetCompanyForSignals] = useState<Company | null>(null);
+  const [targetLeadForSignals, setTargetLeadForSignals] = useState<Lead | null>(null);
+  const [isIcpDrawerOpen, setIsIcpDrawerOpen] = useState(false);
+
+  // Modais do Assistente Inteligente & Playbook
+  const [isAiAnalysisModalOpen, setIsAiAnalysisModalOpen] = useState(false);
+  const [selectedCompanyForAi, setSelectedCompanyForAi] = useState<Company | null>(null);
+  const [selectedLeadForAi, setSelectedLeadForAi] = useState<Lead | null>(null);
+
+  const [isAdaptiveFunnelModalOpen, setIsAdaptiveFunnelModalOpen] = useState(false);
+  const [selectedCompanyForAdaptive, setSelectedCompanyForAdaptive] = useState<Company | null>(null);
+  const [selectedLeadForAdaptive, setSelectedLeadForAdaptive] = useState<Lead | null>(null);
+
+  const [isPlaybookModalOpen, setIsPlaybookModalOpen] = useState(false);
+  const [playbookInitialStage, setPlaybookInitialStage] = useState<string>('abertura');
+
+  const [isAiAuthorizedActionsModalOpen, setIsAiAuthorizedActionsModalOpen] = useState(false);
+  const [isSystemLearningModalOpen, setIsSystemLearningModalOpen] = useState(false);
+
+  // Estados da Fila 1 a 1
   const [copied, setCopied] = useState(false);
   const [isEditingMessage, setIsEditingMessage] = useState(false);
   const [customMessage, setCustomMessage] = useState('');
@@ -112,19 +183,94 @@ export const ProspectingView: React.FC = () => {
   // Drawer de Detalhes da Empresa
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Modal de Qualificação
-  const [isQualificationOpen, setIsQualificationOpen] = useState(false);
-
-  // Modal do Motor de Personalização (4x3)
-  const [isLeadMessageModalOpen, setIsLeadMessageModalOpen] = useState(false);
-
   // Copiloto Gemini de Prospecção
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copilotInitialAction, setCopilotInitialAction] = useState<CopilotActionType>('PERSONALIZAR');
-  const [showSalesApproach, setShowSalesApproach] = useState(false);
 
-  // Item atual da fila
-  const currentItem = queueItems[0] || null;
+  // Item atual da fila filtrado pelo modo ativo
+  const filteredQueueItems = useMemo(() => {
+    return queueItems.filter((item) => {
+      const company = item.company || companies.find((c) => c.id === item.action.clientId);
+      const lead = item.lead || leads.find((l) => l.companyId === company?.id);
+      const itemMode = resolveProspectingMode(company, lead);
+      return itemMode === activeMode;
+    });
+  }, [queueItems, companies, leads, activeMode]);
+
+  // Contadores por Modo
+  const { demandaCount, latenteCount } = useMemo(() => {
+    let dCount = 0;
+    let lCount = 0;
+    companies.forEach((comp) => {
+      const lead = leads.find((l) => l.companyId === comp.id);
+      const m = resolveProspectingMode(comp, lead);
+      if (m === 'OPORTUNIDADE_LATENTE') lCount++;
+      else dCount++;
+    });
+    return { demandaCount: dCount, latenteCount: lCount };
+  }, [companies, leads]);
+
+  // Lista Priorizada Completa para o Modo Ativo
+  const prioritizedItems: PrioritizedItem[] = useMemo(() => {
+    return companies
+      .filter((company) => {
+        const lead = leads.find((l) => l.companyId === company.id);
+        const compMode = resolveProspectingMode(company, lead);
+        return compMode === activeMode;
+      })
+      .map((company) => {
+        const contact = contacts.find((c) => c.companyId === company.id && c.isPrimary) || contacts.find((c) => c.companyId === company.id);
+        const lead = leads.find((l) => l.companyId === company.id);
+        const opportunityState: OpportunityState =
+          company.opportunityState ||
+          lead?.opportunityState ||
+          (activeMode === 'OPORTUNIDADE_LATENTE' ? 'HIPOTESE' : 'CONFIRMADO');
+
+        const explanation =
+          activeMode === 'OPORTUNIDADE_LATENTE'
+            ? calculateOportunidadeLatenteScore(company, contact, lead, icps)
+            : calculateDemandaIdentificadaScore(company, contact, lead, icps);
+
+        return {
+          company,
+          contact,
+          lead,
+          explanation,
+          opportunityState,
+        };
+      })
+      .sort((a, b) => b.explanation.totalScore - a.explanation.totalScore);
+  }, [companies, contacts, leads, icps, activeMode]);
+
+  // Filtragem na Lista Priorizada
+  const filteredPrioritizedItems = useMemo(() => {
+    return prioritizedItems.filter((item) => {
+      const matchesSearch =
+        searchTerm === '' ||
+        (item.company.tradeName || item.company.name).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.company.niche || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.company.city || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.contact?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesState =
+        selectedStateFilter === 'todos' || item.opportunityState === selectedStateFilter;
+
+      const matchesNiche =
+        selectedNicheFilter === 'todos' || item.company.niche === selectedNicheFilter;
+
+      return matchesSearch && matchesState && matchesNiche;
+    });
+  }, [prioritizedItems, searchTerm, selectedStateFilter, selectedNicheFilter]);
+
+  const allNiches = useMemo(() => {
+    const set = new Set<string>();
+    companies.forEach((c) => {
+      if (c.niche) set.add(c.niche);
+    });
+    return Array.from(set);
+  }, [companies]);
+
+  const currentItem = filteredQueueItems[0] || null;
 
   // Atualizar dados quando o item mudar
   useEffect(() => {
@@ -242,10 +388,72 @@ export const ProspectingView: React.FC = () => {
     success(`Ação reagendada para ${formatRelativeDate(customAdiarDate)}.`);
   };
 
+  // Salvar Sinais no Modal
+  const handleSaveSignals = async (signals: string[], customSignals: string[]) => {
+    if (!targetCompanyForSignals) return;
+    const updatedCompany: Company = {
+      ...targetCompanyForSignals,
+      signals,
+      customSignals,
+      updatedAt: new Date().toISOString(),
+    };
+    await updateCompany(updatedCompany);
+
+    if (targetLeadForSignals) {
+      const updatedLead: Lead = {
+        ...targetLeadForSignals,
+        customSignals,
+        updatedAt: new Date().toISOString(),
+      };
+      await updateLead(updatedLead);
+    }
+    success('Sinais atualizados com sucesso e score recalculado!');
+  };
+
+  const handleOpenSignals = (company: Company, lead?: Lead) => {
+    setTargetCompanyForSignals(company);
+    setTargetLeadForSignals(lead || null);
+    setIsSignalsModalOpen(true);
+  };
+
+  // Atualizar Estado da Oportunidade
+  const handleUpdateOpportunityState = async (state: OpportunityState) => {
+    if (!selectedPrioritizedLead) return;
+    const updatedCompany: Company = {
+      ...selectedPrioritizedLead.company,
+      opportunityState: state,
+      updatedAt: new Date().toISOString(),
+    };
+    await updateCompany(updatedCompany);
+
+    if (selectedPrioritizedLead.lead) {
+      const updatedLead: Lead = {
+        ...selectedPrioritizedLead.lead,
+        opportunityState: state,
+        updatedAt: new Date().toISOString(),
+      };
+      await updateLead(updatedLead);
+    }
+    setSelectedPrioritizedLead({
+      ...selectedPrioritizedLead,
+      opportunityState: state,
+    });
+    success(`Estado atualizado para: ${state}`);
+  };
+
   // Atalhos de teclado (C: copiar, W: whatsapp, Enter: enviar)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isPaused || isAdiarOpen || isDrawerOpen || isQualificationOpen || isCopilotOpen) {
+      if (
+        isPaused ||
+        isAdiarOpen ||
+        isDrawerOpen ||
+        isCopilotOpen ||
+        isSignalsModalOpen ||
+        selectedPrioritizedLead ||
+        isIcpDrawerOpen ||
+        viewType === 'lista'
+      ) {
         return;
       }
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) {
@@ -280,676 +488,517 @@ export const ProspectingView: React.FC = () => {
     isPaused,
     isAdiarOpen,
     isDrawerOpen,
-    isQualificationOpen,
     isCopilotOpen,
+    isSignalsModalOpen,
+    selectedPrioritizedLead,
+    isIcpDrawerOpen,
+    viewType,
   ]);
 
-  // Se a fila estiver vazia:
-  if (!currentItem || queueItems.length === 0) {
-    if (companies.length === 0) {
-      return (
-        <div className="space-y-6 max-w-2xl mx-auto py-8 animate-in fade-in duration-300">
-          <ContextualTip
-            id="prospecting_first_access_tip"
-            title="Modo Prospecção Ativa"
-            message="O Modo Prospecção é a tela de foco onde você executa uma ação por vez (mensagens WhatsApp, ligações, emails) com atalhos de teclado e scripts prontos."
-          />
+  // Objeto de Explicação para o Item Atual da Fila
+  const currentExplanation = useMemo(() => {
+    if (!currentItem) return null;
+    const company = currentItem.company || companies.find((c) => c.id === currentItem.action.clientId);
+    const contact = currentItem.contact || contacts.find((c) => c.companyId === company?.id);
+    const lead = currentItem.lead || leads.find((l) => l.companyId === company?.id);
 
-          <div className="p-8 sm:p-10 rounded-2xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] shadow-xs text-center space-y-6">
-            <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 text-[#3F6FB5] dark:text-blue-300 mx-auto flex items-center justify-center">
-              <Zap className="w-8 h-8 fill-[#3F6FB5] dark:fill-blue-300" />
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-[#202124] dark:text-[#E8EAED]">
-                Fila de Prospecção Vazia
-              </h2>
-              <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6] max-w-md mx-auto leading-relaxed">
-                Adicione sua primeira empresa para que o sistema gere automaticamente as ações de abordagem e follow-up na sua fila de execução.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              <Button
-                variant="primary"
-                size="md"
-                onClick={openAddCompanyModal}
-                leftIcon={<Building2 className="w-4 h-4" />}
-                className="w-full sm:w-auto font-bold"
-              >
-                + Adicionar Primeira Empresa
-              </Button>
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => setActiveRoute('dashboard')}
-                className="w-full sm:w-auto"
-              >
-                Voltar ao Dashboard
-              </Button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (completedToday.length === 0) {
-      return (
-        <div className="space-y-6 max-w-2xl mx-auto py-8 animate-in fade-in duration-300">
-          <div className="p-8 sm:p-10 rounded-2xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] shadow-xs text-center space-y-6">
-            <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-[#3F6FB5] dark:text-blue-300 mx-auto flex items-center justify-center">
-              <CheckCircle2 className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-[#202124] dark:text-[#E8EAED]">
-                Nenhuma Ação Agendada para Hoje
-              </h2>
-              <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6] max-w-md mx-auto leading-relaxed">
-                Suas tarefas e follow-ups estão em dia. Você pode cadastrar novas empresas ou agendar novas abordagens no painel de clientes.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => setActiveRoute('clients')}
-                leftIcon={<Building2 className="w-4 h-4" />}
-                className="w-full sm:w-auto"
-              >
-                Ver Empresas & Prospects
-              </Button>
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => setActiveRoute('dashboard')}
-                className="w-full sm:w-auto"
-              >
-                Ir para o Dashboard
-              </Button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-6 max-w-2xl mx-auto py-8 animate-in fade-in duration-300">
-        <div className="p-8 rounded-2xl bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] shadow-xs text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
-            <Trophy className="w-8 h-8" />
-          </div>
-
-          <div className="space-y-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 rounded-md border border-emerald-200 dark:border-emerald-800/40">
-              Rotina Concluída com Sucesso
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-bold text-[#202124] dark:text-[#E8EAED]">
-              Fila de Prospecção Finalizada!
-            </h2>
-            <p className="text-xs sm:text-sm text-[#5F6368] dark:text-[#9AA0A6] max-w-md mx-auto leading-relaxed">
-              Você executou todas as ações planejadas para hoje. Excelente consistência!
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 max-w-sm mx-auto p-4 rounded-xl bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] text-left">
-            <div>
-              <span className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6] font-medium uppercase block">Executadas Hoje</span>
-              <span className="text-xl font-bold text-[#202124] dark:text-[#E8EAED] mt-0.5 block">{completedToday.length} ações</span>
-            </div>
-            <div>
-              <span className="text-[11px] text-[#5F6368] dark:text-[#9AA0A6] font-medium uppercase block">Streak Atual</span>
-              <span className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1">
-                <Flame className="w-4 h-4 fill-current" />
-                {streakDays} dias
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => setActiveRoute('dashboard')}
-              leftIcon={<Zap className="w-4 h-4" />}
-            >
-              Ir para o Início
-            </Button>
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => setActiveRoute('clients')}
-              leftIcon={<Building2 className="w-4 h-4" />}
-            >
-              Ver Clientes & Cadastros
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const channelDetails = getChannelBadgeDetails(currentItem.action.channel);
-  const company = currentItem.company || companies.find((c) => c.id === currentItem.action.clientId);
-  const contact = currentItem.contact || contacts.find((c) => c.companyId === company?.id);
-  const lead = currentItem.lead || leads.find((l) => l.companyId === company?.id);
-  const targetService = currentItem.service || services.find((s) => s.id === lead?.serviceId);
-  const stageDef = STAGES_CONFIG[lead?.stage || 'NOVO'] || STAGES_CONFIG['NOVO'];
-
-  const rawPhone = contact?.whatsapp || contact?.phone || currentItem.client.whatsapp || currentItem.client.phone;
-  const currentActionEstMinutes = currentItem.action.estMinutes || 3;
+    return activeMode === 'OPORTUNIDADE_LATENTE'
+      ? calculateOportunidadeLatenteScore(company, contact, lead, icps)
+      : calculateDemandaIdentificadaScore(company, contact, lead, icps);
+  }, [currentItem, companies, contacts, leads, icps, activeMode]);
 
   return (
-    <div className="space-y-5 max-w-6xl mx-auto animate-in fade-in duration-200">
-      {/* 1. BARRA DE STATUS DA SESSÃO ATIVA */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] p-4 rounded-xl shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-[#3F6FB5] dark:text-blue-300 flex items-center justify-center font-bold text-sm">
-            <Zap className="w-5 h-5 fill-current" />
-          </div>
+    <div className="space-y-6 max-w-5xl mx-auto pb-12 animate-in fade-in duration-200">
+      {/* 1. TOPO: SELETOR DE MODOS & BARRA DE AÇÕES RÁPIDAS */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold text-[#202124] dark:text-[#E8EAED] flex items-center gap-2">
-              <span>Modo Foco em Execução</span>
-              <Badge variant="blue" size="sm">
-                Ao Vivo
-              </Badge>
-              {streakDays > 0 && (
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/40">
-                  <Flame className="w-3 h-3 fill-current" /> {streakDays}d seguidos
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] mt-0.5">
-              <strong>{metrics.pendingToday}</strong> restantes • Duração estimada: <strong>{formattedDuration}</strong> (~{currentActionEstMinutes} min nesta ação)
+            <h1 className="text-xl sm:text-2xl font-bold text-[#1E293B] dark:text-white tracking-tight">
+              Central de Prospecção & Priorização
+            </h1>
+            <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+              Qualifique empresas por sinais reais e priorize abordagens de alta conversão
             </p>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsPaused(true)}
-            leftIcon={<Pause className="w-3.5 h-3.5" />}
-          >
-            Pausar
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Alternar entre Central O que fazer agora, Fila 1 a 1 e Lista Priorizada */}
+            <div className="flex items-center bg-[#F1F5F9] dark:bg-[#1E222A] p-1 rounded-xl border border-[#E2E6EC] dark:border-[#272B33]">
+              <button
+                type="button"
+                onClick={() => setViewType('acoes')}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  viewType === 'acoes'
+                    ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                    : 'text-[#64748B] dark:text-[#94A3B8] hover:text-[#1E293B]'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" /> O que Fazer Agora?
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewType('foco')}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  viewType === 'foco'
+                    ? 'bg-white dark:bg-[#252B35] text-[#1E293B] dark:text-white shadow-2xs'
+                    : 'text-[#64748B] dark:text-[#94A3B8] hover:text-[#1E293B]'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" /> Fila 1 a 1
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewType('lista')}
+                className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                  viewType === 'lista'
+                    ? 'bg-white dark:bg-[#252B35] text-[#1E293B] dark:text-white shadow-2xs'
+                    : 'text-[#64748B] dark:text-[#94A3B8] hover:text-[#1E293B]'
+                }`}
+              >
+                <ListOrdered className="w-3.5 h-3.5" /> Lista Priorizada
+              </button>
+            </div>
 
-          <div className="hidden lg:flex items-center gap-2 text-xs text-[#5F6368] dark:text-[#9AA0A6] ml-2">
-            <span className="flex items-center gap-1 bg-[#F7F8FA] dark:bg-[#1E2228] px-2 py-1 rounded-md border border-[#E6E8EB] dark:border-[#2D3139]">
-              <Kbd>W</Kbd> WhatsApp
-            </span>
-            <span className="flex items-center gap-1 bg-[#F7F8FA] dark:bg-[#1E2228] px-2 py-1 rounded-md border border-[#E6E8EB] dark:border-[#2D3139]">
-              <Kbd>C</Kbd> Copiar
-            </span>
-            <span className="flex items-center gap-1 bg-[#F7F8FA] dark:bg-[#1E2228] px-2 py-1 rounded-md border border-[#E6E8EB] dark:border-[#2D3139]">
-              <Kbd>↵ Enter</Kbd> Concluir
-            </span>
+            {/* Playbook Comercial */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsPlaybookModalOpen(true)}
+              className="text-xs font-semibold"
+            >
+              <MessageSquare className="w-3.5 h-3.5 mr-1" />
+              Playbook
+            </Button>
+
+            {/* Ações Autorizadas IA */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAiAuthorizedActionsModalOpen(true)}
+              className="text-xs font-semibold"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 mr-1 text-purple-600" />
+              Ações IA
+            </Button>
+
+            {/* Aprendizado do Sistema */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSystemLearningModalOpen(true)}
+              className="text-xs font-semibold"
+            >
+              <Trophy className="w-3.5 h-3.5 mr-1 text-amber-500" />
+              Aprendizado
+            </Button>
+
+            {/* Gerenciador de ICPs */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsIcpDrawerOpen(true)}
+              leftIcon={<Target className="w-3.5 h-3.5" />}
+            >
+              ICPs
+            </Button>
           </div>
         </div>
+
+        {/* TOGGLE DOS 2 MODOS (DEMANDA IDENTIFICADA vs OPORTUNIDADE LATENTE) */}
+        {viewType !== 'acoes' && (
+          <ProspectingModeToggle
+            currentMode={activeMode}
+            onChangeMode={(m) => {
+              setActiveMode(m);
+              setViewType('foco');
+            }}
+            demandaCount={demandaCount}
+            latenteCount={latenteCount}
+          />
+        )}
       </div>
 
-      {/* 2. PALCO PRINCIPAL DE EXECUÇÃO EM 2 COLUNAS */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* COLUNA ESQUERDA: DOSSIER COMPLETO & SCRIPT (7 colunas) */}
-        <div className="lg:col-span-7 space-y-4">
-          {/* Card: Dossiê do Cliente, Empresa & Serviço */}
-          <Card padding="md" className="space-y-4">
-            {/* Topo do Dossiê */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge variant={channelDetails.label === 'WhatsApp' ? 'emerald' : 'blue'} size="sm">
-                    {channelDetails.label}
-                  </Badge>
-                  {currentItem.objective && (
-                    <Badge variant="purple" size="sm">
-                      {currentItem.objective}
-                    </Badge>
-                  )}
-                  <Badge variant={stageDef.badgeVariant} size="sm">
-                    {stageDef.label}
-                  </Badge>
-                  <ScoreBadge
-                    score={lead?.score || 50}
-                    size="xs"
-                    interactive
-                    companyName={company?.name}
-                  />
-                </div>
-
-                <h2 className="text-lg font-bold text-[#202124] dark:text-[#E8EAED] truncate pt-0.5">
-                  {contact?.name || company?.name || 'Decisor Principal'}
-                </h2>
-
-                <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
-                  {contact?.role ? `${contact.role} • ` : ''}
-                  <button
-                    onClick={() => setIsDrawerOpen(true)}
-                    className="font-semibold text-[#202124] dark:text-[#E8EAED] hover:underline cursor-pointer"
-                  >
-                    {company?.name}
-                  </button>
-                  {company?.niche ? ` (${company.niche})` : ''}
+      {/* 2. CONTEÚDO PRINCIPAL DE ACORDO COM A VISÃO */}
+      {viewType === 'acoes' ? (
+        /* VISÃO CENTRAL O QUE FAZER AGORA (ASSISTENTE INTELIGENTE) */
+        <WhatToDoNowHub
+          onOpenCompany={(comp) => {
+            setSelectedCompany(comp);
+            setIsDrawerOpen(true);
+          }}
+          onOpenAiAnalysis={(comp, ld) => {
+            setSelectedCompanyForAi(comp);
+            setSelectedLeadForAi(ld || null);
+            setIsAiAnalysisModalOpen(true);
+          }}
+          onOpenAdaptiveFunnel={(comp, ld) => {
+            setSelectedCompanyForAdaptive(comp);
+            setSelectedLeadForAdaptive(ld || null);
+            setIsAdaptiveFunnelModalOpen(true);
+          }}
+          onOpenPlaybook={(stage) => {
+            if (stage) setPlaybookInitialStage(stage);
+            setIsPlaybookModalOpen(true);
+          }}
+        />
+      ) : viewType === 'lista' ? (
+        /* VISÃO LISTA PRIORIZADA DE OPORTUNIDADES */
+        <PrioritizedLeadList
+          items={filteredPrioritizedItems}
+          mode={activeMode}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          selectedStateFilter={selectedStateFilter}
+          onStateFilterChange={setSelectedStateFilter}
+          selectedNicheFilter={selectedNicheFilter}
+          onNicheFilterChange={setSelectedNicheFilter}
+          allNiches={allNiches}
+          onSelectLead={(item) => setSelectedPrioritizedLead(item)}
+          onOpenSignalsModal={(comp, ld) => handleOpenSignals(comp, ld)}
+          onAddNewCompany={openAddCompanyModal}
+        />
+      ) : (
+        /* VISÃO FOCO (FILA 1 A 1) */
+        <div>
+          {!currentItem ? (
+            <div className="p-8 sm:p-12 text-center bg-white dark:bg-[#181B20] rounded-2xl border border-[#E2E6EC] dark:border-[#272B33] space-y-4 shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-[#2563EB] dark:text-blue-400 mx-auto flex items-center justify-center">
+                <CheckCircle2 className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-[#1E293B] dark:text-white">
+                  Fila de {activeMode === 'OPORTUNIDADE_LATENTE' ? 'Oportunidade Latente' : 'Demanda Identificada'} em Dia!
+                </h3>
+                <p className="text-xs text-[#64748B] dark:text-[#94A3B8] max-w-md mx-auto">
+                  Você não possui ações pendentes para hoje neste modo. Você pode adicionar novas empresas ou consultar a lista priorizada.
                 </p>
               </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center justify-center gap-3 pt-2">
                 <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => setIsQualificationOpen(true)}
-                  leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-500" />}
+                  variant="primary"
+                  size="sm"
+                  onClick={openAddCompanyModal}
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
                 >
-                  Qualificar
+                  + Adicionar Empresa
                 </Button>
                 <Button
                   variant="secondary"
-                  size="xs"
-                  onClick={() => setIsDrawerOpen(true)}
-                  leftIcon={<ExternalLink className="w-3.5 h-3.5" />}
+                  size="sm"
+                  onClick={() => setViewType('lista')}
+                  leftIcon={<ListOrdered className="w-3.5 h-3.5" />}
                 >
-                  Dossiê
+                  Ver Lista Priorizada
                 </Button>
               </div>
             </div>
+          ) : (
+            <div className="space-y-5">
+              {/* Card da Empresa Atual & Decisor */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#181B20] border border-[#E2E6EC] dark:border-[#272B33] shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg sm:text-xl font-bold text-[#1E293B] dark:text-white">
+                        {currentItem.company?.tradeName || currentItem.company?.name || currentItem.client.name}
+                      </h3>
+                      <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                        {currentItem.company?.niche || 'Geral'}
+                      </span>
+                    </div>
 
-            {/* Informações Rápidas de Contato */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-[#ECEEF1] dark:border-[#2D3139]">
-              <div className="flex items-center gap-2 text-[#5F6368] dark:text-[#9AA0A6]">
-                <Phone className="w-3.5 h-3.5 text-[#80868B]" />
-                <span>{rawPhone ? formatPhoneNumber(rawPhone) : 'Sem telefone'}</span>
-              </div>
-              {company?.city && (
-                <div className="flex items-center gap-2 text-[#5F6368] dark:text-[#9AA0A6]">
-                  <MapPin className="w-3.5 h-3.5 text-[#80868B]" />
-                  <span>{company.city}</span>
-                </div>
-              )}
-              {company?.website && (
-                <div className="flex items-center gap-2 text-[#5F6368] dark:text-[#9AA0A6] truncate">
-                  <Globe className="w-3.5 h-3.5 text-[#80868B]" />
-                  <a
-                    href={company.website.startsWith('http') ? company.website : `https://${company.website}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[#3F6FB5] hover:underline truncate"
-                  >
-                    {company.website.replace(/^https?:\/\//, '')}
-                  </a>
-                </div>
-              )}
-              {targetService && (
-                <div className="flex items-center gap-2 text-[#5F6368] dark:text-[#9AA0A6]">
-                  <Zap className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Oferta: <strong>{targetService.name}</strong></span>
-                </div>
-              )}
-            </div>
-
-            {/* MOTIVO / GATILHO DE PRIORIDADE (POR QUÊ) */}
-            <div className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] text-xs space-y-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#3F6FB5] block">
-                Por que este prospect é prioritário hoje?
-              </span>
-              <p className="text-[#5F6368] dark:text-[#9AA0A6]">
-                {lead?.qualificationResult?.recommendation ||
-                  (lead?.score && lead.score >= 80
-                    ? 'Lead com score alto (>80 pts). Excelente alinhamento com a oferta de serviço.'
-                    : 'Ação planejada na rotina diária de prospecção.')}
-              </p>
-            </div>
-          </Card>
-
-          {/* Card: O Que Dizer — Script Pronto com Edição Rápida */}
-          <Card padding="md" className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-[#3F6FB5]" />
-                <h3 className="text-sm font-semibold text-[#202124] dark:text-[#E8EAED]">
-                  Mensagem Personalizada & Script
-                </h3>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="xs"
-                  onClick={() => setIsLeadMessageModalOpen(true)}
-                  leftIcon={<Sparkles className="w-3 h-3 text-blue-500" />}
-                  className="font-medium"
-                >
-                  Personalizar (4x3)
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => setIsEditingMessage(!isEditingMessage)}
-                  leftIcon={<Edit2 className="w-3 h-3" />}
-                >
-                  {isEditingMessage ? 'Fechar Edição' : 'Editar Mensagem'}
-                </Button>
-              </div>
-            </div>
-
-            {isEditingMessage ? (
-              <textarea
-                value={customMessage}
-                onChange={(e) => setCustomMessage(e.target.value)}
-                rows={7}
-                className="w-full p-3 rounded-lg bg-white dark:bg-[#181B20] border border-[#DADDE1] dark:border-[#2D3139] text-xs text-[#202124] dark:text-[#E8EAED] font-sans leading-relaxed focus:outline-none focus:border-[#3F6FB5] resize-none"
-              />
-            ) : (
-              <div className="p-3.5 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] text-xs sm:text-sm text-[#202124] dark:text-[#E8EAED] font-sans leading-relaxed whitespace-pre-line select-text">
-                {activeMessage}
-              </div>
-            )}
-
-            {/* Copiloto Gemini para Ajuste Rápido do Script */}
-            <div className="pt-2 border-t border-[#ECEEF1] dark:border-[#2D3139]">
-              <CopilotActionButtons
-                onSelectAction={(action) => {
-                  setCopilotInitialAction(action);
-                  setIsCopilotOpen(true);
-                }}
-              />
-            </div>
-          </Card>
-        </div>
-
-        {/* COLUNA DIREITA: BOTÕES DE EXECUÇÃO & REGISTRO (5 colunas) */}
-        <div className="lg:col-span-5 space-y-4">
-          {/* Card de Ações Imediatas */}
-          <Card padding="md" className="space-y-4">
-            <div className="space-y-0.5">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#5F6368] dark:text-[#9AA0A6]">
-                Execução
-              </span>
-              <h3 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED]">
-                Enviar & Registrar
-              </h3>
-            </div>
-
-            <div className="space-y-2">
-              {/* Botão 1: Abrir WhatsApp */}
-              <button
-                type="button"
-                onClick={handleOpenWhatsApp}
-                className="w-full py-3 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
-              >
-                <MessageCircle className="w-4 h-4 fill-white" />
-                <span>Abrir WhatsApp com Mensagem</span>
-              </button>
-
-              {/* Botão 2: Copiar Mensagem */}
-              <button
-                type="button"
-                onClick={handleCopyMessage}
-                className="w-full py-2.5 px-4 rounded-lg bg-white dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] hover:bg-neutral-50 dark:hover:bg-[#252A32] text-[#202124] dark:text-[#E8EAED] font-medium text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                <Copy className="w-3.5 h-3.5 text-[#5F6368] dark:text-[#9AA0A6]" />
-                <span>{copied ? '✓ Copiado!' : 'Copiar Mensagem (C)'}</span>
-              </button>
-            </div>
-
-            {/* Formulário de Registro & Avanço */}
-            <div className="pt-3 border-t border-[#ECEEF1] dark:border-[#2D3139] space-y-3">
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-[#202124] dark:text-[#E8EAED]">
-                  Estágio no Funil Após Envio
-                </label>
-                <select
-                  value={selectedStage}
-                  onChange={(e) => setSelectedStage(e.target.value as LeadStage)}
-                  className="w-full h-10 px-3 rounded-lg bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] text-xs text-[#202124] dark:text-[#E8EAED] focus:outline-none focus:border-[#3F6FB5] font-medium"
-                >
-                  {ALL_LEAD_STAGES.map((st) => (
-                    <option key={st} value={st}>
-                      {STAGES_CONFIG[st]?.label || st}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-[#202124] dark:text-[#E8EAED]">
-                  Notas & Resultado do Contato (Opcional)
-                </label>
-                <textarea
-                  value={outcomeNotes}
-                  onChange={(e) => setOutcomeNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Ex: Mensagem enviada pelo WhatsApp, aguardando resposta..."
-                  className="w-full p-2.5 bg-white dark:bg-[#1E2228] border border-[#DADDE1] dark:border-[#2D3139] rounded-lg text-xs text-[#202124] dark:text-[#E8EAED] placeholder:text-[#80868B] dark:placeholder:text-[#5F6368] focus:outline-none focus:border-[#3F6FB5] resize-none"
-                />
-              </div>
-
-              {/* Próxima Ação Automática */}
-              <div className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={scheduleNext}
-                    onChange={(e) => setScheduleNext(e.target.checked)}
-                    className="rounded border-[#DADDE1] text-[#3F6FB5] focus:ring-0"
-                  />
-                  <span className="text-xs font-semibold text-[#202124] dark:text-[#E8EAED]">
-                    Agendar Próxima Ação Automática
-                  </span>
-                </label>
-
-                {scheduleNext && (
-                  <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-                    <input
-                      type="text"
-                      value={nextActionTitle}
-                      onChange={(e) => setNextActionTitle(e.target.value)}
-                      placeholder="Título da ação"
-                      className="px-2.5 py-1.5 rounded-md bg-white dark:bg-[#181B20] border border-[#DADDE1] dark:border-[#2D3139] text-[#202124] dark:text-[#E8EAED] text-xs"
-                    />
-                    <select
-                      value={nextActionDays}
-                      onChange={(e) => setNextActionDays(Number(e.target.value))}
-                      className="px-2 py-1.5 rounded-md bg-white dark:bg-[#181B20] border border-[#DADDE1] dark:border-[#2D3139] text-[#202124] dark:text-[#E8EAED] text-xs"
-                    >
-                      <option value={1}>Em 1 dia</option>
-                      <option value={2}>Em 2 dias</option>
-                      <option value={3}>Em 3 dias</option>
-                      <option value={5}>Em 5 dias</option>
-                      <option value={7}>Em 7 dias</option>
-                    </select>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#64748B] dark:text-[#94A3B8]">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5" />
+                        {currentItem.company?.city || 'Sem cidade'}, {currentItem.company?.country || 'Brasil'}
+                      </span>
+                      {currentItem.contact && (
+                        <span className="flex items-center gap-1 font-medium text-[#1E293B] dark:text-white">
+                          <User className="w-3.5 h-3.5 text-[#2563EB]" />
+                          Decisor: {currentItem.contact.name} {currentItem.contact.role ? `(${currentItem.contact.role})` : ''}
+                        </span>
+                      )}
+                      {(currentItem.contact?.whatsapp || currentItem.client.whatsapp) && (
+                        <span className="font-mono text-[#334155] dark:text-[#CBD5E1]">
+                          {currentItem.contact?.whatsapp || currentItem.client.whatsapp}
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        const comp = currentItem.company || companies.find((c) => c.id === currentItem.action.clientId);
+                        if (comp) handleOpenSignals(comp, currentItem.lead || undefined);
+                      }}
+                      leftIcon={<SlidersHorizontal className="w-3.5 h-3.5" />}
+                    >
+                      Qualificar / Sinais
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsDrawerOpen(true)}
+                    >
+                      Ver Cadastro
+                    </Button>
+                  </div>
+                </div>
+
+                {/* SEÇÃO DO SCORE EXPLICÁVEL & ESTADO DA OPORTUNIDADE */}
+                {currentExplanation && (
+                  <OpportunityScoreCard
+                    explanation={currentExplanation}
+                    opportunityState={
+                      currentItem.company?.opportunityState ||
+                      currentItem.lead?.opportunityState ||
+                      (activeMode === 'OPORTUNIDADE_LATENTE' ? 'HIPOTESE' : 'CONFIRMADO')
+                    }
+                    onUpdateState={async (newState) => {
+                      const comp = currentItem.company || companies.find((c) => c.id === currentItem.action.clientId);
+                      if (comp) {
+                        await updateCompany({ ...comp, opportunityState: newState, updatedAt: new Date().toISOString() });
+                        if (currentItem.lead) {
+                          await updateLead({ ...currentItem.lead, opportunityState: newState, updatedAt: new Date().toISOString() });
+                        }
+                        success(`Estado da oportunidade atualizado para: ${newState}`);
+                      }
+                    }}
+                  />
                 )}
-              </div>
 
-              {/* Botão de Envio & Avanço (Principal) */}
-              <button
-                type="button"
-                onClick={handleComplete}
-                className="w-full py-3.5 px-4 rounded-lg bg-[#3F6FB5] hover:bg-[#345d99] active:bg-[#2b4e82] text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Marcar Enviado & Próximo (Enter)</span>
-              </button>
+                {/* Bloco de Mensagem & Script de Abordagem */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-[#1E293B] dark:text-white flex items-center gap-1.5">
+                      <MessageSquare className="w-4 h-4 text-[#2563EB]" />
+                      Mensagem Preparada para este Prospect:
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCopyMessage}
+                        className="text-xs text-[#2563EB] dark:text-blue-400 font-medium hover:underline flex items-center gap-1"
+                      >
+                        {copied ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copied ? 'Copiado!' : 'Copiar (C)'}
+                      </button>
+                    </div>
+                  </div>
 
-              {/* Ações Secundárias: Pular e Adiar */}
-              <div className="flex items-center gap-2 pt-1">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleSkip}
-                  className="flex-1 text-[#5F6368] dark:text-[#9AA0A6]"
-                >
-                  Pular (Mover p/ Final)
-                </Button>
+                  <div className="p-3.5 rounded-xl bg-[#F8FAFC] dark:bg-[#121418] border border-[#CBD5E1] dark:border-[#334155] text-xs sm:text-sm text-[#1E293B] dark:text-[#E2E8F0] whitespace-pre-line leading-relaxed">
+                    {activeMessage}
+                  </div>
 
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setIsAdiarOpen(true)}
-                  className="flex-1 text-[#5F6368] dark:text-[#9AA0A6]"
-                >
-                  Adiar Ação...
-                </Button>
+                  {/* Ações de Execução */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleSkip}
+                      >
+                        Pular
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setIsAdiarOpen(true)}
+                      >
+                        Adiar
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleOpenWhatsApp}
+                        leftIcon={<MessageCircle className="w-4 h-4 text-emerald-600" />}
+                      >
+                        ABRIR WHATSAPP (W)
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleComplete}
+                        rightIcon={<ArrowRight className="w-4 h-4" />}
+                      >
+                        Marcar Enviado & Avançar (Enter)
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </Card>
+          )}
         </div>
-      </div>
-
-      {/* MODAL DE PAUSA */}
-      {isPaused && (
-        <Modal
-          isOpen={isPaused}
-          onClose={() => setIsPaused(false)}
-          title="Sessão em Pausa"
-          size="sm"
-        >
-          <div className="space-y-4 text-center py-2">
-            <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 mx-auto flex items-center justify-center border border-amber-200 dark:border-amber-800/40">
-              <Pause className="w-6 h-6" />
-            </div>
-
-            <div className="space-y-1">
-              <h3 className="text-base font-semibold text-[#202124] dark:text-[#E8EAED]">
-                Resumo da Sua Sessão
-              </h3>
-              <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
-                Você concluiu <strong>{completedToday.length}</strong> ações hoje. Restam <strong>{metrics.pendingToday}</strong> ações pendentes (~{formattedDuration}).
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 pt-2">
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => setIsPaused(false)}
-                leftIcon={<Play className="w-4 h-4" />}
-                className="w-full"
-              >
-                Continuar Prospecção Agora
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setIsPaused(false);
-                  setActiveRoute('dashboard');
-                }}
-                className="w-full"
-              >
-                Sair para o Início
-              </Button>
-            </div>
-          </div>
-        </Modal>
       )}
 
-      {/* MODAL DE ADIAR / REAGENDAR */}
-      {isAdiarOpen && (
-        <Modal
-          isOpen={isAdiarOpen}
-          onClose={() => setIsAdiarOpen(false)}
-          title="Adiar ou Reagendar Ação"
-          size="sm"
-        >
-          <div className="space-y-4">
-            <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
-              Escolha para quando deseja mover esta ação de prospecção:
-            </p>
+      {/* 3. MODAIS E DRAWERS INTEGRADOS */}
 
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleAdiar(1)}
-                className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] hover:bg-neutral-100 dark:hover:bg-[#252A32] text-xs font-semibold text-[#202124] dark:text-[#E8EAED] text-center transition-colors cursor-pointer"
-              >
-                +1 Dia
-                <span className="block text-[10px] text-[#5F6368] dark:text-[#9AA0A6] font-normal mt-0.5">Amanhã</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAdiar(2)}
-                className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] hover:bg-neutral-100 dark:hover:bg-[#252A32] text-xs font-semibold text-[#202124] dark:text-[#E8EAED] text-center transition-colors cursor-pointer"
-              >
-                +2 Dias
-                <span className="block text-[10px] text-[#5F6368] dark:text-[#9AA0A6] font-normal mt-0.5">Em 2 dias</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAdiar(7)}
-                className="p-3 rounded-lg bg-[#F7F8FA] dark:bg-[#1E2228] border border-[#E6E8EB] dark:border-[#2D3139] hover:bg-neutral-100 dark:hover:bg-[#252A32] text-xs font-semibold text-[#202124] dark:text-[#E8EAED] text-center transition-colors cursor-pointer"
-              >
-                +7 Dias
-                <span className="block text-[10px] text-[#5F6368] dark:text-[#9AA0A6] font-normal mt-0.5">Em 1 semana</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleCustomAdiar} className="space-y-3 pt-2 border-t border-[#ECEEF1] dark:border-[#2D3139]">
-              <label className="block text-xs font-medium text-[#202124] dark:text-[#E8EAED]">
-                Ou selecione uma data específica:
-              </label>
-              <input
-                type="date"
-                value={customAdiarDate}
-                onChange={(e) => setCustomAdiarDate(e.target.value)}
-                min={new Date().toISOString().slice(0, 10)}
-                className="w-full h-10 px-3 bg-white dark:bg-[#181B20] border border-[#DADDE1] dark:border-[#2D3139] rounded-lg text-xs text-[#202124] dark:text-[#E8EAED] focus:outline-none focus:border-[#3F6FB5]"
-              />
-              <Button type="submit" variant="primary" size="sm" className="w-full">
-                Confirmar Reagendamento
-              </Button>
-            </form>
-          </div>
-        </Modal>
-      )}
-
-      {/* DRAWER DE DETALHES DA EMPRESA */}
-      {isDrawerOpen && company && (
-        <CompanyDetailsDrawer
-          company={company}
-          onClose={() => setIsDrawerOpen(false)}
-          onEditCompany={() => {
-            setIsDrawerOpen(false);
-            setActiveRoute('clients');
+      {/* Modal de Detalhes e Análise da Oportunidade */}
+      {selectedPrioritizedLead && (
+        <OpportunityDetailModal
+          isOpen={Boolean(selectedPrioritizedLead)}
+          onClose={() => setSelectedPrioritizedLead(null)}
+          company={selectedPrioritizedLead.company}
+          contact={selectedPrioritizedLead.contact}
+          lead={selectedPrioritizedLead.lead}
+          mode={activeMode}
+          icps={icps}
+          services={services}
+          onOpenSignalSelector={() => {
+            handleOpenSignals(selectedPrioritizedLead.company, selectedPrioritizedLead.lead);
+          }}
+          onUpdateOpportunityState={handleUpdateOpportunityState}
+          onAdvanceToFunnelStage={async (newStage, note) => {
+            if (selectedPrioritizedLead.lead) {
+              await logInteractionAndAdvance({
+                companyId: selectedPrioritizedLead.company.id,
+                contactId: selectedPrioritizedLead.contact?.id,
+                leadId: selectedPrioritizedLead.lead.id,
+                channel: 'whatsapp',
+                notes: note || `Avançado para ${newStage}`,
+                newStage,
+              });
+            }
+          }}
+          onScheduleNextAction={async (title, date) => {
+            if (selectedPrioritizedLead.lead) {
+              await scheduleNextAction(selectedPrioritizedLead.lead.id, title, date);
+            }
           }}
         />
       )}
 
-      {/* MODAL DE QUALIFICAÇÃO DE LEAD */}
-      {company && lead && (
-        <QualificationModal
-          isOpen={isQualificationOpen}
-          onClose={() => setIsQualificationOpen(false)}
-          company={company}
-          contact={contact}
-          lead={lead}
+      {/* Modal de Sinais e Diagnóstico */}
+      {isSignalsModalOpen && targetCompanyForSignals && (
+        <SignalSelectorModal
+          isOpen={isSignalsModalOpen}
+          onClose={() => {
+            setIsSignalsModalOpen(false);
+            setTargetCompanyForSignals(null);
+            setTargetLeadForSignals(null);
+          }}
+          company={targetCompanyForSignals}
+          lead={targetLeadForSignals}
+          mode={activeMode}
+          onSaveSignals={handleSaveSignals}
         />
       )}
 
-      {/* MODAL DO MOTOR DE PERSONALIZAÇÃO 4x3 & AUDITORIA */}
-      {company && lead && (
-        <LeadMessageModal
-          isOpen={isLeadMessageModalOpen}
-          onClose={() => setIsLeadMessageModalOpen(false)}
-          company={company}
-          lead={lead}
-          initialContactId={contact?.id}
+      {/* Drawer de Perfis de Cliente Ideal (ICP) */}
+      <IcpManagementDrawer
+        isOpen={isIcpDrawerOpen}
+        onClose={() => setIsIcpDrawerOpen(false)}
+        icps={icps}
+        services={services}
+        onSaveIcp={async (newIcp) => {
+          await upsertIcp(newIcp);
+          success('Perfil ICP salvo com sucesso!');
+        }}
+        onDeleteIcp={async (id) => {
+          await deleteIcp(id);
+          success('Perfil ICP excluído.');
+        }}
+      />
+
+      {/* Drawer de Detalhes da Empresa */}
+      {isDrawerOpen && (
+        <CompanyDetailsDrawer
+          company={selectedCompanyForAi || currentItem?.company || companies.find((c) => c.id === currentItem?.action.clientId) || null}
+          onClose={() => setIsDrawerOpen(false)}
+          onEditCompany={(comp) => {
+            setIsDrawerOpen(false);
+          }}
         />
       )}
 
-      {/* MODAL DO COPILOTO GEMINI */}
-      {company && (
-        <CopilotAssistantModal
-          isOpen={isCopilotOpen}
-          onClose={() => setIsCopilotOpen(false)}
-          company={company}
-          contact={contact}
-          lead={lead}
-          service={targetService}
-          initialActionType={copilotInitialAction}
-        />
+      {/* Modal de Análise Detalhada de Lead pela IA */}
+      <AiLeadAnalysisModal
+        isOpen={isAiAnalysisModalOpen}
+        onClose={() => {
+          setIsAiAnalysisModalOpen(false);
+          setSelectedCompanyForAi(null);
+          setSelectedLeadForAi(null);
+        }}
+        company={selectedCompanyForAi}
+        lead={selectedLeadForAi}
+      />
+
+      {/* Modal de Funil Adaptativo */}
+      <AdaptiveFunnelModal
+        isOpen={isAdaptiveFunnelModalOpen}
+        onClose={() => {
+          setIsAdaptiveFunnelModalOpen(false);
+          setSelectedCompanyForAdaptive(null);
+          setSelectedLeadForAdaptive(null);
+        }}
+        company={selectedCompanyForAdaptive}
+        lead={selectedLeadForAdaptive}
+      />
+
+      {/* Modal do Playbook Comercial */}
+      <CommercialPlaybookModal
+        isOpen={isPlaybookModalOpen}
+        onClose={() => setIsPlaybookModalOpen(false)}
+        initialStageId={playbookInitialStage}
+      />
+
+      {/* Modal de Ações Autorizadas da IA (Human-in-the-Loop) */}
+      <AiAuthorizedActionsModal
+        isOpen={isAiAuthorizedActionsModalOpen}
+        onClose={() => setIsAiAuthorizedActionsModalOpen(false)}
+      />
+
+      {/* Modal de Aprendizado do Sistema & Métricas Fatuais */}
+      <SystemLearningModal
+        isOpen={isSystemLearningModalOpen}
+        onClose={() => setIsSystemLearningModalOpen(false)}
+      />
+
+      {/* Modal de Adiar Ação */}
+      {isAdiarOpen && (
+        <Modal
+          isOpen={isAdiarOpen}
+          onClose={() => setIsAdiarOpen(false)}
+          title="Adiar Próxima Ação"
+          size="sm"
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+              Escolha quando este prospect deve reaparecer na sua fila:
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <Button variant="secondary" size="sm" onClick={() => handleAdiar(1)}>
+                Amanhã
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => handleAdiar(3)}>
+                Em 3 dias
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => handleAdiar(7)}>
+                Em 1 semana
+              </Button>
+            </div>
+            <form onSubmit={handleCustomAdiar} className="space-y-2 pt-2 border-t border-[#E2E6EC] dark:border-[#272B33]">
+              <label className="text-xs font-semibold text-[#1E293B] dark:text-white block">
+                Ou selecione uma data específica:
+              </label>
+              <Input
+                type="date"
+                value={customAdiarDate}
+                onChange={(e) => setCustomAdiarDate(e.target.value)}
+              />
+              <Button type="submit" variant="primary" size="sm" className="w-full">
+                Reagendar
+              </Button>
+            </form>
+          </div>
+        </Modal>
       )}
     </div>
   );

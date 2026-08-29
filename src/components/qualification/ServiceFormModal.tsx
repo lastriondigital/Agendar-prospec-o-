@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import {
   AlertCircle,
   CheckCircle,
+  Globe,
   HelpCircle,
   Plus,
   Trash2,
   X,
 } from 'lucide-react';
-import { Service } from '../../types';
+import { MarketPriceItem, Service } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -25,7 +26,7 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   service,
   onSave,
 }) => {
-  const [activeTab, setActiveTab] = useState<'geral' | 'beneficios' | 'objecoes' | 'provas'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral' | 'precos_mercado' | 'beneficios' | 'objecoes' | 'provas'>('geral');
 
   // Basic Info
   const [name, setName] = useState(service?.name || '');
@@ -36,6 +37,11 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
   const [idealCustomerProfile, setIdealCustomerProfile] = useState(service?.idealCustomerProfile || '');
   const [standardCTA, setStandardCTA] = useState(service?.standardCTA || '');
   const [active, setActive] = useState(service ? service.active : true);
+
+  // Market Prices
+  const [marketPrices, setMarketPrices] = useState<MarketPriceItem[]>(
+    service?.marketPrices || []
+  );
 
   // Dynamic Lists
   const [benefits, setBenefits] = useState<string[]>(
@@ -66,6 +72,30 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const handleAddMarketPrice = () => {
+    setMarketPrices([
+      ...marketPrices,
+      {
+        id: `mp-${Date.now()}`,
+        country: 'Portugal',
+        currency: 'EUR',
+        currencySymbol: '€',
+        price: 350,
+        anchorPrice: 500,
+      },
+    ]);
+  };
+
+  const handleRemoveMarketPrice = (index: number) => {
+    setMarketPrices(marketPrices.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateMarketPrice = (index: number, updates: Partial<MarketPriceItem>) => {
+    setMarketPrices(
+      marketPrices.map((mp, i) => (i === index ? { ...mp, ...updates } : mp))
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -79,6 +109,7 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         .filter((o) => o.objection || o.counterArgument);
       const cleanArguments = argumentsList.map((a) => a.trim()).filter(Boolean);
       const cleanProofs = associatedProofs.map((p) => p.trim()).filter(Boolean);
+      const cleanMarketPrices = marketPrices.filter((mp) => mp.country && mp.currency && mp.price > 0);
 
       const payload: Service = {
         id: service?.id || `srv-${Date.now()}`,
@@ -88,6 +119,7 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         currency,
         anchorPrice: anchorPrice !== '' ? Number(anchorPrice) : undefined,
         ticketValue: basePrice !== '' ? Number(basePrice) : undefined,
+        marketPrices: cleanMarketPrices,
         benefits: cleanBenefits,
         idealCustomerProfile: idealCustomerProfile.trim(),
         problemsSolved: cleanProblems,
@@ -132,46 +164,58 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('geral')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'geral'
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            1. Dados Gerais & Preço
+            1. Geral & Preço Base
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('precos_mercado')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'precos_mercado'
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                : 'text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>2. Preços por Mercado ({marketPrices.length})</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('beneficios')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'beneficios'
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            2. Benefícios & Dores
+            3. Benefícios & Dores
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('objecoes')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'objecoes'
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            3. Objeções & Argumentos
+            4. Objeções & Argumentos
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('provas')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'provas'
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            4. Provas & CTA Padrão
+            5. Provas & CTA
           </button>
         </div>
 
@@ -216,7 +260,7 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Input
-                label="Preço Base (Mínimo)"
+                label="Preço Base Padrão"
                 type="number"
                 placeholder="Ex: 1500"
                 value={basePrice}
@@ -231,7 +275,7 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
               />
               <div>
                 <label className="block text-xs font-bold text-neutral-300 mb-1">
-                  Moeda
+                  Moeda Padrão
                 </label>
                 <select
                   value={currency}
@@ -239,8 +283,12 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                   className="w-full rounded-xl bg-neutral-950 border border-neutral-800 p-2.5 text-xs text-neutral-100 focus:border-emerald-500 focus:outline-none"
                 >
                   <option value="BRL">BRL (R$)</option>
-                  <option value="USD">USD ($)</option>
                   <option value="EUR">EUR (€)</option>
+                  <option value="MZN">MZN (MT)</option>
+                  <option value="AOA">AOA (Kz)</option>
+                  <option value="CVE">CVE ($)</option>
+                  <option value="USD">USD ($)</option>
+                  <option value="GBP">GBP (£)</option>
                 </select>
               </div>
             </div>
@@ -253,6 +301,143 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
                 onChange={(e) => setIdealCustomerProfile(e.target.value)}
               />
             </div>
+          </div>
+        )}
+
+        {/* TAB 2: PREÇOS POR MERCADO */}
+        {activeTab === 'precos_mercado' && (
+          <div className="space-y-4 animate-in fade-in duration-150">
+            <div className="p-3.5 rounded-xl bg-blue-950/20 border border-blue-900/40 text-xs text-neutral-300 space-y-1">
+              <p className="font-bold text-blue-300 flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5" />
+                Preços Específicos por País / Mercado
+              </p>
+              <p className="text-[11px] text-neutral-400">
+                Configure valores comerciais customizados para cada país ou moeda. O sistema respeita estritamente o poder de compra local sem conversões cegas.
+              </p>
+            </div>
+
+            {marketPrices.length === 0 ? (
+              <div className="text-center py-6 border border-dashed border-neutral-800 rounded-xl space-y-2">
+                <Globe className="w-8 h-8 text-neutral-600 mx-auto" />
+                <p className="text-xs text-neutral-400 font-medium">Nenhum preço específico por mercado cadastrado.</p>
+                <p className="text-[11px] text-neutral-500">Este serviço usará o Preço Base padrão ({currency} {basePrice || 'não definido'}).</p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="xs"
+                  onClick={handleAddMarketPrice}
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
+                  className="mt-2"
+                >
+                  Adicionar Preço para Outro País
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {marketPrices.map((mp, index) => (
+                  <div
+                    key={index}
+                    className="p-3.5 bg-neutral-950 border border-neutral-800 rounded-xl space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-neutral-200 flex items-center gap-1.5">
+                        <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                        Regra #{index + 1}: {mp.country || 'Novo Mercado'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMarketPrice(index)}
+                        className="text-neutral-500 hover:text-red-400 p-1 transition-colors"
+                        title="Remover regra"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-400 mb-1">País</label>
+                        <select
+                          value={mp.country}
+                          onChange={(e) => {
+                            const newCountry = e.target.value;
+                            let autoCurrency = mp.currency;
+                            if (newCountry === 'Portugal') autoCurrency = 'EUR';
+                            if (newCountry === 'Brasil') autoCurrency = 'BRL';
+                            if (newCountry === 'Moçambique') autoCurrency = 'MZN';
+                            if (newCountry === 'Angola') autoCurrency = 'AOA';
+                            if (newCountry === 'Cabo Verde') autoCurrency = 'CVE';
+                            if (newCountry === 'Estados Unidos') autoCurrency = 'USD';
+                            if (newCountry === 'Reino Unido') autoCurrency = 'GBP';
+                            handleUpdateMarketPrice(index, { country: newCountry, currency: autoCurrency });
+                          }}
+                          className="w-full rounded-lg bg-neutral-900 border border-neutral-800 p-2 text-xs text-neutral-100 focus:border-emerald-500 focus:outline-none"
+                        >
+                          <option value="Portugal">🇵🇹 Portugal</option>
+                          <option value="Brasil">🇧🇷 Brasil</option>
+                          <option value="Moçambique">🇲🇿 Moçambique</option>
+                          <option value="Angola">🇦🇴 Angola</option>
+                          <option value="Cabo Verde">🇨🇻 Cabo Verde</option>
+                          <option value="Estados Unidos">🇺🇸 Estados Unidos</option>
+                          <option value="Reino Unido">🇬🇧 Reino Unido</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-400 mb-1">Moeda</label>
+                        <select
+                          value={mp.currency}
+                          onChange={(e) => handleUpdateMarketPrice(index, { currency: e.target.value })}
+                          className="w-full rounded-lg bg-neutral-900 border border-neutral-800 p-2 text-xs text-neutral-100 focus:border-emerald-500 focus:outline-none"
+                        >
+                          <option value="EUR">EUR (€)</option>
+                          <option value="BRL">BRL (R$)</option>
+                          <option value="MZN">MZN (MT)</option>
+                          <option value="AOA">AOA (Kz)</option>
+                          <option value="CVE">CVE ($)</option>
+                          <option value="USD">USD ($)</option>
+                          <option value="GBP">GBP (£)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-400 mb-1">Preço Base *</label>
+                        <input
+                          type="number"
+                          value={mp.price}
+                          onChange={(e) => handleUpdateMarketPrice(index, { price: Number(e.target.value) || 0 })}
+                          placeholder="Ex: 350"
+                          className="w-full rounded-lg bg-neutral-900 border border-neutral-800 p-2 text-xs text-neutral-100 focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-medium text-neutral-400 mb-1">Preço Âncora</label>
+                        <input
+                          type="number"
+                          value={mp.anchorPrice || ''}
+                          onChange={(e) => handleUpdateMarketPrice(index, { anchorPrice: Number(e.target.value) || undefined })}
+                          placeholder="Ex: 500"
+                          className="w-full rounded-lg bg-neutral-900 border border-neutral-800 p-2 text-xs text-neutral-100 focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="xs"
+                  onClick={handleAddMarketPrice}
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
+                  className="w-full justify-center"
+                >
+                  Adicionar Outro Mercado / País
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

@@ -1,4 +1,5 @@
 import { Company, Contact, Lead, Service, MessageTemplate, VariationLevel, MessageAuditResult, AuditChecklistItem, PersonalizedMessageResult, ContactSalutation, ContactGender, PersonaRole } from '../types';
+import { resolveCommercialContext } from './commercialPersonalization';
 
 export interface VariableDef {
   tag: string; // Ex: [NOME]
@@ -128,16 +129,48 @@ export const DYNAMIC_VARIABLES: VariableDef[] = [
     legacyTag: '{{preco}}',
     label: 'Preço / Investimento',
     category: 'servico',
-    description: 'Valor de investimento do serviço',
-    example: '2.500 MT',
+    description: 'Valor de investimento do serviço na moeda local',
+    example: 'R$ 2.500',
+  },
+  {
+    tag: '[MOEDA]',
+    legacyTag: '{{moeda}}',
+    label: 'Símbolo da Moeda',
+    category: 'servico',
+    description: 'Símbolo monetário (R$, €, MT, Kz, $, £)',
+    example: 'R$',
   },
   {
     tag: '[ÂNCORA]',
     legacyTag: '{{ancora}}',
-    label: 'Âncora de Preço / Referência',
+    label: 'Preço de Referência / Âncora',
     category: 'servico',
     description: 'Valor âncora de mercado para contraste comercial',
-    example: '5.000 MT',
+    example: 'R$ 4.500',
+  },
+  {
+    tag: '[PREÇO_DE_REFERÊNCIA]',
+    legacyTag: '{{preco_de_referencia}}',
+    label: 'Preço de Referência',
+    category: 'servico',
+    description: 'Alias para preço âncora de referência',
+    example: 'R$ 4.500',
+  },
+  {
+    tag: '[FORMA_DE_PAGAMENTO]',
+    legacyTag: '{{forma_de_pagamento}}',
+    label: 'Forma de Pagamento',
+    category: 'servico',
+    description: 'Métodos aceitos (Pix, MB Way, M-Pesa, Transferência)',
+    example: 'Pix ou Cartão até 12x',
+  },
+  {
+    tag: '[CONDIÇÃO_DE_PAGAMENTO]',
+    legacyTag: '{{condicao_de_pagamento}}',
+    label: 'Condição de Pagamento',
+    category: 'servico',
+    description: 'Condições de entrada e parcelamento',
+    example: '50% entrada + 50% entrega',
   },
   {
     tag: '[BENEFÍCIO]',
@@ -167,12 +200,28 @@ export const DYNAMIC_VARIABLES: VariableDef[] = [
     isContextual: true,
   },
   {
+    tag: '[SINAL]',
+    legacyTag: '{{sinal}}',
+    label: 'Sinal Específico Identificado',
+    category: 'diagnostico',
+    description: 'Sinal positivo, de dor ou de oportunidade identificado',
+    example: 'website antigo sem versão mobile responsiva',
+  },
+  {
     tag: '[OBSERVAÇÃO]',
     legacyTag: '{{observacao}}',
     label: 'Observação do Lead',
     category: 'diagnostico',
     description: 'Notas personalizadas cadastradas no lead',
     example: 'estão abrindo nova unidade em breve',
+  },
+  {
+    tag: '[OBSERVAÇÃO_PERSONALIZADA]',
+    legacyTag: '{{observacao_personalizada}}',
+    label: 'Observação Personalizada',
+    category: 'diagnostico',
+    description: 'Observações específicas do contexto do prospect',
+    example: 'prioridade no primeiro trimestre',
   },
   {
     tag: '[ETAPA_FUNIL]',
@@ -416,26 +465,38 @@ export interface PersonalizationContext {
 export function buildVariableMap(context: PersonalizationContext): Record<string, string> {
   const { company, contact, service, lead, customVariables = {} } = context;
 
-  const rawName = contact?.name || 'Cliente';
+  const resolved = resolveCommercialContext({
+    company,
+    contact,
+    lead,
+    service,
+    customVariables,
+  });
+
+  const rawName = contact?.name || resolved.contactName || 'Cliente';
   const firstName = rawName.trim().split(' ')[0] || 'Cliente';
   const salutationDetails = resolveSalutationDetails(contact);
   const companyName = company?.name || 'sua empresa';
-  const city = company?.city || 'sua região';
-  const country = company?.country || 'Moçambique';
+  const city = resolved.city !== 'Configuração não definida' ? resolved.city : (company?.city || 'Configuração não definida');
+  const country = resolved.country || 'Brasil';
   const niche = company?.niche || 'seu segmento';
-  const role = contact?.role || 'gestor';
+  const role = typeof resolved.contactRole === 'string' ? resolved.contactRole : (contact?.role || 'gestor');
   const responsible = contact?.name || 'responsável';
   const score = lead?.score !== undefined ? `${lead.score}` : '85';
 
-  const serviceName = service?.name || 'nossas soluções';
+  const serviceName = resolved.serviceName || service?.name || 'nossas soluções';
   const offer = service?.valueProposition || service?.name || 'otimização comercial';
-  const price = service?.basePrice ? `${service.currency || 'MT'} ${service.basePrice.toLocaleString('pt-BR')}` : 'sob consulta';
-  const anchor = service?.basePrice ? `${service.currency || 'MT'} ${(service.basePrice * 1.6).toLocaleString('pt-BR')}` : 'valor de mercado';
+  const price = resolved.priceFormatted;
+  const anchor = resolved.anchorPriceFormatted;
+  const currencySymbol = resolved.currencySymbol;
+  const paymentMethod = resolved.paymentMethod;
+  const paymentTerms = resolved.paymentTerms;
   const benefit = service?.benefits?.[0] || 'aumentar a atração de clientes qualificados';
-  const cta = service?.defaultCta || 'Você teria 10 minutos para vermos isso juntos esta semana?';
+  const cta = resolved.cta || service?.defaultCta || 'Você teria 10 minutos para vermos isso juntos esta semana?';
 
-  const problem = resolveDiagnosedProblem(service, company, lead);
-  const notes = contact?.notes || company?.notes || lead?.notes || '';
+  const problem = resolved.diagnosedProblem || resolveDiagnosedProblem(service, company, lead);
+  const detectedSignal = resolved.detectedSignal;
+  const notes = contact?.notes || company?.notes || lead?.notes || 'Configuração não definida';
   const stage = lead?.stage || 'Primeiro Contato';
   const nextAction = lead?.nextActionTitle || 'Apresentação';
   const dateStr = new Date().toLocaleDateString('pt-BR');
@@ -447,8 +508,8 @@ export function buildVariableMap(context: PersonalizationContext): Record<string
     '{{nome}}': rawName,
     '[PRIMEIRO_NOME]': firstName,
     '{{primeiro_nome}}': firstName,
-    '[TRATAMENTO]': salutationDetails.salutationText,
-    '{{tratamento}}': salutationDetails.salutationText,
+    '[TRATAMENTO]': salutationDetails.salutationText || resolved.salutation,
+    '{{tratamento}}': salutationDetails.salutationText || resolved.salutation,
     '[GÊNERO]': salutationDetails.genderArticle,
     '[GENERO]': salutationDetails.genderArticle,
     '{{genero}}': salutationDetails.genderArticle,
@@ -464,9 +525,13 @@ export function buildVariableMap(context: PersonalizationContext): Record<string
     '[CIDADE]': city,
     '{{cidade}}': city,
     '[PAIS]': country,
+    '[PAÍS]': country,
     '{{pais}}': country,
+    '{{país}}': country,
     '[NICHO]': niche,
     '{{nicho}}': niche,
+    '[SEGMENTO]': niche,
+    '{{segmento}}': niche,
     '[SCORE]': score,
     '{{score}}': score,
     '[DECISOR]': responsible,
@@ -476,26 +541,46 @@ export function buildVariableMap(context: PersonalizationContext): Record<string
     '[SERVIÇO]': serviceName,
     '[SERVICO]': serviceName,
     '{{servico}}': serviceName,
+    '{{serviço}}': serviceName,
     '[OFERTA]': offer,
     '{{oferta}}': offer,
     '[PREÇO]': price,
     '[PRECO]': price,
     '{{preco}}': price,
+    '{{preço}}': price,
+    '[MOEDA]': currencySymbol,
+    '{{moeda}}': currencySymbol,
     '[ÂNCORA]': anchor,
     '[ANCORA]': anchor,
     '{{ancora}}': anchor,
+    '{{âncora}}': anchor,
+    '[PREÇO DE REFERÊNCIA]': anchor,
+    '[PRECO DE REFERENCIA]': anchor,
+    '{{preco_de_referencia}}': anchor,
+    '[FORMA DE PAGAMENTO]': paymentMethod,
+    '{{forma_de_pagamento}}': paymentMethod,
+    '[CONDIÇÃO DE PAGAMENTO]': paymentTerms,
+    '[CONDICAO DE PAGAMENTO]': paymentTerms,
+    '{{condicao_de_pagamento}}': paymentTerms,
     '[BENEFÍCIO]': benefit,
     '[BENEFICIO]': benefit,
     '{{beneficio}}': benefit,
+    '{{benefício}}': benefit,
     '[CTA]': cta,
     '{{cta}}': cta,
 
     // Diagnostic & Context
     '[PROBLEMA]': problem,
     '{{problema}}': problem,
+    '[SINAL]': detectedSignal,
+    '{{sinal}}': detectedSignal,
     '[OBSERVAÇÃO]': notes,
     '[OBSERVACAO]': notes,
     '{{observacao}}': notes,
+    '{{observação}}': notes,
+    '[OBSERVAÇÃO PERSONALIZADA]': notes,
+    '[OBSERVACAO PERSONALIZADA]': notes,
+    '{{observacao_personalizada}}': notes,
     '[ETAPA_FUNIL]': stage,
     '{{etapa_funil}}': stage,
     '[PRÓXIMA_AÇÃO]': nextAction,
