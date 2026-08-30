@@ -34,6 +34,7 @@ import { STAGES_CONFIG } from '../utils/constants';
 import { ScheduleActionModal } from '../components/clients/ScheduleActionModal';
 import { CompanyDetailsDrawer } from '../components/clients/CompanyDetailsDrawer';
 import { ScoreBadge } from '../components/qualification/ScoreBadge';
+import { NextActionsCentral } from '../components/dashboard/NextActionsCentral';
 
 export const DashboardView: React.FC = () => {
   const {
@@ -348,6 +349,9 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* CENTRAL: MINHAS PRÓXIMAS AÇÕES (O QUE FAZER AGORA?) */}
+      <NextActionsCentral onOpenCompany={(comp) => setSelectedCompany(comp)} />
 
       {/* 3. ALERTAS DE TAREFAS ATRASADAS (SE HOUVER) */}
       {overdueActions.length > 0 && (

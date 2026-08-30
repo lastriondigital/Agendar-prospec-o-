@@ -121,6 +121,82 @@ function generateOfflineFallback(request: CopilotRequest): CopilotResult {
   let nextActionSuggestion = '';
 
   switch (request.actionType) {
+    case 'ANALISAR_LEAD_COMPLETO': {
+      const hasWeb = Boolean(ctx.website && ctx.website.length > 3);
+      const isOutdated = ctx.websiteQuality === 'outdated';
+      const hasWhatsapp = Boolean(ctx.contactWhatsapp);
+      const hasDecisionMaker = Boolean(ctx.contactRole && /ceo|diretor|sócio|dono|gerente|proprietário|fundador/i.test(ctx.contactRole));
+      
+      // Cálculo de scores
+      let oppScore = 50;
+      let qualScore = 50;
+      const problems: string[] = [];
+
+      if (!hasWeb) {
+        oppScore += 25;
+        problems.push('Sem website oficial identificado');
+      } else if (isOutdated) {
+        oppScore += 20;
+        problems.push('Website desatualizado ou com baixa conversão mobile');
+      }
+
+      if (ctx.apparentNeed) {
+        oppScore += 20;
+        problems.push(`Necessidade visível: ${ctx.apparentNeed}`);
+      }
+
+      if (ctx.unitsCount && ctx.unitsCount > 1) {
+        oppScore += 15;
+        qualScore += 20;
+        problems.push(`Múltiplas unidades (${ctx.unitsCount}) com potencial de padronização`);
+      }
+
+      if (hasWhatsapp) {
+        oppScore += 15;
+        qualScore += 15;
+      } else {
+        problems.push('Canal de WhatsApp direto não mapeado');
+      }
+
+      if (hasDecisionMaker) {
+        qualScore += 25;
+      }
+
+      if (ctx.niche) {
+        qualScore += 15;
+      }
+
+      oppScore = Math.min(100, Math.max(15, oppScore));
+      qualScore = Math.min(100, Math.max(20, qualScore));
+
+      const icpFitVal = qualScore >= 80 ? 'A' : qualScore >= 60 ? 'B' : qualScore >= 40 ? 'C' : 'D';
+      const potentialVal = oppScore >= 75 ? 'Alto' : oppScore >= 45 ? 'Médio' : 'Baixo';
+      const recommendedSrv = ctx.serviceName || (problems.some(p => p.includes('website')) ? 'Website & Landing Page de Alta Conversão' : 'Diagnóstico Comercial & Prospecção');
+      const pitchAngleVal = `Abordagem consultiva focando em ${problems[0] || 'geração de demanda previsível'} para o setor de ${ctx.niche || 'atuação'}, sem confrontar fornecedores atuais e apresentando diagnósticos visíveis.`;
+      
+      const scriptVal = `${contactGreeting}, tudo bem?\n\nAcompanhei a presença da ${ctx.companyName}${ctx.niche ? ` no segmento de ${ctx.niche}` : ''} e notei ${problems[0] ? problems[0].toLowerCase() : 'oportunidade de otimizar a captação de clientes'}.\n\nEstruturamos soluções que ajudam empresas como a sua a resolver isso sem complicação. Faz sentido um bate-papo de 10 minutos nesta semana para te mostrar um diagnóstico prático?`;
+
+      resultText = `Diagnóstico Inteligente:\n• ICP Fit: Grau ${icpFitVal} (${potentialVal} Potencial)\n• Score Oportunidade: ${oppScore}/100\n• Score Qualificação: ${qualScore}/100\n• Dores: ${problems.join(', ') || 'Demanda latente'}\n• Serviço Recomendado: ${recommendedSrv}\n• Ângulo: ${pitchAngleVal}`;
+
+      return {
+        resultText,
+        icpFit: icpFitVal,
+        opportunityScore: oppScore,
+        qualificationScore: qualScore,
+        potential: potentialVal,
+        identifiedProblems: problems,
+        recommendedService: recommendedSrv,
+        pitchAngle: pitchAngleVal,
+        nextActionSuggestion: 'Enviar mensagem personalizada de primeiro contato no WhatsApp',
+        recommendedChannel: hasWhatsapp ? 'whatsapp' : 'call',
+        suggestedScript: scriptVal,
+        factsUsed,
+        inferences,
+        missingData,
+        isOfflineFallback: true,
+      };
+    }
+
     case 'PERSONALIZAR':
       resultText = `${contactGreeting}, tudo bem?\n\nAcompanhei a actuação da ${ctx.companyName}${ctx.niche ? ` no sector de ${ctx.niche}` : ''} e notei uma grande oportunidade de potencializar seus resultados comerciais${serviceMention}.\n\nPodemos trocar 5 minutos de ideias nesta semana para apresentar um diagnóstico prático?`;
       alternatives = [

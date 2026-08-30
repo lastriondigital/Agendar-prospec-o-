@@ -50,6 +50,10 @@ import { CopilotAssistantModal } from '../copilot/CopilotAssistantModal';
 import { CopilotActionType } from '../../types';
 import { ApproachRecommendationCard } from '../sales/ApproachRecommendationCard';
 import { ScheduleMessageModal } from '../scheduling/ScheduleMessageModal';
+import { DualScoreBadge } from '../qualification/DualScoreBadge';
+import { LeadAiAnalysisModal } from '../copilot/LeadAiAnalysisModal';
+import { AdaptiveResponseModal } from '../sales/AdaptiveResponseModal';
+import { PlaybookModal } from '../sales/PlaybookModal';
 
 interface CompanyDetailsDrawerProps {
   company: Company | null;
@@ -95,6 +99,9 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [messageTargetContactId, setMessageTargetContactId] = useState<string | undefined>(undefined);
   const [isQualificationOpen, setIsQualificationOpen] = useState(false);
+  const [isAiAnalysisOpen, setIsAiAnalysisOpen] = useState(false);
+  const [isAdaptiveResponseOpen, setIsAdaptiveResponseOpen] = useState(false);
+  const [isPlaybookOpen, setIsPlaybookOpen] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copilotInitialAction, setCopilotInitialAction] = useState<CopilotActionType>('PERSONALIZAR');
   const [quickNote, setQuickNote] = useState('');
@@ -325,49 +332,42 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
                   <Button
                     variant="secondary"
                     size="xs"
-                    onClick={() => setIsQualificationOpen(true)}
-                    leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-500" />}
+                    onClick={() => setIsAiAnalysisOpen(true)}
+                    leftIcon={<Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />}
+                    className="text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/40 bg-purple-50/50 dark:bg-purple-950/20"
                   >
-                    Qualificar Lead
+                    Analisar com IA
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => setIsAdaptiveResponseOpen(true)}
+                    leftIcon={<Zap className="w-3.5 h-3.5 text-amber-500" />}
+                  >
+                    Funil Adaptativo
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    onClick={() => setIsQualificationOpen(true)}
+                  >
+                    Qualificar
                   </Button>
                 </>
               )}
             </div>
 
-            <div className="flex items-center gap-4 text-xs">
-              {companyLead?.temperature && (
-                <div className="flex items-center gap-1 font-medium">
-                  {companyLead.temperature === 'quente' ? (
-                    <span className="text-amber-700 dark:text-amber-400 flex items-center gap-1">
-                      <Flame className="w-3.5 h-3.5 fill-current" /> Quente
-                    </span>
-                  ) : companyLead.temperature === 'morno' ? (
-                    <span className="text-[#3F6FB5] dark:text-blue-300 flex items-center gap-1">
-                      <Zap className="w-3.5 h-3.5" /> Morno
-                    </span>
-                  ) : (
-                    <span className="text-[#5F6368] dark:text-[#9AA0A6] flex items-center gap-1">
-                      <Thermometer className="w-3.5 h-3.5" /> Frio
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {leadScoreResult ? (
-                <ScoreBadge
-                  score={leadScoreResult.score}
-                  size="sm"
-                  interactive
-                  scoreResult={leadScoreResult}
-                  companyName={company.name}
-                  showLabel
-                />
-              ) : companyLead?.score !== undefined ? (
-                <div className="flex items-center gap-1.5 font-mono text-[#202124] dark:text-[#E8EAED]">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="font-bold">{companyLead.score} pts</span>
-                </div>
-              ) : null}
+            <div className="flex items-center gap-3 text-xs">
+              <DualScoreBadge
+                company={company}
+                contact={primaryContact}
+                lead={companyLead}
+                icps={icps}
+                services={services}
+                history={companyHistory}
+              />
             </div>
           </div>
         </div>
@@ -1214,6 +1214,32 @@ export const CompanyDetailsDrawer: React.FC<CompanyDetailsDrawerProps> = ({
         onClose={() => setIsScheduleMessageModalOpen(false)}
         initialClientId={company.id}
       />
+
+      {/* Modal de Análise com IA */}
+      {isAiAnalysisOpen && (
+        <LeadAiAnalysisModal
+          company={company}
+          contact={primaryContact}
+          lead={companyLead}
+          onClose={() => setIsAiAnalysisOpen(false)}
+          onScheduleAction={() => setIsScheduleMessageModalOpen(true)}
+        />
+      )}
+
+      {/* Modal de Funil Adaptativo */}
+      {isAdaptiveResponseOpen && (
+        <AdaptiveResponseModal
+          company={company}
+          contact={primaryContact}
+          lead={companyLead}
+          onClose={() => setIsAdaptiveResponseOpen(false)}
+        />
+      )}
+
+      {/* Modal do Playbook Comercial */}
+      {isPlaybookOpen && (
+        <PlaybookModal onClose={() => setIsPlaybookOpen(false)} />
+      )}
     </div>
   );
 };

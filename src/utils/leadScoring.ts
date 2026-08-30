@@ -404,3 +404,278 @@ export function calculateLeadScore(
     breakdown,
   };
 }
+
+/**
+ * Interface com os 2 scores separados e detalhados
+ */
+export interface DualLeadScoreResult {
+  opportunityScore: number; // 0 a 100 (urgência, demanda, facilidade de abordagem, sinais)
+  qualificationScore: number; // 0 a 100 (fit de ICP, porte, decisor, faturamento, maturidade)
+  priorityScore: number; // 0 a 100 (score combinado)
+  classification: LeadScoreClassification;
+  demandType: 'demanda_identificada' | 'oportunidade_latente' | 'qualificado_icp';
+  opportunityBreakdown: ScoringBreakdownItem[];
+  qualificationBreakdown: ScoringBreakdownItem[];
+  recommendation: string;
+}
+
+/**
+ * Calcula o Score de Oportunidade (0-100)
+ * Focado em: dor latente, sem site, site defasado, presença fraca no GMB, necessidade aparente, momento de abordagem
+ */
+export function calculateOpportunityScore(
+  company?: Company,
+  contact?: Contact,
+  lead?: Lead
+): { score: number; breakdown: ScoringBreakdownItem[] } {
+  const breakdown: ScoringBreakdownItem[] = [];
+  let score = 30; // base inicial
+
+  if (!company) return { score: 0, breakdown: [] };
+
+  const notes = `${company.notes || ''} ${lead?.notes || ''} ${company.apparentNeed || ''}`.toLowerCase();
+
+  // 1. Sem website ou website desatualizado
+  if (!company.website || company.website.trim().length < 4) {
+    score += 25;
+    breakdown.push({
+      ruleId: 'opp_no_website',
+      label: 'Sem Website Oficial',
+      points: 25,
+      matched: true,
+      reason: 'Oportunidade imediata de desenvolvimento web ou landing page.',
+    });
+  } else if (
+    company.websiteQuality === 'outdated' ||
+    notes.includes('desatualizado') ||
+    notes.includes('lento') ||
+    notes.includes('antigo')
+  ) {
+    score += 20;
+    breakdown.push({
+      ruleId: 'opp_outdated_site',
+      label: 'Website com Oportunidade de Melhoria',
+      points: 20,
+      matched: true,
+      reason: 'Site existente com baixa conversão ou defasado.',
+    });
+  }
+
+  // 2. Necessidade aparente ou dor anotada
+  if (company.apparentNeed || notes.includes('precisa') || notes.includes('gargalo') || notes.includes('problema')) {
+    score += 25;
+    breakdown.push({
+      ruleId: 'opp_apparent_need',
+      label: 'Demanda / Dor Identificada',
+      points: 25,
+      matched: true,
+      reason: company.apparentNeed || 'Dor operacional ou comercial já mapeada.',
+    });
+  }
+
+  // 3. WhatsApp direto disponível (facilidade e timing de abordagem)
+  if (contact?.whatsapp || (!contact && notes.includes('whatsapp'))) {
+    score += 15;
+    breakdown.push({
+      ruleId: 'opp_whatsapp_ready',
+      label: 'Canal Direto (WhatsApp Ativo)',
+      points: 15,
+      matched: true,
+      reason: 'Canal ágil para contato sem intermediários.',
+    });
+  }
+
+  // 4. Múltiplas unidades com processos manuais
+  const units = company.unitsCount ?? 1;
+  if (units > 1) {
+    score += 15;
+    breakdown.push({
+      ruleId: 'opp_multi_units',
+      label: `Operação com ${units} Unidades`,
+      points: 15,
+      matched: true,
+      reason: 'Complexidade operacional que demanda padronização e sistemas.',
+    });
+  }
+
+  // 5. Temperatura / Urgência
+  if (lead?.temperature === 'quente' || lead?.temperature === 'hot') {
+    score += 15;
+    breakdown.push({
+      ruleId: 'opp_hot_temp',
+      label: 'Lead em Momento Quente',
+      points: 15,
+      matched: true,
+      reason: 'Interesse manifestado recentemente.',
+    });
+  }
+
+  const finalOppScore = Math.max(10, Math.min(100, Math.round(score)));
+  return { score: finalOppScore, breakdown };
+}
+
+/**
+ * Calcula o Score de Qualificação (0-100)
+ * Focado em: fit com ICP, porte da empresa, decisor acessível, segmento prioritário, localização
+ */
+export function calculateQualificationScore(
+  company?: Company,
+  contact?: Contact,
+  icps: IdealCustomerProfile[] = []
+): { score: number; breakdown: ScoringBreakdownItem[] } {
+  const breakdown: ScoringBreakdownItem[] = [];
+  let score = 20; // base inicial
+
+  if (!company) return { score: 0, breakdown: [] };
+
+  // 1. Decisor com cargo estratégico mapeado
+  if (contact?.role) {
+    const roleLower = contact.role.toLowerCase();
+    const isOwnerOrDirector = /sócio|socio|diretor|ceo|proprietário|proprietario|dono|gerente|fundador/i.test(roleLower);
+    if (isOwnerOrDirector) {
+      score += 30;
+      breakdown.push({
+        ruleId: 'qual_decision_maker',
+        label: `Decisor Mapeado: ${contact.role}`,
+        points: 30,
+        matched: true,
+        reason: 'Contato com poder de decisão de compra direto.',
+      });
+    } else {
+      score += 15;
+      breakdown.push({
+        ruleId: 'qual_contact_mapped',
+        label: `Contato Cadastrado: ${contact.role}`,
+        points: 15,
+        matched: true,
+        reason: 'Contato mapeado na empresa.',
+      });
+    }
+  }
+
+  // 2. Enquadramento no ICP
+  const activeIcps = icps.filter((i) => i.active !== false);
+  const matchedIcp = activeIcps.find((icp) => {
+    return icp.niches.some(
+      (n) =>
+        company.niche.toLowerCase().includes(n.toLowerCase()) ||
+        n.toLowerCase().includes(company.niche.toLowerCase()) ||
+        company.category.toLowerCase().includes(n.toLowerCase())
+    );
+  });
+
+  if (matchedIcp) {
+    score += 30;
+    breakdown.push({
+      ruleId: 'qual_icp_match',
+      label: `Perfil Ideal (ICP: ${matchedIcp.name})`,
+      points: 30,
+      matched: true,
+      reason: `Nicho ${company.niche} corresponde perfeitamente ao ICP estratégico.`,
+    });
+  } else if (company.niche) {
+    score += 15;
+    breakdown.push({
+      ruleId: 'qual_niche_defined',
+      label: `Nicho Definido (${company.niche})`,
+      points: 15,
+      matched: true,
+      reason: 'Segmento de atuação claro.',
+    });
+  }
+
+  // 3. Estrutura / Porte da Empresa
+  const units = company.unitsCount ?? 1;
+  if (units >= 5) {
+    score += 20;
+    breakdown.push({
+      ruleId: 'qual_size_large',
+      label: `Porte Expandido (${units} unidades)`,
+      points: 20,
+      matched: true,
+      reason: 'Rede consolidada com alto poder de investimento.',
+    });
+  } else if (units >= 2) {
+    score += 15;
+    breakdown.push({
+      ruleId: 'qual_size_medium',
+      label: `Porte Médio (${units} unidades)`,
+      points: 15,
+      matched: true,
+      reason: 'Empresa em expansão com capacidade de pagamento.',
+    });
+  } else {
+    score += 10;
+    breakdown.push({
+      ruleId: 'qual_size_single',
+      label: 'Negócio Estabelecido (1 unidade)',
+      points: 10,
+      matched: true,
+      reason: 'Operação física estabelecida.',
+    });
+  }
+
+  // 4. Cidade / Praça Estratégica
+  if (company.city && company.city.trim().length > 0) {
+    score += 10;
+    breakdown.push({
+      ruleId: 'qual_location',
+      label: `Localização: ${company.city}`,
+      points: 10,
+      matched: true,
+      reason: 'Praça de atuação identificada.',
+    });
+  }
+
+  const finalQualScore = Math.max(10, Math.min(100, Math.round(score)));
+  return { score: finalQualScore, breakdown };
+}
+
+/**
+ * Calcula a visão unificada e explicável com Dual Score
+ */
+export function calculateDualLeadScore(
+  company?: Company,
+  contact?: Contact,
+  lead?: Lead,
+  icps: IdealCustomerProfile[] = [],
+  services: Service[] = [],
+  history: HistoryEvent[] = [],
+  weights: ScoringWeightConfig = DEFAULT_SCORING_WEIGHTS
+): DualLeadScoreResult {
+  const opp = calculateOpportunityScore(company, contact, lead);
+  const qual = calculateQualificationScore(company, contact, icps);
+
+  // Score de prioridade combinado (50% oportunidade, 50% qualificação)
+  const priorityScore = Math.round(opp.score * 0.5 + qual.score * 0.5);
+  const classification = getScoreClassification(priorityScore);
+
+  let demandType: 'demanda_identificada' | 'oportunidade_latente' | 'qualificado_icp' = 'oportunidade_latente';
+  if (opp.score >= 75) {
+    demandType = 'demanda_identificada';
+  } else if (qual.score >= 75) {
+    demandType = 'qualificado_icp';
+  }
+
+  let recommendation = '';
+  if (opp.score >= 80 && qual.score >= 80) {
+    recommendation = 'Alta prioridade: Dor evidente e tomador de decisão acessível. Fazer contato hoje.';
+  } else if (opp.score >= 75) {
+    recommendation = 'Demanda clara identificada: Abordar com script consultivo focado na dor visível.';
+  } else if (qual.score >= 75) {
+    recommendation = 'Fit excelente de perfil: Iniciar descoberta para levantar objetivos de crescimento.';
+  } else {
+    recommendation = 'Qualificação inicial: Validar decisor e coletar mais informações de contexto.';
+  }
+
+  return {
+    opportunityScore: opp.score,
+    qualificationScore: qual.score,
+    priorityScore,
+    classification,
+    demandType,
+    opportunityBreakdown: opp.breakdown,
+    qualificationBreakdown: qual.breakdown,
+    recommendation,
+  };
+}

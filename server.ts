@@ -79,6 +79,25 @@ app.post("/api/copilot/action", async (req, res) => {
 
     let actionPrompt = "";
     switch (actionType) {
+      case "ANALISAR_LEAD_COMPLETO":
+        actionPrompt = `AÇÃO: [DIAGNÓSTICO COMPLETO DO LEAD COM IA]
+Realize uma análise consultiva e minuciosa deste prospect:
+Contexto do Lead: ${JSON.stringify(leadContext)}
+Catálogo de Serviços e ICPs: ${JSON.stringify(options?.availableServices || [])}
+
+DIRETRIZES RÍGIDAS:
+1. Avalie a aderência ao ICP: Classifique em A (Excelente Fit), B (Bom Fit), C (Fit Moderado) ou D (Baixo Fit) com justificativa.
+2. Calcule 2 scores explicáveis de 0 a 100:
+   - opportunityScore (0-100): urgência, demanda identificada, dores visíveis, facilidade de abordagem;
+   - qualificationScore (0-100): fit com perfil de cliente ideal, porte, decisor identificado, maturidade.
+3. Avalie o Potencial: "Alto", "Médio" ou "Baixo".
+4. Identifique problemas reais ou dores latentes (ex: sem site, perfil incompleto no Google, processos manuais com múltiplas unidades).
+5. Sugira o melhor serviço e o ângulo de abordagem consultivo (use linguagem hipotética quando falar de perdas ou riscos).
+6. Recomende a próxima melhor ação imediata e o canal ideal.
+7. Gere um script de abordagem altamente personalizado pronto para envio.
+8. Separe com rigor absoluto: Fatos confirmados (factsUsed), Inferências de mercado (inferences) e Informações ausentes (missingData).`;
+        break;
+
       case "PERSONALIZAR":
         actionPrompt = `AÇÃO: [PERSONALIZAR]
 Gere uma mensagem altamente personalizada e humanizada de primeiro contato para este prospect.
@@ -233,6 +252,30 @@ Instruções: ${inputMessage || "Gere uma análise completa."}`;
             recommendedChannel: {
               type: Type.STRING,
               description: "Canal sugerido: whatsapp, linkedin, email, call",
+            },
+            icpFit: {
+              type: Type.STRING,
+              description: "Aderência ao ICP: A, B, C ou D com justificativa",
+            },
+            opportunityScore: {
+              type: Type.INTEGER,
+              description: "Score de Oportunidade (0 a 100) baseado em urgência e sinais",
+            },
+            qualificationScore: {
+              type: Type.INTEGER,
+              description: "Score de Qualificação (0 a 100) baseado em fit de ICP e decisor",
+            },
+            potential: {
+              type: Type.STRING,
+              description: "Potencial: Alto, Médio ou Baixo",
+            },
+            pitchAngle: {
+              type: Type.STRING,
+              description: "Ângulo de abordagem consultivo",
+            },
+            suggestedScript: {
+              type: Type.STRING,
+              description: "Script pronto para abordagem com variáveis",
             },
           },
           required: ["resultText", "factsUsed", "inferences", "missingData"],
