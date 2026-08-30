@@ -61,7 +61,7 @@ export async function runFullProductionAudit(): Promise<ProductionAuditReport> {
     'Limpeza de cache manual pelo usuário no navegador pode apagar dados locais se o Cloud Sync não estiver autenticado.',
   ];
   const technicalRecommendations: string[] = [
-    'Incentivar a ativação do Cloud Sync gratuito com Firestore para persistência em múltiplos dispositivos.',
+    'Incentivar a ativação do Cloud Sync gratuito com Supabase para persistência em múltiplos dispositivos.',
     'Realizar backups periódicos em JSON / CSV através da Central de Backup nas Configurações.',
     'Utilizar a tecla de atalho (W) na Central de Comando para ganho de velocidade no envio via WhatsApp Web / App.',
   ];

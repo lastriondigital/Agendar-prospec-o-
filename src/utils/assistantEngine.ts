@@ -958,7 +958,9 @@ export function generateAiActionSuggestions(
 
   // 2. Leads com respostas positivas que ainda estão em primeiro contato
   const readyForDiagnosis = leads.filter((l) => {
-    return l.stage === 'PRIMEIRO_CONTATO' && (l.responseOutcome === 'positive' || (l.qualificationScore && l.qualificationScore >= 35));
+    const isFirstContact = l.stage === 'PRIMEIRO_CONTACTO' || (l.stage as any) === 'PRIMEIRO_CONTATO';
+    const isPositive = l.responseOutcome === 'interessado' || l.responseOutcome === 'reuniao' || l.responseOutcome === 'pediu_orcamento' || (l.responseOutcome as any) === 'positive';
+    return isFirstContact && (isPositive || ((l.qualificationScore || 0) >= 35));
   });
 
   if (readyForDiagnosis.length > 0) {
@@ -1012,9 +1014,10 @@ export function calculateSystemLearningMetrics(
     const current = countriesMap.get(country) || { total: 0, responded: 0, converted: 0 };
     current.total += 1;
     const lead = leads.find((l) => l.companyId === c.id);
-    if (lead?.stage === 'GANHO' || lead?.stage === 'CLIENTE') current.converted += 1;
+    if (lead?.stage === 'CLIENTE' || (lead?.stage as any) === 'GANHO') current.converted += 1;
     const hasResp = history.some((h) => h.companyId === c.id && (h.type === 'response_received' || h.title?.includes('resposta')));
-    if (hasResp || lead?.responseOutcome === 'positive') current.responded += 1;
+    const isPositive = lead?.responseOutcome === 'interessado' || lead?.responseOutcome === 'reuniao' || lead?.responseOutcome === 'pediu_orcamento' || (lead?.responseOutcome as any) === 'positive';
+    if (hasResp || isPositive) current.responded += 1;
     countriesMap.set(country, current);
   });
 
@@ -1043,11 +1046,12 @@ export function calculateSystemLearningMetrics(
     const total = matchedComps.length;
     const converted = matchedComps.filter((c) => {
       const l = leads.find((lead) => lead.companyId === c.id);
-      return l?.stage === 'GANHO' || l?.stage === 'CLIENTE';
+      return l?.stage === 'CLIENTE' || (l?.stage as any) === 'GANHO';
     }).length;
     const responded = matchedComps.filter((c) => {
       const l = leads.find((lead) => lead.companyId === c.id);
-      return l?.responseOutcome === 'positive' || history.some((h) => h.companyId === c.id && h.type === 'response_received');
+      const isPositive = l?.responseOutcome === 'interessado' || l?.responseOutcome === 'reuniao' || l?.responseOutcome === 'pediu_orcamento' || (l?.responseOutcome as any) === 'positive';
+      return isPositive || history.some((h) => h.companyId === c.id && h.type === 'response_received');
     }).length;
 
     const respRate = total > 0 ? Math.round((responded / total) * 100) : 0;
@@ -1073,7 +1077,8 @@ export function calculateSystemLearningMetrics(
     const total = matchingCompanies.length;
     const responded = matchingCompanies.filter((c) => {
       const l = leads.find((lead) => lead.companyId === c.id);
-      return l?.responseOutcome === 'positive' || (l?.score || 0) >= 70;
+      const isPositive = l?.responseOutcome === 'interessado' || l?.responseOutcome === 'reuniao' || l?.responseOutcome === 'pediu_orcamento' || (l?.responseOutcome as any) === 'positive';
+      return isPositive || (l?.score || 0) >= 70;
     }).length;
     const respRate = total > 0 ? Math.round((responded / total) * 100) : 50;
 

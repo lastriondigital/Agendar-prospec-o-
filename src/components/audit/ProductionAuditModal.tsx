@@ -65,7 +65,7 @@ export const ProductionAuditModal: React.FC<ProductionAuditModalProps> = ({ isOp
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `prospect-os-audit-report-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `leadion-audit-report-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     success('Relatório técnico exportado com sucesso!');
@@ -75,7 +75,7 @@ export const ProductionAuditModal: React.FC<ProductionAuditModalProps> = ({ isOp
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Auditoria Completa de Produção • PROSPECT OS"
+      title="Auditoria Completa de Produção • LEADION"
       size="xl"
     >
       <div className="space-y-6 text-neutral-200">
@@ -329,7 +329,7 @@ export const ProductionAuditModal: React.FC<ProductionAuditModalProps> = ({ isOp
             </div>
             <div className="pt-3 space-y-1 text-[11px] text-neutral-300 max-h-72 overflow-y-auto">
               <div>
-                <span className="text-emerald-400">[SYSTEM_AUDIT]</span> Iniciando bateria de testes do PROSPECT OS v2.0...
+                <span className="text-emerald-400">[SYSTEM_AUDIT]</span> Iniciando bateria de testes do LEADION v2.0...
               </div>
               {report.steps.map((s) => (
                 <div key={s.stepNumber} className="flex items-start gap-2">
@@ -351,7 +351,7 @@ export const ProductionAuditModal: React.FC<ProductionAuditModalProps> = ({ isOp
         {/* Rodapé de Ações */}
         <div className="flex items-center justify-between pt-4 border-t border-neutral-800 text-xs">
           <span className="text-neutral-500">
-            PROSPECT OS Production Engine • Audit Build v2.0.4
+            LEADION Production Engine • Audit Build v2.0.4
           </span>
           <Button variant="primary" size="sm" onClick={onClose}>
             Fechar Relatório

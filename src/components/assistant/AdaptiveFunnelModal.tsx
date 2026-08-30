@@ -80,23 +80,22 @@ export const AdaptiveFunnelModal: React.FC<AdaptiveFunnelModalProps> = ({
     const newQualScore = Math.min(100, Math.max(0, (lead?.qualificationScore || 20) + selectedRule.qualificationScoreDelta));
 
     if (lead) {
-      updateLead(lead.id, {
+      updateLead({
+        ...lead,
         stage: targetStage,
         nextActionTitle: selectedRule.targetNextAction,
         qualificationScore: newQualScore,
         lastContactDate: new Date().toISOString(),
-        responseOutcome: selectedRule.qualificationScoreDelta > 0 ? 'positive' : 'objection',
+        responseOutcome: selectedRule.qualificationScoreDelta > 0 ? 'interessado' : 'nao_interessado',
       });
     }
 
     addHistoryEvent({
-      id: `hist_adapt_${Date.now()}`,
       companyId: company.id,
       leadId: lead?.id,
       type: 'response_received',
       title: `Resposta do Lead Adaptada: ${selectedRule.classification}`,
       description: `Classificação: ${selectedRule.classification} | Próxima Ação: ${selectedRule.targetNextAction} | Delta Qualificação: ${selectedRule.qualificationScoreDelta > 0 ? `+${selectedRule.qualificationScoreDelta}` : selectedRule.qualificationScoreDelta}`,
-      timestamp: new Date().toISOString(),
     });
 
     const destPhone = contact?.whatsapp || contact?.phone || company.companyWhatsApp || company.companyPhone || '';
@@ -180,7 +179,7 @@ export const AdaptiveFunnelModal: React.FC<AdaptiveFunnelModalProps> = ({
                       "{rule.leadResponsePattern}"
                     </span>
                     <Badge
-                      variant={rule.qualificationScoreDelta >= 15 ? 'green' : rule.qualificationScoreDelta >= 0 ? 'blue' : 'gray'}
+                      variant={rule.qualificationScoreDelta >= 15 ? 'emerald' : rule.qualificationScoreDelta >= 0 ? 'blue' : 'neutral'}
                       size="sm"
                     >
                       {rule.qualificationScoreDelta > 0 ? `+${rule.qualificationScoreDelta}` : rule.qualificationScoreDelta} pts

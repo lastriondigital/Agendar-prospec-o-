@@ -190,7 +190,7 @@ export const ConflictResolutionModal: React.FC = () => {
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-semibold text-sm">
                   <Cloud className="w-4 h-4" />
-                  <span>Versão Nuvem (Firestore)</span>
+                  <span>Versão Nuvem (Supabase)</span>
                 </div>
                 <div className="flex items-center gap-1 text-[11px] text-slate-400">
                   <Clock className="w-3.5 h-3.5" />

@@ -117,7 +117,7 @@ export const ServicesView: React.FC = () => {
           <h1 className="text-2xl font-black text-neutral-100 flex items-center gap-2">
             <span>Motor de Qualificação & ICP</span>
             <span className="text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
-              PROSPECT OS
+              LEADION
             </span>
           </h1>
           <p className="text-xs text-neutral-400 mt-1">

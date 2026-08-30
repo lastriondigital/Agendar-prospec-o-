@@ -433,7 +433,7 @@ export const LeadAiAnalysisModal: React.FC<LeadAiAnalysisModalProps> = ({
                 <div className="space-y-4 animate-in fade-in duration-150">
                   <div className="p-3.5 rounded-xl bg-neutral-50 dark:bg-[#20242A] border border-[#E6E8EB] dark:border-[#2D3139] text-xs text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed">
                     <ShieldCheck className="w-4 h-4 inline mr-1.5 text-blue-500" />
-                    <strong>Transparência Algorítmica:</strong> O PROSPECT OS separa com rigor absoluto o que foi confirmado nos dados, o que é inferência de mercado e o que ainda precisa ser investigado.
+                    <strong>Transparência Algorítmica:</strong> O LEADION separa com rigor absoluto o que foi confirmado nos dados, o que é inferência de mercado e o que ainda precisa ser investigado.
                   </div>
 
                   {/* Fatos */}

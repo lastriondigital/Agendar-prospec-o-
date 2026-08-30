@@ -33,6 +33,7 @@ import {
   Contact,
   IdealCustomerProfile,
   Lead,
+  LeadStage,
   OpportunityState,
   ProspectingMode,
   Service,

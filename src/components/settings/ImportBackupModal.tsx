@@ -137,7 +137,7 @@ export const ImportBackupModal: React.FC<ImportBackupModalProps> = ({
               Selecione ou arraste o arquivo .json de backup
             </h4>
             <p className="text-xs text-slate-400 dark:text-neutral-400 light:text-slate-500 max-w-sm mx-auto">
-              O PROSPECT OS validará a integridade do arquivo e sanitizará todos os dados antes de gravar no banco local.
+              O LEADION validará a integridade do arquivo e sanitizará todos os dados antes de gravar no banco local.
             </p>
           </div>
         ) : (

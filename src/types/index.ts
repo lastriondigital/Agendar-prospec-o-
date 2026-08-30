@@ -69,6 +69,23 @@ export type LeadStage =
   | 'NOVO'
   | 'QUALIFICADO'
   | 'PRIMEIRO_CONTACTO'
+  | 'PRIMEIRO_CONTATO'
+  | 'DIAGNOSTICO'
+  | 'DIAGNÓSTICO'
+  | 'DEMONSTRACAO'
+  | 'DEMONSTRAÇÃO'
+  | 'APRESENTACAO'
+  | 'APRESENTAÇÃO'
+  | 'OFERTA'
+  | 'PROPOSTA'
+  | 'NEGOCIACAO'
+  | 'NEGOCIAÇÃO'
+  | 'CONTRATO_ENVIADO'
+  | 'FECHAMENTO'
+  | 'GANHO'
+  | 'CLIENTE'
+  | 'FOLLOW_UP'
+  | 'SEM_RESPOSTA'
   | 'SEM_RESPOSTA_2'
   | 'SEM_RESPOSTA_3'
   | 'SEM_RESPOSTA_OUTRO_HORARIO'
@@ -79,18 +96,16 @@ export type LeadStage =
   | 'RESPOSTA_NEGATIVA'
   | 'INTERESSADO'
   | 'REUNIÃO'
-  | 'PROPOSTA'
-  | 'NEGOCIAÇÃO'
-  | 'CLIENTE'
-  | 'SEM_RESPOSTA'
   | 'OBJEÇÃO'
   | 'ADIADO'
   | 'PERDIDO'
-  | 'REATIVAÇÃO';
+  | 'REATIVAÇÃO'
+  | 'ARQUIVADO'
+  | string;
 
-export type LeadPriority = 'alta' | 'média' | 'media' | 'baixa' | 'high' | 'medium' | 'low';
-export type LeadTemperature = 'quente' | 'morno' | 'frio' | 'hot' | 'warm' | 'cold';
-export type CompanyStatus = 'active' | 'archived' | 'lead' | 'client';
+export type LeadPriority = 'alta' | 'média' | 'media' | 'baixa' | 'urgente' | 'high' | 'medium' | 'low' | string;
+export type LeadTemperature = 'quente' | 'morno' | 'frio' | 'hot' | 'warm' | 'cold' | string;
+export type CompanyStatus = 'active' | 'archived' | 'lead' | 'client' | string;
 
 export type LostReasonType =
   | 'sem_orcamento'
@@ -98,7 +113,8 @@ export type LostReasonType =
   | 'nao_interessado'
   | 'sem_resposta'
   | 'servico_inadequado'
-  | 'outro';
+  | 'outro'
+  | string;
 
 export type ResponseOutcomeType =
   | 'interessado'
@@ -107,7 +123,9 @@ export type ResponseOutcomeType =
   | 'pediu_orcamento'
   | 'pediu_falar_depois'
   | 'reuniao'
-  | 'outro';
+  | 'positive'
+  | 'outro'
+  | string;
 
 export type WhatsAppScriptType =
   | 'primeiro_contacto'
@@ -119,7 +137,348 @@ export type WhatsAppScriptType =
   | 'diagnostico'
   | 'proposta'
   | 'reativacao'
-  | 'outro';
+  | 'outro'
+  | string;
+
+/**
+ * Modo e Tipos do Assistente de Prospecção
+ */
+export type ProspectingMode = 'DEMANDA_IDENTIFICADA' | 'OPORTUNIDADE_LATENTE' | 'AMBOS' | string;
+export type SignalCategory = 'website' | 'design' | 'gmb' | 'scale' | 'process' | 'operations' | 'general' | string;
+export type OpportunityState = 'HIPOTESE' | 'VALIDANDO' | 'CONFIRMADO' | 'DESCARTADO' | 'PROBLEMA_CONFIRMADO' | 'PROVAVEL' | 'DEMANDA_IDENTIFICADA' | 'OPORTUNIDADE_LATENTE' | string;
+export type VariationLevel = 'none' | 'minor' | 'contextual' | 'ai' | 'leve' | 'moderada' | 'reestruturacao' | string;
+export type ContactSalutation = 'Sr.' | 'Sra.' | 'Dr.' | 'Dra.' | 'Prof.' | 'Prezado' | 'Prezada' | 'Estimado' | 'Estimada' | 'Olá' | 'custom' | string;
+export type ContactGender = 'masculino' | 'feminino' | 'neutro' | 'm' | 'f' | 'outro' | string;
+export type PersonaRole = 'decisor' | 'socio' | 'diretor' | 'gerente' | 'operacional' | 'atendimento' | 'recepcao' | 'outro' | string;
+export type PlaybookStageKey = 'abertura' | 'descoberta' | 'apresentacao' | 'negociacao' | 'fechamento' | 'reativacao' | string;
+export type FormalityLevel = 'formal' | 'consultivo' | 'direto' | 'amigavel' | string;
+export type PronounUsage = 'voce' | 'tu' | 'senhor' | 'neutro' | string;
+
+export interface ProspectSignalItem {
+  id: string;
+  category: 'website' | 'design' | 'gmb' | 'scale' | 'process' | 'operations' | 'general' | string;
+  mode: ProspectingMode;
+  label: string;
+  description: string;
+  points: number;
+}
+
+export interface ScorePillarDetail {
+  score: number;
+  max: number;
+  label: string;
+  details: string;
+  insufficientData?: boolean;
+}
+
+export interface OpportunityScoreExplanation {
+  mode: ProspectingMode;
+  totalScore: number;
+  classification: 'baixa' | 'media' | 'alta' | 'prioridade_maxima';
+  classificationLabel: string;
+  isHighPriority: boolean;
+  icpAdequacy?: ScorePillarDetail;
+  problemIntensity?: ScorePillarDetail;
+  buyingPotential?: ScorePillarDetail;
+  engagementIntent?: ScorePillarDetail;
+  latentIcpAdequacy?: ScorePillarDetail;
+  companyScale?: ScorePillarDetail;
+  operationalComplexity?: ScorePillarDetail;
+  repetitiveProcesses?: ScorePillarDetail;
+  digitalizationPotential?: ScorePillarDetail;
+  problemFrequency?: ScorePillarDetail;
+  apparentInvestmentCapacity?: ScorePillarDetail;
+  detectedSignals: string[];
+  customSignals: string[];
+  insufficientDataFields: string[];
+  recommendationLanguage: string;
+}
+
+export interface AuditChecklistItem {
+  id: string;
+  label: string;
+  passed: boolean;
+  score?: number; // 0 a 100
+  status?: 'valid' | 'warning' | 'error' | string;
+  message?: string;
+  feedback?: string;
+  details?: string;
+  fieldKey?: string;
+}
+
+export interface MessageAuditResult {
+  overallScore?: number;
+  score?: number;
+  isValid?: boolean;
+  passed?: boolean;
+  status: 'aprovado' | 'alerta' | 'reprovado' | 'approved' | 'has_warnings' | 'incomplete';
+  items?: AuditChecklistItem[];
+  checklist?: AuditChecklistItem[];
+  missingFields?: string[];
+  resolvedVariables?: Record<string, string>;
+  strengths?: string[];
+  warnings?: string[];
+  recommendations?: string[];
+  detectedClichés?: string[];
+}
+
+export interface PersonalizedMessageResult {
+  message?: string;
+  content?: string;
+  variationLevel?: VariationLevel;
+  variationLevelUsed?: VariationLevel;
+  audit: MessageAuditResult;
+  usedVariables?: string[];
+  unresolvedVariables?: string[];
+  detectedTone?: string;
+  metadata?: any;
+}
+
+export interface MarketPriceItem {
+  id: string;
+  country: string;
+  countryCode?: string;
+  serviceId?: string;
+  serviceName?: string;
+  price: number;
+  anchorPrice?: number;
+  currency: string;
+  currencySymbol?: string;
+  paymentMethod?: string;
+  paymentTerms?: string;
+  notes?: string;
+  observations?: string;
+}
+
+export interface MarketProfile {
+  country?: string;
+  city?: string;
+  region?: string;
+  currency?: string;
+  language?: string;
+  formalityLevel?: 'formal' | 'consultivo' | 'direto' | 'amigavel' | FormalityLevel;
+  pronounUsage?: 'voce' | 'tu' | 'senhor' | 'neutro' | PronounUsage;
+  customPrice?: number;
+  customAnchorPrice?: number;
+  paymentMethod?: string;
+  paymentTerms?: string;
+  contactName?: string;
+  contactGender?: ContactGender;
+  contactRole?: PersonaRole;
+}
+
+export interface CountryPersonalizationRule {
+  id: string;
+  country: string;
+  countryCode: string;
+  defaultCurrency: string;
+  currencySymbol: string;
+  defaultLanguage: string;
+  defaultLanguageLabel: string;
+  formality: 'formal' | 'consultivo' | 'direto' | 'amigavel' | FormalityLevel;
+  pronoun: 'voce' | 'tu' | 'senhor' | 'neutro' | PronounUsage;
+  salutations: string[];
+  terms: {
+    site: string;
+    budget: string;
+    phone: string;
+    team: string;
+    company: string;
+    pricePhrase: string;
+  };
+  priceFormatTemplate?: string;
+}
+
+export interface CommercialPersonalizationSettings {
+  defaultCountry: string;
+  defaultCurrency: string;
+  defaultLanguage?: string;
+  defaultFormality: 'formal' | 'consultivo' | 'direto' | 'amigavel' | FormalityLevel;
+  defaultTreatment?: PronounUsage;
+  strictNoGuessGender?: boolean;
+  strictNoAutoCurrencyConversion?: boolean;
+  countryRules?: CountryPersonalizationRule[];
+  marketRules?: CountryPersonalizationRule[];
+  globalMarketPrices?: MarketPriceItem[];
+  defaultTerms?: {
+    site: string;
+    budget: string;
+    phone: string;
+    team: string;
+    company: string;
+    pricePhrase: string;
+  };
+  antiClichéFilterEnabled?: boolean;
+  updatedAt?: string;
+}
+
+export interface ResolvedCommercialContext {
+  country: string;
+  city: string;
+  region: string;
+  currency: string;
+  currencySymbol: string;
+  language: string;
+  formalityLevel: string;
+  pronounUsage: string;
+  terms: {
+    site: string;
+    budget: string;
+    phone: string;
+    team: string;
+    company: string;
+    pricePhrase: string;
+  };
+  serviceName: string;
+  serviceId?: string;
+  priceFormatted: string;
+  rawPrice?: number;
+  anchorPriceFormatted: string;
+  rawAnchorPrice?: number;
+  paymentMethod: string;
+  paymentTerms: string;
+  contactName: string;
+  contactFirstName: string;
+  contactGender: string;
+  contactRole: string;
+  roleLabel: string;
+  salutation: string;
+  personaAngle: string;
+  diagnosedProblem: string;
+  detectedSignal: string;
+  cta: string;
+  hierarchySource: {
+    priceSource: 'lead' | 'icp' | 'service' | 'global' | 'country' | 'not_defined';
+    currencySource: 'lead' | 'campaign' | 'icp' | 'service' | 'country';
+    languageSource: 'lead' | 'country';
+    roleSource: 'contact' | 'inferred';
+  };
+}
+
+/**
+ * Tipos do Assistente Inteligente de Prospecção
+ */
+export type AdaptiveResponseKey =
+  | 'funcionario_pedir_responsavel'
+  | 'responsavel_diagnostico'
+  | 'solucao_existente'
+  | 'interesse_preco'
+  | 'feedback_positivo'
+  | 'objecao_timing'
+  | 'objecao_sem_interesse'
+  | 'duvida_tecnica'
+  | string;
+
+export interface AdaptiveFunnelRule {
+  key: AdaptiveResponseKey;
+  leadResponsePattern: string;
+  classification: string;
+  targetNextAction: string;
+  recommendedStage: LeadStage | string;
+  qualificationScoreDelta: number;
+  suggestedScriptTitle: string;
+  suggestedScript: string;
+}
+
+export interface AiActionPermissions {
+  canCreateClient: boolean;
+  canCreateScript: boolean;
+  canCreateTasks: 'require_auth' | 'allow' | 'block';
+  canMoveLeads: 'require_auth' | 'allow' | 'block';
+  canCreateCampaigns: 'require_auth' | 'allow' | 'block';
+  canAdjustWeights: 'require_auth' | 'allow' | 'block';
+}
+
+export interface AiAuthorizedAction {
+  id: string;
+  type: 'create_followups' | 'create_followup_tasks' | 'move_leads_stage' | 'suggest_score_weight' | 'archive_inactive' | string;
+  title: string;
+  description: string;
+  impactCount?: number;
+  details?: Record<string, any>;
+  requestedAt: string;
+  executedAt?: string;
+  status: 'pending' | 'approved' | 'rejected' | 'authorized';
+}
+
+export interface AiLeadAnalysisResult {
+  icpAdequacy: string;
+  icpScore: number;
+  problemsAndSignals: string[];
+  commercialPotential: string;
+  opportunityState: OpportunityState;
+  opportunityScore: number;
+  qualificationScore: number;
+  recommendedService: string;
+  recommendedServiceId?: string;
+  analysisRiskOrLimitations: string[];
+  recommendedNextAction: string;
+  recommendedChannel: ContactChannel;
+  recommendedScript: string;
+  confidence: 'alta' | 'media' | 'baixa' | number | string;
+  confidenceReason: string;
+  factsUsed: string[];
+  missingData: string[];
+  analyzedAt: string;
+}
+
+export interface PlaybookStageItem {
+  id: PlaybookStageKey;
+  order: number;
+  title: string;
+  objective: string;
+  recommendedQuestions: string[];
+  tactics: string[];
+  exampleScripts: Array<{
+    title: string;
+    text: string;
+  }>;
+}
+
+export interface ThreeCsStep {
+  description: string;
+  examples: string[];
+}
+
+export interface ThreeCsMethodology {
+  concordar: ThreeCsStep;
+  contornar: ThreeCsStep;
+  conduzir: ThreeCsStep;
+}
+
+export interface DiagnosticQuestionItem {
+  question: string;
+  purpose: string;
+}
+
+export interface DiagnosticQuestionsGuide {
+  estadoAtual: DiagnosticQuestionItem[];
+  estadoDesejado: DiagnosticQuestionItem[];
+  estadoTemido: DiagnosticQuestionItem[];
+}
+
+export interface PlaybookBuildingBlockItem {
+  id: string;
+  category: string;
+  title: string;
+  description: string;
+  applicationExample: string;
+  safetyRule: string;
+}
+
+export interface SystemLearningMetric {
+  id: string;
+  category: 'country' | 'icp' | 'signals' | 'channels' | string;
+  name: string;
+  sampleSize: number;
+  responseRate: number;
+  conversionRate?: number;
+  efficiencyScore: number;
+  trend: 'improving' | 'stable' | 'declining';
+  aiObservation: string;
+  suggestion: string;
+  suggestedWeightDelta?: number;
+}
 
 /**
  * Perfil do Usuário Autenticado
@@ -146,6 +505,7 @@ export interface Company {
   niche: string; // nicho
   country: string; // país
   state?: string; // estado/província
+  region?: string; // região
   city: string; // cidade
   address?: string; // endereço
   website?: string; // website
@@ -166,7 +526,16 @@ export interface Company {
   apparentNeed?: string;
   notes?: string; // observações
   isFavorite?: boolean; // favorito
+  contacts?: Contact[]; // lista de contactos associados
   serviceQualifications?: Record<string, QualificationResult>; // Score e diagnósticos calculados por serviço (ex: Website: 87, Design: 54, Google: 92)
+  currency?: string;
+  language?: string;
+  formalityLevel?: string;
+  marketProfile?: MarketProfile;
+  signals?: string[];
+  customSignals?: string[];
+  prospectingMode?: ProspectingMode;
+  opportunityState?: OpportunityState;
   createdAt: string; // data de criação
   updatedAt: string; // data de atualização
   status: CompanyStatus; // status
@@ -188,6 +557,10 @@ export interface Contact {
   linkedin?: string; // LinkedIn
   notes?: string; // observações
   isPrimary?: boolean; // principal: boolean
+  salutation?: ContactSalutation;
+  customSalutation?: string;
+  gender?: ContactGender;
+  personaRole?: PersonaRole;
   status?: 'active' | 'archived'; // status
   referredByContactId?: string; // indicado por (ID do contacto)
   referredByName?: string; // indicado por (Nome do contacto)
@@ -276,6 +649,7 @@ export interface Lead {
   contactId?: string;
   serviceId?: string;
   serviceName?: string; // serviço
+  icpId?: string;
   source?: string; // origem (Google Maps, Instagram, Indicação, etc)
   score?: number; // score combinado (0-100)
   opportunityScore?: number; // Score de Oportunidade (0-100)
@@ -319,6 +693,10 @@ export interface Lead {
   serviceQualifications?: Record<string, QualificationResult>; // Diagnósticos salvos por serviço
   notes?: string; // observações
   preparedMessages?: Record<string, string>;
+  signals?: string[];
+  customSignals?: string[];
+  prospectingMode?: ProspectingMode;
+  opportunityState?: OpportunityState;
   createdAt: string;
   updatedAt: string;
 }
@@ -472,6 +850,7 @@ export interface Service {
   arguments?: string[]; // argumentos
   proofs?: string[]; // provas associadas
   defaultCta?: string; // CTA padrão
+  marketPrices?: MarketPriceItem[]; // tabela de preços por mercado/país
   active: boolean; // ativo/inativo
 
   // Campos de retrocompatibilidade
@@ -497,11 +876,23 @@ export interface IdealCustomerProfile {
   niches: string[]; // nichos atendidos
   countries: string[]; // países
   cities: string[]; // cidades
+  segment?: string; // segmento
+  country?: string; // país principal
+  regionOrCity?: string; // região ou cidade
   size?: string[]; // tamanho (ex: Micro, Pequena, Média, Grande)
   companySize?: string; // alias textual de porte
+  employeeCountRange?: string; // porte por funcionários
   unitsRange?: string; // número de unidades (ex: "1 a 3 unidades", "Redes 5+")
   minUnits?: number;
   maxUnits?: number;
+  prospectingMode?: ProspectingMode;
+  criteriaWeights?: {
+    icp?: number;
+    problem?: number;
+    potential?: number;
+    intent?: number;
+    [key: string]: number | undefined;
+  };
   priceRange?: {
     min: number;
     max: number;
@@ -512,6 +903,10 @@ export interface IdealCustomerProfile {
   suitableServiceIds: string[]; // serviços adequados
   positiveCriteria: string[]; // critérios positivos (sinais verdes)
   negativeCriteria: string[]; // critérios negativos (red flags)
+  positiveSignals?: string[];
+  problemSignals?: string[];
+  buyingPotentialSignals?: string[];
+  lowPrioritySignals?: string[];
   active?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -660,6 +1055,7 @@ export interface AppSettings {
   lastBackupDate?: string;
   scoringWeights?: ScoringWeightConfig;
   qualificationConfigs?: ServiceQualificationConfig[];
+  commercialPersonalization?: CommercialPersonalizationSettings;
   reactivationDaysThreshold?: number; // padrão 30 dias
 }
 
@@ -718,6 +1114,13 @@ export interface CopilotLeadContext {
   niche?: string;
   city?: string;
   country?: string;
+  currency?: string;
+  priceFormatted?: string;
+  anchorPriceFormatted?: string;
+  paymentMethod?: string;
+  paymentTerms?: string;
+  language?: string;
+  formalityLevel?: string;
   website?: string;
   websiteQuality?: string;
   unitsCount?: number;
@@ -725,6 +1128,8 @@ export interface CopilotLeadContext {
   notes?: string;
   contactName?: string;
   contactRole?: string;
+  contactGender?: string;
+  roleStrategyAngle?: string;
   contactPhone?: string;
   contactWhatsapp?: string;
   contactEmail?: string;
@@ -1113,6 +1518,8 @@ export interface SyncStateSummary {
   conflictCount: number;
   lastError: string | null;
 }
+
+export * from './scripts';
 
 
 

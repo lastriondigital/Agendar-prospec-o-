@@ -623,7 +623,7 @@ export const ProspectingView: React.FC = () => {
         /* VISÃO CENTRAL O QUE FAZER AGORA (ASSISTENTE INTELIGENTE) */
         <WhatToDoNowHub
           onOpenCompany={(comp) => {
-            setSelectedCompany(comp);
+            setSelectedCompanyForAi(comp);
             setIsDrawerOpen(true);
           }}
           onOpenAiAnalysis={(comp, ld) => {
@@ -946,7 +946,7 @@ export const ProspectingView: React.FC = () => {
       <CommercialPlaybookModal
         isOpen={isPlaybookModalOpen}
         onClose={() => setIsPlaybookModalOpen(false)}
-        initialStageId={playbookInitialStage}
+        initialStage={playbookInitialStage}
       />
 
       {/* Modal de Ações Autorizadas da IA (Human-in-the-Loop) */}

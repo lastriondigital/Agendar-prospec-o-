@@ -2,8 +2,7 @@ import { Campaign, Client, MessageTemplate, PipelineStage, ProspectAction, Servi
 
 /**
  * StorageAdapter interface provides clean decoupling between UI and storage backend.
- * Currently backed by IndexedDB for instant offline-first operation,
- * with direct compatibility for future Firebase Firestore sync adapter.
+ * Backed by IndexedDB for instant offline-first operation and synced with Supabase.
  */
 export interface IStorageAdapter {
   // Clients

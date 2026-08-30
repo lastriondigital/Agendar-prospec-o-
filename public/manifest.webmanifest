@@ -1,13 +1,13 @@
 {
-  "name": "PROSPECT OS - Sistema Operacional de Prospecção",
-  "short_name": "PROSPECT OS",
-  "description": "Sistema operacional pessoal de prospecção offline-first para prospecção outbound de alta performance.",
+  "name": "LEADION - Prospecção & Qualificação Comercial",
+  "short_name": "LEADION",
+  "description": "Plataforma profissional de prospecção comercial, qualificação de clientes e agendamento de mensagens.",
   "start_url": "/",
   "id": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#090d16",
-  "theme_color": "#0f172a",
+  "background_color": "#F8FAFC",
+  "theme_color": "#2563EB",
   "categories": ["business", "productivity", "utilities"],
   "icons": [
     {

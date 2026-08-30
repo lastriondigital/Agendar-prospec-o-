@@ -20,7 +20,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
   } = useApp();
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA] text-[#202124] dark:bg-[#121417] dark:text-[#E8EAED] flex flex-row overflow-x-hidden antialiased font-sans transition-colors duration-150">
+    <div className="min-h-screen bg-slate-50/50 text-slate-900 dark:bg-[#0B0F17] dark:text-slate-100 flex flex-row overflow-x-hidden antialiased font-sans transition-colors duration-150">
       {/* Desktop Persistent Sidebar */}
       <Sidebar />
 
@@ -56,4 +56,3 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
     </div>
   );
 };
-

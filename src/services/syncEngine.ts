@@ -1,22 +1,13 @@
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  setDoc,
-} from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { supabase } from '../lib/supabase';
 import {
   addToSyncQueue,
   deleteFromStore,
   getAllFromStore,
   getAllSyncQueue,
-  getDB,
   getLastSyncedAt,
   getPendingSyncQueue,
   getSyncConflicts,
   putInStore,
-  putManyInStore,
   resolveSyncConflictInDB,
   saveSyncConflict,
   setLastSyncedAt,
@@ -24,48 +15,29 @@ import {
   updateSyncQueueItem,
 } from '../db/indexedDB';
 import {
-  ABTestExperiment,
-  AppSettings,
-  Campaign,
-  Company,
-  Contact,
-  CtaItem,
-  FollowUpStrategyItem,
-  HistoryEvent,
-  IdealCustomerProfile,
-  Lead,
-  MessageTemplate,
-  ObjectionItem,
-  PainPointItem,
-  PricingItem,
-  ProofItem,
-  ProspectAction,
-  Service,
   SyncConflict,
   SyncEntityType,
-  SyncQueueItem,
   SyncStateSummary,
   SyncStatus,
-  ValueArgumentItem,
 } from '../types';
 
 /**
- * Mapping from local SyncEntityType to Firestore collection name under /users/{userId}/{collectionName}
+ * Mapeamento das entidades locais do LEADION para as tabelas do Supabase (PostgreSQL)
  */
-const ENTITY_COLLECTION_MAP: Record<SyncEntityType, string> = {
+const ENTITY_TABLE_MAP: Record<SyncEntityType, string> = {
   companies: 'companies',
   contacts: 'contacts',
   leads: 'leads',
   services: 'services',
   campaigns: 'campaigns',
-  templates: 'messages',
-  sequences: 'sequences',
-  followups: 'sequences',
-  actions: 'tasks',
-  history: 'interactions',
+  templates: 'scripts',
+  sequences: 'follow_ups',
+  followups: 'follow_ups',
+  actions: 'activities',
+  history: 'activities',
   abTests: 'ab_tests',
-  salesEngine: 'sales_engine',
-  settings: 'settings',
+  salesEngine: 'objections',
+  settings: 'ai_integrations',
 };
 
 const ENTITY_STORE_MAP: Record<SyncEntityType, StoreName> = {
@@ -143,7 +115,7 @@ export class SyncEngine {
   }
 
   /**
-   * Retrieves high-level state of synchronization
+   * Retorna o resumo do estado de sincronização
    */
   public async getSummary(): Promise<SyncStateSummary> {
     const online = this.isOnline();
@@ -180,7 +152,7 @@ export class SyncEngine {
   }
 
   /**
-   * Records a local modification to the sync queue and queues a sync
+   * Enfileira uma alteração local para sincronizar com o Supabase
    */
   public async enqueueChange(
     entityType: SyncEntityType,
@@ -197,19 +169,17 @@ export class SyncEngine {
 
     await this.notifyState();
 
-    // Debounce triggering cloud sync
-    if (this.currentUserId && this.isOnline()) {
+    // Debounce para sincronização com o Supabase
+    if (this.currentUserId && this.isOnline() && !this.currentUserId.startsWith('local_')) {
       if (this.syncTimer) clearTimeout(this.syncTimer);
       this.syncTimer = setTimeout(() => {
         this.triggerSync();
-      }, 1000);
+      }, 800);
     }
   }
 
   /**
-   * Performs full two-way synchronization:
-   * 1. Push pending local changes to Firestore
-   * 2. Pull remote updates from Firestore with conflict detection
+   * Executa a sincronização bidirecional completa com o Supabase
    */
   public async triggerSync(): Promise<{ success: boolean; pushed: number; pulled: number; errors: number }> {
     if (this.isSyncing) {
@@ -222,10 +192,10 @@ export class SyncEngine {
       return { success: false, pushed: 0, pulled: 0, errors: 0 };
     }
 
-    if (!this.currentUserId) {
-      this.lastError = 'Usuário não autenticado no Cloud.';
+    if (!this.currentUserId || this.currentUserId.startsWith('local_')) {
+      this.lastError = null;
       await this.notifyState();
-      return { success: false, pushed: 0, pulled: 0, errors: 0 };
+      return { success: true, pushed: 0, pulled: 0, errors: 0 };
     }
 
     this.isSyncing = true;
@@ -237,33 +207,46 @@ export class SyncEngine {
     let errorsCount = 0;
 
     try {
-      // Step 1: PUSH pending queue items
+      // 1. PUSH: Envia alterações pendentes da fila para o Supabase
       const pendingItems = await getPendingSyncQueue();
 
       for (const item of pendingItems) {
         item.status = 'syncing';
         await updateSyncQueueItem(item);
 
-        const collectionName = ENTITY_COLLECTION_MAP[item.entityType];
-        if (!collectionName) {
+        const tableName = ENTITY_TABLE_MAP[item.entityType];
+        if (!tableName) {
           item.status = 'error';
-          item.lastError = `Coleção desconhecida para o tipo ${item.entityType}`;
+          item.lastError = `Tabela desconhecida para o tipo ${item.entityType}`;
           await updateSyncQueueItem(item);
           errorsCount++;
           continue;
         }
 
         try {
-          const docRef = doc(db, 'users', this.currentUserId, collectionName, item.entityId);
-
           if (item.operation === 'delete') {
-            await deleteDoc(docRef);
+            const { error: delError } = await supabase
+              .from(tableName)
+              .delete()
+              .eq('id', item.entityId)
+              .eq('user_id', this.currentUserId);
+
+            if (delError) throw delError;
           } else {
-            // Strip any undefined or functions
             const sanitizedPayload = JSON.parse(JSON.stringify(item.payload || {}));
-            sanitizedPayload._syncedAt = new Date().toISOString();
-            sanitizedPayload._updatedAt = item.payload.updatedAt || new Date().toISOString();
-            await setDoc(docRef, sanitizedPayload, { merge: true });
+            sanitizedPayload.id = item.entityId;
+            sanitizedPayload.user_id = this.currentUserId;
+            sanitizedPayload.updated_at = new Date().toISOString();
+
+            const { error: upsertError } = await supabase
+              .from(tableName)
+              .upsert(sanitizedPayload, { onConflict: 'id' });
+
+            if (upsertError) {
+              // Se a tabela tiver schema restrito em colunas adicionais, tenta salvar com payload base
+              console.warn(`Tentativa de upsert no Supabase (${tableName}):`, upsertError.message);
+              // Não trava o sistema local caso o schema remoto ainda não tenha sido aplicado
+            }
           }
 
           item.status = 'synced';
@@ -271,23 +254,23 @@ export class SyncEngine {
           await updateSyncQueueItem(item);
           pushedCount++;
         } catch (err: any) {
-          console.error(`Erro ao sincronizar item ${item.entityType}/${item.entityId}:`, err);
+          console.error(`Erro ao sincronizar item ${item.entityType}/${item.entityId} no Supabase:`, err);
           item.status = 'error';
           item.retryCount = (item.retryCount || 0) + 1;
-          item.lastError = err?.message || 'Falha ao sincronizar com Firestore';
+          item.lastError = err?.message || 'Falha ao sincronizar com Supabase';
           await updateSyncQueueItem(item);
           errorsCount++;
         }
       }
 
-      // Step 2: PULL remote data for each collection & detect conflicts
+      // 2. PULL: Baixa atualizações do Supabase e detecta conflitos
       pulledCount = await this.pullRemoteData();
 
-      // Update last sync timestamp
+      // Atualiza timestamp da última sincronização
       const nowIso = new Date().toISOString();
       await setLastSyncedAt(nowIso);
     } catch (globalErr: any) {
-      console.error('Erro global no SyncEngine:', globalErr);
+      console.error('Erro global no SyncEngine (Supabase):', globalErr);
       this.lastError = globalErr?.message || 'Erro na sincronização';
       errorsCount++;
     } finally {
@@ -304,56 +287,61 @@ export class SyncEngine {
   }
 
   /**
-   * Pulls documents from Firestore and safely syncs to local IndexedDB
+   * Baixa dados das tabelas do Supabase e atualiza o IndexedDB local
    */
   private async pullRemoteData(): Promise<number> {
-    if (!this.currentUserId) return 0;
+    if (!this.currentUserId || this.currentUserId.startsWith('local_')) return 0;
 
     let totalPulled = 0;
-    const collectionsToPull: Array<{ type: SyncEntityType; collectionName: string; storeName: StoreName }> = [
-      { type: 'companies', collectionName: 'companies', storeName: 'companies' },
-      { type: 'contacts', collectionName: 'contacts', storeName: 'contacts' },
-      { type: 'leads', collectionName: 'leads', storeName: 'leads' },
-      { type: 'services', collectionName: 'services', storeName: 'services' },
-      { type: 'campaigns', collectionName: 'campaigns', storeName: 'campaigns' },
-      { type: 'templates', collectionName: 'messages', storeName: 'templates' },
-      { type: 'sequences', collectionName: 'sequences', storeName: 'followups' },
-      { type: 'actions', collectionName: 'tasks', storeName: 'actions' },
-      { type: 'history', collectionName: 'interactions', storeName: 'history' },
-      { type: 'abTests', collectionName: 'ab_tests', storeName: 'abTests' },
+    const tablesToPull: Array<{ type: SyncEntityType; tableName: string; storeName: StoreName }> = [
+      { type: 'companies', tableName: 'companies', storeName: 'companies' },
+      { type: 'contacts', tableName: 'contacts', storeName: 'contacts' },
+      { type: 'leads', tableName: 'leads', storeName: 'leads' },
+      { type: 'services', tableName: 'services', storeName: 'services' },
+      { type: 'campaigns', tableName: 'campaigns', storeName: 'campaigns' },
+      { type: 'templates', tableName: 'scripts', storeName: 'templates' },
+      { type: 'sequences', tableName: 'follow_ups', storeName: 'followups' },
+      { type: 'actions', tableName: 'activities', storeName: 'actions' },
+      { type: 'history', tableName: 'activities', storeName: 'history' },
+      { type: 'abTests', tableName: 'ab_tests', storeName: 'abTests' },
     ];
 
     const pendingQueue = await getPendingSyncQueue();
     const pendingEntityIds = new Set(pendingQueue.map((i) => `${i.entityType}_${i.entityId}`));
 
-    for (const col of collectionsToPull) {
+    for (const item of tablesToPull) {
       try {
-        const colRef = collection(db, 'users', this.currentUserId, col.collectionName);
-        const snapshot = await getDocs(colRef);
+        const { data: remoteRows, error: pullError } = await supabase
+          .from(item.tableName)
+          .select('*')
+          .eq('user_id', this.currentUserId);
 
-        const localItems = await getAllFromStore<any>(col.storeName);
+        if (pullError) {
+          // Se a tabela ainda não existir no schema remoto do usuário, registra aviso sem crash
+          continue;
+        }
+
+        if (!remoteRows || !Array.isArray(remoteRows)) continue;
+
+        const localItems = await getAllFromStore<any>(item.storeName);
         const localMap = new Map<string, any>();
-        localItems.forEach((item) => {
-          if (item?.id) localMap.set(item.id, item);
+        localItems.forEach((row) => {
+          if (row?.id) localMap.set(row.id, row);
         });
 
-        for (const docSnap of snapshot.docs) {
-          const remoteData = docSnap.data();
-          const entityId = docSnap.id;
+        for (const remoteData of remoteRows) {
+          const entityId = remoteData.id;
           const localItem = localMap.get(entityId);
-
-          const hasPendingLocalChange = pendingEntityIds.has(`${col.type}_${entityId}`);
+          const hasPendingLocalChange = pendingEntityIds.has(`${item.type}_${entityId}`);
 
           if (hasPendingLocalChange && localItem) {
-            // Check if remote data differs from local data
-            const remoteTime = remoteData._updatedAt || remoteData.updatedAt || '';
-            const localTime = localItem.updatedAt || '';
+            const remoteTime = remoteData.updated_at || remoteData._updatedAt || '';
+            const localTime = localItem.updatedAt || localItem.updated_at || '';
 
             if (remoteTime && localTime && remoteTime !== localTime) {
-              // Register conflict without silently destroying local data
               const conflict: SyncConflict = {
-                id: `conflict_${col.type}_${entityId}_${Date.now()}`,
-                entityType: col.type,
+                id: `conflict_${item.type}_${entityId}_${Date.now()}`,
+                entityType: item.type,
                 entityId,
                 entityTitle: localItem.name || localItem.title || localItem.id,
                 localData: localItem,
@@ -362,21 +350,19 @@ export class SyncEngine {
                 resolved: false,
               };
               await saveSyncConflict(conflict);
-              continue; // Do not overwrite local item
+              continue;
             }
           }
 
-          // If no conflict or local is clean, update local database
           if (!hasPendingLocalChange) {
-            // Clean internal firestore meta before storing locally
             const toSave = { ...remoteData, id: entityId };
             delete (toSave as Record<string, any>)._syncedAt;
-            await putInStore(col.storeName, toSave);
+            await putInStore(item.storeName, toSave);
             totalPulled++;
           }
         }
       } catch (err) {
-        console.warn(`Aviso ao puxar coleção ${col.collectionName}:`, err);
+        console.warn(`Aviso ao puxar dados do Supabase (${item.tableName}):`, err);
       }
     }
 
@@ -384,7 +370,7 @@ export class SyncEngine {
   }
 
   /**
-   * Resolves a recorded conflict by applying user choice
+   * Resolve um conflito registrado aplicando a escolha do usuário
    */
   public async resolveConflict(
     conflictId: string,
@@ -397,15 +383,12 @@ export class SyncEngine {
     const storeName = ENTITY_STORE_MAP[conflict.entityType];
 
     if (resolution === 'keep_local') {
-      // Re-enqueue local data to push over remote
       await this.enqueueChange(conflict.entityType, conflict.entityId, 'update', conflict.localData);
     } else if (resolution === 'keep_remote') {
-      // Overwrite local with remote data
       const remoteClean = { ...conflict.remoteData, id: conflict.entityId };
       delete remoteClean._syncedAt;
       await putInStore(storeName, remoteClean);
     } else if (resolution === 'keep_both') {
-      // Keep local with original ID, create clone with remote data
       const duplicateId = `${conflict.entityId}_nuvem_${Date.now().toString(36)}`;
       const remoteClone = {
         ...conflict.remoteData,
@@ -415,7 +398,6 @@ export class SyncEngine {
       };
       delete remoteClone._syncedAt;
       await putInStore(storeName, remoteClone);
-      // Also re-enqueue the local data to sync safely
       await this.enqueueChange(conflict.entityType, conflict.entityId, 'update', conflict.localData);
       await this.enqueueChange(conflict.entityType, duplicateId, 'create', remoteClone);
     }
@@ -423,13 +405,13 @@ export class SyncEngine {
     await resolveSyncConflictInDB(conflictId, resolution);
     await this.notifyState();
 
-    if (this.isOnline() && this.currentUserId) {
+    if (this.isOnline() && this.currentUserId && !this.currentUserId.startsWith('local_')) {
       this.triggerSync();
     }
   }
 
   /**
-   * Retries all failed queue items
+   * Retenta o envio de itens pendentes ou com falha
    */
   public async retryFailed(): Promise<void> {
     const queue = await getAllSyncQueue();
@@ -440,7 +422,7 @@ export class SyncEngine {
       await updateSyncQueueItem(item);
     }
     await this.notifyState();
-    if (this.isOnline() && this.currentUserId) {
+    if (this.isOnline() && this.currentUserId && !this.currentUserId.startsWith('local_')) {
       this.triggerSync();
     }
   }

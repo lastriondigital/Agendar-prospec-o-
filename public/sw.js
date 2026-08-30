@@ -1,9 +1,9 @@
 /**
- * PROSPECT OS - Production Service Worker
+ * LEADION - Production Service Worker
  * Offline-first app shell, immutable asset caching, and offline fallback strategy.
  */
 
-const CACHE_NAME = 'prospect-os-v6.0.0';
+const CACHE_NAME = 'leadion-v6.0.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -63,10 +63,10 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET and external API / Firebase requests
+  // Skip non-GET and external API / Supabase requests
   if (request.method !== 'GET') return;
   if (!url.protocol.startsWith('http')) return;
-  if (url.hostname.includes('googleapis.com') || url.hostname.includes('firebase')) return;
+  if (url.hostname.includes('googleapis.com') || url.hostname.includes('supabase.co')) return;
 
   // HTML navigation requests -> Network First with offline Cache Fallback
   if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {

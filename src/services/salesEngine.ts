@@ -13,6 +13,13 @@ import {
   ValueArgumentItem,
 } from '../types';
 import {
+  DetailedObjection,
+  FollowUpItem,
+  ProspectingType,
+  ScriptRecommendationResult,
+  ScriptStepDefinition,
+} from '../types/scripts';
+import {
   SEED_ARGUMENTS,
   SEED_CTAS,
   SEED_FOLLOWUPS,
@@ -21,6 +28,186 @@ import {
   SEED_PRICING,
   SEED_PROOFS,
 } from '../db/salesEngineSeed';
+import { IDENTIFIED_PROBLEM_STEPS } from '../db/prospectingScriptsData';
+import { LATENT_OPPORTUNITY_STEPS } from '../db/prospectingLatentData';
+import { DETAILED_OBJECTIONS } from '../db/objectionsData';
+
+/**
+ * Retorna a lista de etapas de acordo com o tipo de prospecção
+ */
+export function getProspectingSteps(type: ProspectingType): ScriptStepDefinition[] {
+  return type === 'identified_problem' ? IDENTIFIED_PROBLEM_STEPS : LATENT_OPPORTUNITY_STEPS;
+}
+
+/**
+ * Obtém uma etapa específica pelo número
+ */
+export function getStepByNumber(type: ProspectingType, stepNumber: number): ScriptStepDefinition | null {
+  const steps = getProspectingSteps(type);
+  return steps.find((s) => s.stepNumber === stepNumber) || null;
+}
+
+/**
+ * Realiza a substituição de todas as variáveis do roteiro
+ */
+export function fillScriptVariables(
+  template: string,
+  data: {
+    nome?: string;
+    empresa?: string;
+    niche?: string;
+    servico?: string;
+    problema?: string;
+    preco?: string;
+    preco_ancora?: string;
+    dias_sem_resposta?: number;
+    dia_semana?: string;
+    cidade?: string;
+  }
+): string {
+  if (!template) return '';
+
+  const replacements: Record<string, string> = {
+    nome: data.nome || 'Gestor(a)',
+    empresa: data.empresa || 'sua empresa',
+    niche: data.niche || 'seu segmento',
+    servico: data.servico || 'solução digital',
+    problema: data.problema || 'perda de contatos qualificados',
+    preco: data.preco || 'R$ 1.500,00',
+    preco_ancora: data.preco_ancora || 'R$ 2.800,00',
+    dias_sem_resposta: String(data.dias_sem_resposta || 2),
+    dia_semana: data.dia_semana || 'quinta-feira',
+    cidade: data.cidade || 'sua região',
+  };
+
+  let result = template;
+  for (const [key, val] of Object.entries(replacements)) {
+    const regex = new RegExp(`{{${key}}}`, 'gi');
+    result = result.replace(regex, val);
+  }
+
+  // Substituições secundárias com colchetes [PRAZO], [LINK_DO_PROTOTIPO], etc.
+  result = result
+    .replace(/\[NOME_DO_CLIENTE\]/gi, replacements.nome)
+    .replace(/\[NOME_DA_EMPRESA\]/gi, replacements.empresa)
+    .replace(/\[NICHO\]/gi, replacements.niche)
+    .replace(/\[NOME_DO_SERVICO\]/gi, replacements.servico)
+    .replace(/\[PRECO\]/gi, replacements.preco)
+    .replace(/\[PRAZO\]/gi, '5 a 7 dias úteis')
+    .replace(/\[PRAZO_DIAS\]/gi, '5')
+    .replace(/\[TEMPO_ESTIMADO\]/gi, '2 a 3')
+    .replace(/\[LINK_DO_PROTOTIPO\]/gi, 'https://preview.leadion.app/demo')
+    .replace(/\[DATA_HORA\]/gi, 'amanhã às 14h')
+    .replace(/\[DIA_SUGERIDO\]/gi, replacements.dia_semana);
+
+  return result;
+}
+
+/**
+ * Busca objeção detalhada com todos os campos e follow-ups
+ */
+export function findDetailedObjection(
+  input: string,
+  objections: DetailedObjection[] = DETAILED_OBJECTIONS
+): DetailedObjection | null {
+  if (!input) return null;
+  const norm = input.toLowerCase().trim();
+
+  return (
+    objections.find((obj) => {
+      const matchTitle = obj.title.toLowerCase().includes(norm) || norm.includes(obj.title.toLowerCase());
+      const matchCode = obj.code.toLowerCase().includes(norm) || norm.includes(obj.code.toLowerCase());
+      const matchKeyword = obj.keywords.some((kw) => norm.includes(kw.toLowerCase()) || kw.toLowerCase().includes(norm));
+      return matchTitle || matchCode || matchKeyword;
+    }) || null
+  );
+}
+
+/**
+ * Gera recomendação completa de Roteiro e Próximo Passo para Prospecção
+ */
+export interface ScriptFlowRecommendationResult {
+  step: ScriptStepDefinition;
+  scriptText: string;
+  nextFollowUp?: FollowUpItem;
+  nextStepRecommendation: string;
+  diagnosticQuestions?: string[];
+  variablesUsed: Record<string, any>;
+}
+
+export function generateScriptRecommendation(params: {
+  lead?: Lead | null;
+  company?: Company | null;
+  contact?: Contact | null;
+  service?: Service | null;
+  prospectingType?: ProspectingType;
+  currentStepNumber?: number;
+  currentFollowUpIndex?: number;
+  stylePreference?: 'consultivo' | 'direto' | 'casual' | 'formal';
+}): ScriptFlowRecommendationResult {
+  const {
+    lead,
+    company,
+    contact,
+    service,
+    prospectingType = (company?.apparentNeed?.toLowerCase().includes('app') || company?.apparentNeed?.toLowerCase().includes('sistema')
+      ? 'latent_opportunity'
+      : 'identified_problem'),
+    currentStepNumber = 1,
+    currentFollowUpIndex = 0,
+    stylePreference = 'consultivo',
+  } = params;
+
+  const steps = getProspectingSteps(prospectingType);
+  const step = steps.find((s) => s.stepNumber === currentStepNumber) || steps[0];
+
+  const variableData = {
+    nome: contact?.name || company?.name || 'Gestor(a)',
+    empresa: company?.name || 'sua empresa',
+    niche: company?.niche || 'seu segmento',
+    servico: service?.name || 'Landing Page de Alta Conversão',
+    problema: company?.apparentNeed || 'perda de contatos no WhatsApp por falta de página rápida',
+    preco: service?.basePrice ? formatCurrencyValue(service.basePrice, service.currency || 'BRL') : 'R$ 1.500,00',
+    preco_ancora: service?.basePrice ? formatCurrencyValue(service.basePrice * 1.6, service.currency || 'BRL') : 'R$ 2.400,00',
+    cidade: company?.city || 'sua região',
+  };
+
+  // Obter texto padrão ou variação de estilo
+  let rawText = step.defaultScript;
+  if (step.variationsByStyle && step.variationsByStyle[stylePreference]) {
+    rawText = step.variationsByStyle[stylePreference] || rawText;
+  }
+
+  const scriptText = fillScriptVariables(rawText, variableData);
+
+  // Follow-up correspondente
+  let nextFollowUp: FollowUpItem | undefined = undefined;
+  if (step.followUps && step.followUps.length > 0) {
+    const fu = step.followUps[Math.min(currentFollowUpIndex, step.followUps.length - 1)];
+    if (fu) {
+      nextFollowUp = {
+        ...fu,
+        message: fillScriptVariables(fu.message, variableData),
+      };
+    }
+  }
+
+  // Próximo passo sugerido
+  const nextStepDef = steps.find((s) => s.stepNumber === currentStepNumber + 1);
+  const nextStepRecommendation = nextStepDef
+    ? `Avançar para Etapa ${nextStepDef.stepNumber}: ${nextStepDef.stepName}`
+    : 'Etapa final do fluxo atingida';
+
+  return {
+    step,
+    scriptText,
+    nextFollowUp,
+    nextStepRecommendation,
+    diagnosticQuestions: step.diagnosticQuestions,
+    variablesUsed: variableData,
+  };
+}
+
 
 /**
  * Gera a Recomendação de Abordagem estruturada nos 7 Pilares:

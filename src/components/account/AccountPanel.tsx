@@ -327,7 +327,7 @@ export const AccountPanel: React.FC = () => {
             Zona de Segurança & Exclusão de Conta
           </h4>
           <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
-            Exclui permanentemente sua conta no Firebase Authentication e seu perfil na nuvem.
+            Exclui permanentemente sua conta no Supabase Auth e seu perfil na nuvem.
           </p>
         </div>
 
@@ -357,7 +357,7 @@ export const AccountPanel: React.FC = () => {
             <div className="text-rose-800 dark:text-rose-300 space-y-1">
               <strong className="block font-bold">Atenção: Ação Irreversível!</strong>
               <p>
-                Ao excluir sua conta, suas credenciais de acesso e perfil serão permanentemente removidos do Firebase Authentication.
+                Ao excluir sua conta, suas credenciais de acesso e perfil serão permanentemente removidos do Supabase Auth.
               </p>
             </div>
           </div>

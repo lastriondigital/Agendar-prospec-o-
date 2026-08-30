@@ -17,38 +17,38 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="text-xs sm:text-sm font-medium text-[#202124] dark:text-[#E8EAED] select-none"
+            className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 select-none"
           >
             {label}
           </label>
         )}
         <div className="relative flex items-center">
           {leftIcon && (
-            <div className="absolute left-3.5 text-[#5F6368] dark:text-[#9AA0A6] pointer-events-none flex items-center justify-center">
+            <div className="absolute left-3.5 text-slate-400 dark:text-slate-500 pointer-events-none flex items-center justify-center">
               {leftIcon}
             </div>
           )}
           <input
             ref={ref}
             id={inputId}
-            className={`w-full h-11 bg-white dark:bg-[#181B20] text-[#202124] dark:text-[#E8EAED] placeholder-[#80868B] dark:placeholder-[#5F6368] border rounded-lg px-3.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#3F6FB5]/20 focus:border-[#3F6FB5] disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`w-full h-11 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 border rounded-xl px-3.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed ${
               leftIcon ? 'pl-10' : ''
             } ${rightIcon ? 'pr-10' : ''} ${
               error
-                ? 'border-red-500 focus:ring-red-500/20 focus:border-red-500'
-                : 'border-[#DADDE1] dark:border-[#2D3139] hover:border-neutral-400 dark:hover:border-neutral-600'
+                ? 'border-rose-500 focus:ring-rose-500/20 focus:border-rose-500'
+                : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
             } ${className}`}
             {...props}
           />
           {rightIcon && (
-            <div className="absolute right-3.5 text-[#5F6368] dark:text-[#9AA0A6] flex items-center justify-center">
+            <div className="absolute right-3.5 text-slate-400 dark:text-slate-500 flex items-center justify-center">
               {rightIcon}
             </div>
           )}
         </div>
-        {error && <span className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</span>}
+        {error && <span className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</span>}
         {!error && helperText && (
-          <span className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">{helperText}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{helperText}</span>
         )}
       </div>
     );

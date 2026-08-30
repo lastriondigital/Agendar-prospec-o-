@@ -15,6 +15,8 @@ import {
   Filter,
   Info,
   Calendar,
+  GitCommit,
+  Layers,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import {
@@ -33,8 +35,12 @@ import { Modal } from '../components/ui/Modal';
 import { useToast } from '../context/ToastContext';
 import { formatCurrencyValue } from '../services/salesEngine';
 import { ApproachRecommendationCard } from '../components/sales/ApproachRecommendationCard';
+import { ProspectingFlowView } from '../components/sales/ProspectingFlowView';
+import { DetailedObjectionsBankView } from '../components/sales/DetailedObjectionsBankView';
 
 type SalesEngineTab =
+  | 'prospectingFlow'
+  | 'detailedObjections'
   | 'simulator'
   | 'objections'
   | 'proofs'
@@ -371,6 +377,30 @@ export const SalesEngineView: React.FC = () => {
       {/* Tabs Navigation */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-slate-800 text-sm no-scrollbar">
         <button
+          onClick={() => setActiveTab('prospectingFlow')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg font-medium whitespace-nowrap transition ${
+            activeTab === 'prospectingFlow'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+          }`}
+        >
+          <GitCommit className="w-4 h-4 text-indigo-300" />
+          Fluxo de Prospecção (23 & 16 Etapas)
+        </button>
+
+        <button
+          onClick={() => setActiveTab('detailedObjections')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg font-medium whitespace-nowrap transition ${
+            activeTab === 'detailedObjections'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4 text-amber-300" />
+          Banco de Objeções (45+ Casos)
+        </button>
+
+        <button
           onClick={() => setActiveTab('simulator')}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg font-medium whitespace-nowrap transition ${
             activeTab === 'simulator'
@@ -379,7 +409,7 @@ export const SalesEngineView: React.FC = () => {
           }`}
         >
           <Sparkles className="w-4 h-4" />
-          Recomendação de Abordagem (7 Pilares)
+          Recomendação (7 Pilares)
         </button>
 
         <button
@@ -391,7 +421,7 @@ export const SalesEngineView: React.FC = () => {
           }`}
         >
           <ShieldAlert className="w-4 h-4" />
-          Objeções & Respostas ({objections.length})
+          Objeções Custom ({objections.length})
         </button>
 
         <button
@@ -427,7 +457,7 @@ export const SalesEngineView: React.FC = () => {
           }`}
         >
           <MessageSquare className="w-4 h-4" />
-          Argumentos & Benefícios ({argsList.length})
+          Argumentos ({argsList.length})
         </button>
 
         <button
@@ -439,7 +469,7 @@ export const SalesEngineView: React.FC = () => {
           }`}
         >
           <AlertCircle className="w-4 h-4" />
-          Problemas & Dores ({painPoints.length})
+          Dores ({painPoints.length})
         </button>
 
         <button
@@ -466,6 +496,12 @@ export const SalesEngineView: React.FC = () => {
           Follow-up ({followups.length})
         </button>
       </div>
+
+      {/* TAB: FLUXO DE PROSPECÇÃO (23 & 16 ETAPAS) */}
+      {activeTab === 'prospectingFlow' && <ProspectingFlowView />}
+
+      {/* TAB: BANCO DE OBJEÇÕES DETALHADAS (45+ CASOS) */}
+      {activeTab === 'detailedObjections' && <DetailedObjectionsBankView />}
 
       {/* TAB 1: RECOMENDAÇÃO DE ABORDAGEM (SIMULADOR) */}
       {activeTab === 'simulator' && (

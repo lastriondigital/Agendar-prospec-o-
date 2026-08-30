@@ -166,7 +166,8 @@ export const AiLeadAnalysisModal: React.FC<AiLeadAnalysisModalProps> = ({
   const handleApplyAndClose = () => {
     if (!analysisResult) return;
     if (lead) {
-      updateLead(lead.id, {
+      updateLead({
+        ...lead,
         nextActionTitle: analysisResult.recommendedNextAction,
         score: analysisResult.opportunityScore,
         opportunityScore: analysisResult.opportunityScore,
@@ -175,13 +176,11 @@ export const AiLeadAnalysisModal: React.FC<AiLeadAnalysisModalProps> = ({
       });
 
       addHistoryEvent({
-        id: `hist_ai_${Date.now()}`,
         companyId: company.id,
         leadId: lead.id,
         type: 'note_added',
         title: 'Análise de IA Aplicada',
         description: `Score Oportunidade: ${analysisResult.opportunityScore} | Qualificação: ${analysisResult.qualificationScore} | Ação: ${analysisResult.recommendedNextAction}`,
-        timestamp: new Date().toISOString(),
       });
     }
 

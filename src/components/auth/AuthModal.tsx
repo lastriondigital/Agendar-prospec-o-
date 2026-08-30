@@ -156,7 +156,7 @@ export const AuthModal: React.FC = () => {
               <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">
                 {isAnonymous
                   ? 'Seus dados atuais serão mantidos e salvos na nuvem'
-                  : 'PROSPECT OS • Prospecção Comercial'}
+                  : 'LEADION • Prospecção Comercial'}
               </p>
             </div>
           </div>
@@ -431,7 +431,7 @@ export const AuthModal: React.FC = () => {
             <span>
               {isAnonymous
                 ? 'Ao vincular sua conta, todos os dados já cadastrados serão transferidos automaticamente.'
-                : 'Isolamento seguro por usuário e persistência com nuvem Firestore.'}
+                : 'Isolamento seguro por usuário e persistência com nuvem Supabase.'}
             </span>
           </div>
         </div>

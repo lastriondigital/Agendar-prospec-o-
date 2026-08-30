@@ -87,7 +87,10 @@ export const AiAuthorizedActionsModal: React.FC<AiAuthorizedActionsModalProps> =
       success('Novo peso de sinal registrado com sucesso.');
     }
 
+    const targetCompId = (action.details?.leadIds && leads.find((l) => l.id === action.details.leadIds[0])?.companyId) || companies[0]?.id || 'system';
+
     addHistoryEvent({
+      companyId: targetCompId,
       type: 'note_added',
       title: `Ação da IA Autorizada: ${action.title}`,
       description: action.description,
@@ -238,7 +241,7 @@ export const AiAuthorizedActionsModal: React.FC<AiAuthorizedActionsModalProps> =
                   <div className="font-bold text-[#202124] dark:text-[#E8EAED]">IA pode sugerir/criar scripts de abordagem?</div>
                   <div className="text-[#5F6368] dark:text-[#9AA0A6]">Gera textos personalizados com base no contexto.</div>
                 </div>
-                <Badge variant="green">Permitido (Sem Envio)</Badge>
+                <Badge variant="emerald">Permitido (Sem Envio)</Badge>
               </div>
 
               {/* Criar Tarefas */}
@@ -274,7 +277,7 @@ export const AiAuthorizedActionsModal: React.FC<AiAuthorizedActionsModalProps> =
                   <div className="font-bold text-rose-900 dark:text-rose-200">Disparo automático de mensagens sem clique humano</div>
                   <div className="text-rose-700 dark:text-rose-300">Envio automático por robôs / bots autônomos.</div>
                 </div>
-                <Badge variant="red">Estritamente Bloqueado</Badge>
+                <Badge variant="rose">Estritamente Bloqueado</Badge>
               </div>
             </div>
           </div>

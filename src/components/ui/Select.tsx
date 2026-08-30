@@ -23,7 +23,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         {label && (
           <label
             htmlFor={selectId}
-            className="text-xs sm:text-sm font-medium text-[#202124] dark:text-[#E8EAED] select-none"
+            className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 select-none"
           >
             {label}
           </label>
@@ -32,10 +32,10 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           <select
             ref={ref}
             id={selectId}
-            className={`w-full h-11 appearance-none bg-white dark:bg-[#181B20] text-[#202124] dark:text-[#E8EAED] border rounded-lg pl-3.5 pr-10 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#3F6FB5]/20 focus:border-[#3F6FB5] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+            className={`w-full h-11 appearance-none bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border rounded-xl pl-3.5 pr-10 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
               error
-                ? 'border-red-500'
-                : 'border-[#DADDE1] dark:border-[#2D3139] hover:border-neutral-400 dark:hover:border-neutral-600'
+                ? 'border-rose-500'
+                : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
             } ${className}`}
             {...props}
           >
@@ -44,17 +44,17 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
                 key={opt.value}
                 value={opt.value}
                 disabled={opt.disabled}
-                className="bg-white text-[#202124] dark:bg-[#181B20] dark:text-[#E8EAED] py-1"
+                className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 py-1"
               >
                 {opt.label}
               </option>
             ))}
           </select>
-          <ChevronDown className="absolute right-3.5 w-4 h-4 text-[#5F6368] dark:text-[#9AA0A6] pointer-events-none" />
+          <ChevronDown className="absolute right-3.5 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
         </div>
-        {error && <span className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</span>}
+        {error && <span className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</span>}
         {!error && helperText && (
-          <span className="text-xs text-[#5F6368] dark:text-[#9AA0A6]">{helperText}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{helperText}</span>
         )}
       </div>
     );

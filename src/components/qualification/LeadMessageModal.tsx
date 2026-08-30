@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Plus,
   ShieldCheck,
+  GitCommit,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
@@ -31,6 +32,7 @@ import {
   generateMessageVariation,
   auditMessageIntegrity,
 } from '../../utils/messagePersonalizer';
+import { fillScriptVariables, getProspectingSteps } from '../../services/salesEngine';
 
 interface LeadMessageModalProps {
   isOpen: boolean;
@@ -370,7 +372,7 @@ export const LeadMessageModal: React.FC<LeadMessageModalProps> = ({
 
         {/* Template Selector, Variação & Ações */}
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-          <div className="sm:col-span-6">
+          <div className="sm:col-span-5">
             <label className="block text-xs font-medium text-slate-400 mb-1">Selecionar Script / Template:</label>
             <select
               value={selectedTemplateId}
@@ -385,17 +387,46 @@ export const LeadMessageModal: React.FC<LeadMessageModalProps> = ({
             </select>
           </div>
 
-          <div className="sm:col-span-3">
-            <label className="block text-xs font-medium text-slate-400 mb-1">Nível de Variação:</label>
+          <div className="sm:col-span-4">
+            <label className="block text-xs font-medium text-slate-400 mb-1">Etapa de Prospecção Direta:</label>
             <select
-              value={variationLevel}
-              onChange={(e) => handleVariationLevelChange(e.target.value as VariationLevel)}
-              className="w-full px-2.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
+              onChange={(e) => {
+                const val = e.target.value;
+                if (!val) return;
+                const [flow, stepNum] = val.split(':');
+                const steps = getProspectingSteps(flow as any);
+                const step = steps.find((s) => s.stepNumber === Number(stepNum));
+                if (step) {
+                  const vars = {
+                    nome: activeContact?.name || company.name || 'Gestor(a)',
+                    empresa: company.name || 'sua empresa',
+                    niche: company.niche || 'seu segmento',
+                    servico: matchedService?.name || 'Landing Page de Alta Conversão',
+                    problema: company.apparentNeed || 'perda de contatos no WhatsApp',
+                    preco: matchedService?.basePrice ? `R$ ${matchedService.basePrice}` : 'R$ 1.500,00',
+                  };
+                  setMessageContent(fillScriptVariables(step.defaultScript, vars));
+                  success(`Etapa ${step.stepNumber} inserida com variáveis preenchidas!`);
+                }
+              }}
+              defaultValue=""
+              className="w-full px-2.5 py-2 rounded-xl bg-slate-900 border border-indigo-700 text-xs text-indigo-200 focus:outline-none focus:border-indigo-500"
             >
-              <option value="none">1. Sem Variação</option>
-              <option value="minor">2. Pequena Variação</option>
-              <option value="contextual">3. Contextual (Papel)</option>
-              <option value="ai">4. Por IA (Anti-alucinação)</option>
+              <option value="" disabled>Carregar Etapa dos Fluxos...</option>
+              <optgroup label="Fluxo 1: Problema Identificado (23 Etapas)">
+                {getProspectingSteps('identified_problem').map((s) => (
+                  <option key={`p_${s.stepNumber}`} value={`identified_problem:${s.stepNumber}`}>
+                    Etapa {s.stepNumber}: {s.stepName}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Fluxo 2: Oportunidade Latente / App / SaaS (16 Etapas)">
+                {getProspectingSteps('latent_opportunity').map((s) => (
+                  <option key={`l_${s.stepNumber}`} value={`latent_opportunity:${s.stepNumber}`}>
+                    Etapa {s.stepNumber}: {s.stepName}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
 

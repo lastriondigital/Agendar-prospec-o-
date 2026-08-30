@@ -132,7 +132,7 @@ export const SettingsView: React.FC = () => {
     confirm({
       title: 'Carregar Dados de Demonstração',
       message:
-        'Isso irá carregar uma base de demonstração (empresas, leads, serviços, scripts e ações) para você testar todas as funcionalidades do PROSPECT OS.',
+        'Isso irá carregar uma base de demonstração (empresas, leads, serviços, scripts e ações) para você testar todas as funcionalidades do LEADION.',
       isDestructive: false,
       confirmText: 'Carregar Demonstração',
       onConfirm: async () => {
@@ -430,7 +430,7 @@ export const SettingsView: React.FC = () => {
           Gerenciamento de Base de Dados & Onboarding
         </h3>
         <p className="text-xs text-[#5F6368] dark:text-[#9AA0A6] leading-relaxed">
-          O PROSPECT OS mantém sua base real limpa. Dados de demonstração servem apenas para testes, estudos de recursos e exploração temporária.
+          O LEADION mantém sua base real limpa. Dados de demonstração servem apenas para testes, estudos de recursos e exploração temporária.
         </p>
 
         <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -440,7 +440,7 @@ export const SettingsView: React.FC = () => {
             onClick={openTutorial}
             leftIcon={<Sparkles className="w-4 h-4 text-amber-500" />}
           >
-            Reabrir Tutorial do Sistema (7 Passos)
+            Reabrir Guia do Leadion (8 Etapas)
           </Button>
 
           <Button

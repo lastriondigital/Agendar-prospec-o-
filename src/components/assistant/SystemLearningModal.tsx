@@ -132,7 +132,7 @@ export const SystemLearningModal: React.FC<SystemLearningModalProps> = ({
                     <h4 className="text-sm font-bold text-[#202124] dark:text-[#E8EAED]">
                       {metric.name}
                     </h4>
-                    <Badge variant={metric.trend === 'improving' ? 'green' : 'blue'} size="sm">
+                    <Badge variant={metric.trend === 'improving' ? 'emerald' : 'blue'} size="sm">
                       Eficiência: {metric.efficiencyScore}%
                     </Badge>
                   </div>

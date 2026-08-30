@@ -21,20 +21,20 @@ export const Card: React.FC<CardProps> = ({
 
   const variantStyles = {
     default:
-      'bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] text-[#202124] dark:text-[#E8EAED] shadow-xs',
+      'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-900 dark:text-slate-100 shadow-xs',
     elevated:
-      'bg-white dark:bg-[#181B20] border border-[#E6E8EB] dark:border-[#2D3139] text-[#202124] dark:text-[#E8EAED] shadow-xs',
+      'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-900 dark:text-slate-100 shadow-sm',
     interactive:
-      'bg-white dark:bg-[#181B20] hover:bg-neutral-50 dark:hover:bg-[#20242A] border border-[#E6E8EB] dark:border-[#2D3139] hover:border-neutral-300 dark:hover:border-neutral-700 text-[#202124] dark:text-[#E8EAED] cursor-pointer transition-colors duration-150 shadow-xs',
+      'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-900 dark:text-slate-100 cursor-pointer transition-colors duration-150 shadow-xs',
     accent:
-      'bg-white dark:bg-[#181B20] border border-[#3F6FB5]/30 dark:border-[#3F6FB5]/40 text-[#202124] dark:text-[#E8EAED] shadow-xs',
+      'bg-white dark:bg-slate-900 border border-blue-500/30 dark:border-blue-500/40 text-slate-900 dark:text-slate-100 shadow-xs',
     subtle:
-      'bg-[#F7F8FA] dark:bg-[#15171B] border border-[#E6E8EB] dark:border-[#2D3139] text-[#5F6368] dark:text-[#9AA0A6]',
+      'bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400',
   };
 
   return (
     <div
-      className={`rounded-xl ${paddingStyles[padding]} ${variantStyles[variant]} ${className}`}
+      className={`rounded-2xl ${paddingStyles[padding]} ${variantStyles[variant]} ${className}`}
       {...props}
     >
       {children}

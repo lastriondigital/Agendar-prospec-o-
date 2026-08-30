@@ -1,6 +1,7 @@
 {
-  "name": "PROSPECT OS",
-  "description": "Sistema operacional pessoal de prospecção offline-first para execução rápida de campanhas, contatos e follow-ups.",
+  "name": "LEADION",
+  "description": "Plataforma profissional de prospecção comercial, qualificação de clientes e agendamento de mensagens.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
+

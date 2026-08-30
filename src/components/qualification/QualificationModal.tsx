@@ -476,7 +476,7 @@ export const QualificationModal: React.FC<QualificationModalProps> = ({
             {/* Bloco 3: Recomendação Acionável */}
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
               <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block">
-                Recomendação Operacional do PROSPECT OS
+                Recomendação Operacional do LEADION
               </span>
               <p className="text-xs text-emerald-200 font-medium leading-relaxed">
                 {currentResult.recommendation}

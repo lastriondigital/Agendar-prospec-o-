@@ -63,7 +63,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (!syncState.isAuthenticated) {
-      info('Nuvem não conectada', 'Faça login para sincronizar seus dados com o Cloud Firestore.');
+      info('Nuvem não conectada', 'Faça login para sincronizar seus dados com o Supabase.');
       return;
     }
 

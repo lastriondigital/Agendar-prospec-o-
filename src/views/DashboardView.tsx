@@ -99,9 +99,9 @@ export const DashboardView: React.FC = () => {
         {/* Dica Contextual Inicial */}
         <ContextualTip
           id="dashboard_first_access"
-          title="Bem-vindo ao PROSPECT OS"
+          title="Bem-vindo ao LEADION"
           message="Adicione sua primeira empresa para gerar a fila de execução diária, qualificar decisores e acompanhar o pipeline."
-          actionLabel="Ver Tutorial Rápido (7 Passos)"
+          actionLabel="Ver Guia do Leadion (8 Etapas)"
           onAction={openTutorial}
         />
 
