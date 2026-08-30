@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   MessageSquareText,
   Plus,
@@ -16,15 +16,19 @@ import {
   Sparkles,
   Layers,
   FileText,
-  Clock,
+  Calendar,
   Send,
-  Users,
+  CheckCircle2,
   ShieldCheck,
+  HelpCircle,
+  Clock,
+  Globe,
+  Sliders,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useConfirm } from '../context/ConfirmDialogContext';
 import { useToast } from '../context/ToastContext';
-import { ContactChannel, MessageTemplate, TemplateCategory, LeadStage, VariationLevel } from '../types';
+import { ContactChannel, MessageTemplate, TemplateCategory, LeadStage, Client } from '../types';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -32,103 +36,125 @@ import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ContextualTip } from '../components/common/ContextualTip';
-import { getChannelBadgeDetails } from '../utils/formatting';
-import { ACTION_TYPE_OPTIONS, CAMPAIGN_TYPE_OPTIONS } from '../utils/schedulingConfig';
-import { ScheduleMessageModal } from '../components/scheduling/ScheduleMessageModal';
-import { VariableSelectorModal } from '../components/messaging/VariableSelectorModal';
-import { MessagePreviewDrawer } from '../components/messaging/MessagePreviewDrawer';
-import { BulkPersonalizationModal } from '../components/messaging/BulkPersonalizationModal';
-import { interpolateDynamicTemplate, generateMessageVariation, auditMessageIntegrity } from '../utils/messagePersonalizer';
+import { ScheduleMessageModal } from '../components/messaging/ScheduleMessageModal';
+import { FlowStepsExplorer } from '../components/scripts/FlowStepsExplorer';
+import { ObjectionsExplorer } from '../components/scripts/ObjectionsExplorer';
+import { ContextFollowUpsMatrix } from '../components/scripts/ContextFollowUpsMatrix';
+import { ScriptSimulatorTester } from '../components/scripts/ScriptSimulatorTester';
+import {
+  getChannelBadgeDetails,
+  interpolateMessage,
+  validateMessageContent,
+  ALLOWED_VARIABLES,
+} from '../utils/formatting';
+import {
+  getActionTypes,
+  CHANNEL_OPTIONS,
+  DEFAULT_ACTION_TYPES,
+  resolveVariablesDetailed,
+} from '../utils/cadenceUtils';
 
-const CATEGORY_LABELS: Record<TemplateCategory, string> = {
-  primeiro_contacto: 'Primeiro Contato',
-  follow_up: 'Follow-up',
-  diagnóstico: 'Diagnóstico',
-  prova: 'Prova Social',
-  proposta: 'Proposta Comercial',
-  objeção: 'Objeção',
-  fechamento: 'Fechamento',
-  pós_venda: 'Pós-Venda',
-  reativação: 'Reativação',
-  custom: 'Personalizado',
-};
+type MessagesSubTab = 'templates' | 'flows' | 'objections' | 'context_followups' | 'simulator';
 
 export const MessagesView: React.FC = () => {
-  const { templates, services, companies, contacts, leads, upsertTemplate, deleteTemplate } = useApp();
+  const { templates, services, companies, contacts, upsertTemplate, deleteTemplate } = useApp();
   const confirm = useConfirm();
   const { success, error } = useToast();
 
+  const [activeTab, setActiveTab] = useState<MessagesSubTab>('templates');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedChannel, setSelectedChannel] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedActionTypeFilter, setSelectedActionTypeFilter] = useState<string>('all');
+  const [selectedActionType, setSelectedActionType] = useState<string>('all');
   const [showArchived, setShowArchived] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
 
-  // Modals do Motor de Personalização
-  const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
-  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
-  const [previewTemplate, setPreviewTemplate] = useState<MessageTemplate | null>(null);
-
-  // Scheduling Modal from Script card
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [schedulingTemplateId, setSchedulingTemplateId] = useState<string | undefined>(undefined);
+  // Modal para agendar diretamente a partir do script
+  const [scheduleTemplateId, setScheduleTemplateId] = useState<string | null>(null);
+  const [scheduleInitialText, setScheduleInitialText] = useState<string | undefined>(undefined);
 
   // Form State
   const [formTitle, setFormTitle] = useState('');
   const [formChannel, setFormChannel] = useState<ContactChannel>('whatsapp');
-  const [formCategory, setFormCategory] = useState<TemplateCategory>('primeiro_contacto');
-  const [formActionType, setFormActionType] = useState<string>('primeiro_contato');
-  const [formCampaignType, setFormCampaignType] = useState<string>('primeiro_contato');
+  const [formActionType, setFormActionType] = useState<string>('Primeiro contato');
+  const [customActionType, setCustomActionType] = useState('');
+  const [isCustomTypeMode, setIsCustomTypeMode] = useState(false);
   const [formContent, setFormContent] = useState('');
   const [formVersion, setFormVersion] = useState('v1.0');
   const [formServiceId, setFormServiceId] = useState('');
   const [formNiche, setFormNiche] = useState('');
   const [formPipelineStage, setFormPipelineStage] = useState<LeadStage | ''>('');
+  const [formStatus, setFormStatus] = useState<'active' | 'archived' | 'draft'>('active');
   const [formNotes, setFormNotes] = useState('');
-  const [formLiveVariationLevel, setFormLiveVariationLevel] = useState<VariationLevel>('none');
 
-  // Sample data for live preview
-  const sampleCompany = companies[0] || { id: 'c1', name: 'Clínica Alfa', niche: 'Saúde & Estética', city: 'Maputo', country: 'Moçambique', apparentNeed: 'Pouca visibilidade no Google Maps' };
-  const sampleContact = contacts[0] || { id: 'ct1', companyId: 'c1', name: 'Dr. Carlos Mboa', role: 'Diretor Clínico', salutation: 'doutor', gender: 'masculino', isPrimary: true };
-  const sampleService = services[0] || { id: 's1', name: 'Presença Digital & Google Perfil de Empresa', basePrice: 2500, currency: 'MT', benefits: ['aumentar a atração de clientes locais qualificados'], defaultCta: 'Podemos analisar isso juntos em 10 minutos esta semana?' };
-  const sampleLead = leads[0] || { id: 'l1', companyId: 'c1', stage: 'Primeiro Contato', priority: 'alta', temperature: 'quente', status: 'active', entryDate: new Date().toISOString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  // Amostras para prévia em tempo real
+  const sampleCompany = companies[0] || {
+    name: 'Clínica Alfa',
+    niche: 'Saúde & Estética',
+    city: 'São Paulo',
+    country: 'Brasil',
+  };
+  const sampleContact: Partial<Client> = {
+    name: contacts[0]?.name || 'Dr. Roberto Santos',
+    role: contacts[0]?.role || 'Diretor Clínico',
+    phone: contacts[0]?.phone || '(11) 98765-4321',
+    whatsapp: contacts[0]?.whatsapp || '(11) 98765-4321',
+    company: companies[0]?.name || 'Clínica Alfa',
+    segment: companies[0]?.niche || 'Saúde & Estética',
+  };
+  const sampleService = services[0] || {
+    name: 'Consultoria de Aquisição Digital',
+    basePrice: 3500,
+    currency: 'R$',
+  };
 
-  const filteredTemplates = templates.filter((t) => {
-    if (showArchived && !t.isArchived) return false;
-    if (!showArchived && t.isArchived) return false;
-    if (showFavoritesOnly && !t.isFavorite) return false;
-    if (selectedChannel !== 'all' && t.channel !== selectedChannel) return false;
-    if (selectedCategory !== 'all' && t.category !== selectedCategory && t.type !== selectedCategory) return false;
-    if (selectedActionTypeFilter !== 'all' && t.actionType !== selectedActionTypeFilter) return false;
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      return (
-        t.title.toLowerCase().includes(q) ||
-        t.content.toLowerCase().includes(q) ||
-        t.notes?.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  // Tipos de ação disponíveis na base
+  const availableActionTypes = useMemo(() => {
+    return getActionTypes(templates);
+  }, [templates]);
+
+  // Filtragem inteligente de templates
+  const filteredTemplates = useMemo(() => {
+    return templates.filter((t) => {
+      if (showArchived && !t.isArchived && t.status !== 'archived') return false;
+      if (!showArchived && (t.isArchived || t.status === 'archived')) return false;
+      if (showFavoritesOnly && !t.isFavorite) return false;
+      if (selectedChannel !== 'all' && t.channel !== selectedChannel) return false;
+      if (selectedActionType !== 'all') {
+        const itemType = t.actionType || t.category || t.type;
+        if (itemType !== selectedActionType) return false;
+      }
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        return (
+          t.title.toLowerCase().includes(q) ||
+          t.content.toLowerCase().includes(q) ||
+          (t.actionType && t.actionType.toLowerCase().includes(q)) ||
+          t.notes?.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [templates, showArchived, showFavoritesOnly, selectedChannel, selectedActionType, searchTerm]);
 
   const handleOpenAdd = () => {
     setEditingTemplate(null);
     setFormTitle('');
     setFormChannel('whatsapp');
-    setFormCategory('primeiro_contacto');
-    setFormActionType('primeiro_contato');
-    setFormCampaignType('primeiro_contato');
-    setFormContent('Olá [TRATAMENTO] [PRIMEIRO_NOME], tudo bem?\n\nVi que você lidera a [EMPRESA] em [CIDADE]. Analisando seu setor ([NICHO]), notei que muitos negócios enfrentam desafios com [PROBLEMA].\n\nNós ajudamos empresas como a sua a [BENEFÍCIO] através do [SERVIÇO].\n\n[CTA]');
+    setFormActionType('Primeiro contato');
+    setCustomActionType('');
+    setIsCustomTypeMode(false);
+    setFormContent(
+      'Olá {{primeiro_nome}}, tudo bem?\n\nVi que você lidera a {{empresa}} em {{cidade}}. Analisando seu setor ({{nicho}}), notei que muitos negócios enfrentam desafios com {{problema}}.\n\nNós ajudamos empresas como a sua a {{beneficio}} através do {{servico}}.\n\n{{cta}}'
+    );
     setFormVersion('v1.0');
     setFormServiceId('');
     setFormNiche('');
     setFormPipelineStage('');
+    setFormStatus('active');
     setFormNotes('');
-    setFormLiveVariationLevel('none');
     setIsModalOpen(true);
   };
 
@@ -136,16 +162,20 @@ export const MessagesView: React.FC = () => {
     setEditingTemplate(template);
     setFormTitle(template.title);
     setFormChannel(template.channel);
-    setFormCategory(template.category || template.type || 'primeiro_contacto');
-    setFormActionType(template.actionType || 'primeiro_contato');
-    setFormCampaignType(template.campaignType || 'primeiro_contato');
+    const actType = template.actionType || template.category || template.type || 'Primeiro contato';
+    setFormActionType(actType);
+    setCustomActionType('');
+    setIsCustomTypeMode(false);
     setFormContent(template.content);
     setFormVersion(template.version || 'v1.0');
     setFormServiceId(template.serviceId || '');
     setFormNiche(template.niche || '');
     setFormPipelineStage(template.pipelineStage || '');
+    setFormStatus(
+      (template.status as 'active' | 'archived' | 'draft') ||
+        (template.isArchived ? 'archived' : 'active')
+    );
     setFormNotes(template.notes || '');
-    setFormLiveVariationLevel('none');
     setIsModalOpen(true);
   };
 
@@ -160,7 +190,7 @@ export const MessagesView: React.FC = () => {
       updatedAt: new Date().toISOString(),
     };
     await upsertTemplate(duplicated);
-    success('Template duplicado com sucesso!');
+    success('Script duplicado com sucesso!');
   };
 
   const handleToggleFavorite = async (template: MessageTemplate) => {
@@ -173,39 +203,48 @@ export const MessagesView: React.FC = () => {
   };
 
   const handleToggleArchive = async (template: MessageTemplate) => {
+    const isNowArchived = !template.isArchived;
     const updated: MessageTemplate = {
       ...template,
-      isArchived: !template.isArchived,
+      isArchived: isNowArchived,
+      status: isNowArchived ? 'archived' : 'active',
       updatedAt: new Date().toISOString(),
     };
     await upsertTemplate(updated);
-    success(updated.isArchived ? 'Template arquivado.' : 'Template restaurado.');
+    success(isNowArchived ? 'Script arquivado.' : 'Script restaurado.');
   };
 
   const handleSaveTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formTitle || !formContent) {
+    if (!formTitle.trim() || !formContent.trim()) {
       error('Preencha o título e o conteúdo da mensagem.');
+      return;
+    }
+
+    const effectiveAction = isCustomTypeMode ? customActionType.trim() : formActionType;
+    if (!effectiveAction) {
+      error('Defina o tipo de ação para este script.');
       return;
     }
 
     const template: MessageTemplate = {
       id: editingTemplate ? editingTemplate.id : `tpl-${Date.now()}`,
-      title: formTitle,
+      title: formTitle.trim(),
       channel: formChannel,
-      category: formCategory,
-      type: formCategory,
-      actionType: formActionType,
-      campaignType: formCampaignType,
-      content: formContent,
-      variables: [],
+      channels: [formChannel],
+      actionType: effectiveAction,
+      category: effectiveAction as any,
+      type: effectiveAction,
+      content: formContent.trim(),
+      variables: ALLOWED_VARIABLES.filter((v) => formContent.includes(`{{${v}}}`)),
       version: formVersion || 'v1.0',
       serviceId: formServiceId || undefined,
       niche: formNiche || undefined,
       pipelineStage: formPipelineStage || undefined,
+      status: formStatus,
       isFavorite: editingTemplate ? editingTemplate.isFavorite : false,
-      isArchived: editingTemplate ? editingTemplate.isArchived : false,
-      notes: formNotes,
+      isArchived: formStatus === 'archived',
+      notes: formNotes.trim(),
       createdAt: editingTemplate?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -222,15 +261,18 @@ export const MessagesView: React.FC = () => {
       isDestructive: true,
       onConfirm: async () => {
         await deleteTemplate(template.id);
-        success('Template excluído.');
+        success('Template excluído com sucesso.');
       },
     });
   };
 
-  const handleInsertVariable = (tag: string) => {
-    setFormContent((prev) => {
-      return prev ? `${prev} ${tag}` : tag;
-    });
+  const insertVariableIntoForm = (varTag: string) => {
+    setFormContent((prev) => prev + ` {{${varTag}}}`);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    success('Mensagem copiada para a área de transferência!');
   };
 
   return (
@@ -238,512 +280,586 @@ export const MessagesView: React.FC = () => {
       {/* Dica Contextual */}
       <ContextualTip
         id="messages_view_tip"
-        title="Motor de Personalização Dinâmica & Biblioteca de Scripts"
-        message="Utilize variáveis dinâmicas ([NOME], [EMPRESA], [PROBLEMA], [TRATAMENTO]) para compor templates adaptativos e realize personalização em massa sem perder a relevância individual."
+        title="Scripts & Relação com Tipos de Ações"
+        message="Vincule seus scripts diretamente a um Tipo de Ação (ex: Primeiro contato, Follow-up 1, Quebra de objeção) e Canal. Ao agendar uma mensagem, o sistema selecionará e preencherá automaticamente o script ideal."
       />
 
-      {/* Header com Ações Rápidas */}
+      {/* Header com Navegação em Abas */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-neutral-100">Biblioteca de Scripts & Personalização</h2>
-          <p className="text-xs text-neutral-400">
-            Crie templates inteligentes com substituição contextual de variáveis e auditoria pré-envio anti-invenção.
+          <h2 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+            <MessageSquareText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            Central de Mensagens, Cadência e Scripts
+          </h2>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            Acesse templates, o motor de fluxos de 23 etapas, matriz de objeções, follow-ups contextuais e simulador em tempo real.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Botão de Destaque: Personalização em Massa */}
+        {activeTab === 'templates' && (
           <Button
-            variant="outline"
+            variant="primary"
             size="sm"
-            onClick={() => setIsBulkModalOpen(true)}
-            leftIcon={<Sparkles className="w-4 h-4 text-amber-400" />}
-            className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+            onClick={handleOpenAdd}
+            leftIcon={<Plus className="w-4 h-4" />}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
           >
-            Personalização em Massa
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setSchedulingTemplateId(undefined);
-              setIsScheduleModalOpen(true);
-            }}
-            leftIcon={<Clock className="w-4 h-4 text-blue-400" />}
-          >
-            Agendar Mensagem
-          </Button>
-
-          <Button variant="primary" size="sm" onClick={handleOpenAdd} leftIcon={<Plus className="w-4 h-4" />}>
             Novo Script
           </Button>
-        </div>
+        )}
       </div>
 
-      {/* Filters & Search Toolbar */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-3.5 rounded-xl bg-neutral-900 border border-neutral-800 shadow-sm">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-          <input
-            type="text"
-            placeholder="Pesquisar por título, conteúdo ou notas..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-blue-500"
-          />
-        </div>
+      {/* 5 Navegação por Abas Principais */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-neutral-200 dark:border-neutral-800 scrollbar-thin">
+        <button
+          onClick={() => setActiveTab('templates')}
+          className={`px-3.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
+            activeTab === 'templates'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          Templates & Biblioteca ({templates.length})
+        </button>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Channel selector */}
-          <select
-            value={selectedChannel}
-            onChange={(e) => setSelectedChannel(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-xs text-neutral-200 focus:outline-none focus:border-blue-500"
-          >
-            <option value="all">Todos os Canais</option>
-            <option value="whatsapp">💬 WhatsApp</option>
-            <option value="linkedin">💼 LinkedIn</option>
-            <option value="email">✉️ E-mail</option>
-            <option value="call">📞 Ligação</option>
-            <option value="instagram">📷 Instagram</option>
-          </select>
+        <button
+          onClick={() => setActiveTab('flows')}
+          className={`px-3.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
+            activeTab === 'flows'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          Motor de Fluxos (23 e 16 Etapas)
+        </button>
 
-          {/* Action Type filter */}
-          <select
-            value={selectedActionTypeFilter}
-            onChange={(e) => setSelectedActionTypeFilter(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-xs text-neutral-200 focus:outline-none focus:border-blue-500"
-          >
-            <option value="all">Todos os Tipos de Ação</option>
-            {ACTION_TYPE_OPTIONS.map((at) => (
-              <option key={at.id} value={at.id}>
-                {at.label}
-              </option>
-            ))}
-          </select>
+        <button
+          onClick={() => setActiveTab('objections')}
+          className={`px-3.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
+            activeTab === 'objections'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+          }`}
+        >
+          <HelpCircle className="w-3.5 h-3.5" />
+          Matriz de Objeções (25+)
+        </button>
 
-          {/* Category selector */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-700 text-xs text-neutral-200 focus:outline-none focus:border-blue-500"
-          >
-            <option value="all">Todas as Categorias</option>
-            {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
+        <button
+          onClick={() => setActiveTab('context_followups')}
+          className={`px-3.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
+            activeTab === 'context_followups'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          Follow-ups por Contexto (14 Cenários)
+        </button>
 
-          {/* Favorites filter */}
-          <Button
-            variant={showFavoritesOnly ? 'primary' : 'secondary'}
-            size="xs"
-            onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-            leftIcon={<Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />}
-          >
-            Favoritos
-          </Button>
-
-          {/* Archive toggle */}
-          <Button
-            variant={showArchived ? 'primary' : 'ghost'}
-            size="xs"
-            onClick={() => setShowArchived(!showArchived)}
-            leftIcon={<Archive className="w-3.5 h-3.5" />}
-          >
-            {showArchived ? 'Ver Ativos' : 'Arquivados'}
-          </Button>
-        </div>
+        <button
+          onClick={() => setActiveTab('simulator')}
+          className={`px-3.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 ${
+            activeTab === 'simulator'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+          }`}
+        >
+          <Sliders className="w-3.5 h-3.5" />
+          Simulador & Testador de Scripts
+        </button>
       </div>
 
-      {/* Templates Grid */}
-      {filteredTemplates.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredTemplates.map((template) => {
-            const channelBadge = getChannelBadgeDetails(template.channel);
-            const livePreview = interpolateDynamicTemplate(template.content, {
-              company: sampleCompany as any,
-              contact: sampleContact as any,
-              service: sampleService as any,
-              lead: sampleLead as any,
-            });
-
-            const matchedService = services.find((s) => s.id === template.serviceId);
-            const actionTypeObj = ACTION_TYPE_OPTIONS.find((a) => a.id === template.actionType);
-
-            return (
-              <Card
-                key={template.id}
-                padding="md"
-                className={`bg-neutral-900 border-neutral-800 space-y-3.5 flex flex-col justify-between transition-all hover:border-neutral-700 ${
-                  template.isArchived ? 'opacity-60 grayscale' : ''
-                }`}
-              >
-                <div className="space-y-3">
-                  {/* Top badges & title */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${channelBadge.bgClass} ${channelBadge.textClass}`}>
-                          {channelBadge.label}
-                        </span>
-                        {actionTypeObj ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 font-medium">
-                            {actionTypeObj.label}
-                          </span>
-                        ) : (
-                          <Badge variant="neutral" size="sm">
-                            {CATEGORY_LABELS[template.category || template.type] || template.category}
-                          </Badge>
-                        )}
-                        <span className="font-mono text-[10px] text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded">
-                          {template.version || 'v1.0'}
-                        </span>
-                        {matchedService && (
-                          <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                            {matchedService.name}
-                          </span>
-                        )}
-                        {template.niche && (
-                          <span className="text-[10px] text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded">
-                            {template.niche}
-                          </span>
-                        )}
-                      </div>
-
-                      <h4 className="text-sm font-bold text-neutral-100 mt-2 flex items-center gap-2">
-                        {template.title}
-                      </h4>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => handleToggleFavorite(template)}
-                        title={template.isFavorite ? 'Desfavoritar' : 'Favoritar'}
-                      >
-                        <Star className={`w-3.5 h-3.5 ${template.isFavorite ? 'text-amber-400 fill-amber-400' : 'text-neutral-500'}`} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => handleDuplicate(template)}
-                        title="Duplicar script"
-                      >
-                        <Copy className="w-3.5 h-3.5 text-neutral-400" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => handleOpenEdit(template)}
-                        title="Editar"
-                      >
-                        <Edit2 className="w-3.5 h-3.5 text-neutral-300" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => handleToggleArchive(template)}
-                        title={template.isArchived ? 'Restaurar' : 'Arquivar'}
-                      >
-                        <Archive className="w-3.5 h-3.5 text-neutral-400" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        onClick={() => handleDeleteTemplate(template)}
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Content Raw */}
-                  <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 font-sans leading-relaxed whitespace-pre-line select-text max-h-32 overflow-y-auto font-mono text-[11px]">
-                    {template.content}
-                  </div>
-
-                  {/* Live Simulation Preview */}
-                  <div className="p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 text-[11px] text-neutral-300 space-y-1">
-                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
-                      <Eye className="w-3 h-3" /> Exemplo Renderizado ({sampleCompany.name}):
-                    </span>
-                    <p className="italic text-neutral-300 line-clamp-2">{livePreview}</p>
-                  </div>
-                </div>
-
-                {/* Footer buttons */}
-                <div className="flex items-center justify-between pt-2 border-t border-neutral-800 text-[11px] text-neutral-500">
-                  <span>{template.notes || 'Pronto para uso'}</span>
-
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => setPreviewTemplate(template)}
-                      leftIcon={<Eye className="w-3 h-3 text-emerald-400" />}
-                      className="text-xs text-emerald-400 hover:text-emerald-300"
-                    >
-                      Prévia & Auditoria
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="xs"
-                      onClick={() => {
-                        setSchedulingTemplateId(template.id);
-                        setIsScheduleModalOpen(true);
-                      }}
-                      leftIcon={<Clock className="w-3 h-3 text-blue-400" />}
-                      className="text-xs"
-                    >
-                      Agendar
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
-        <EmptyState
-          icon={<MessageSquareText className="w-8 h-8 text-neutral-400" />}
-          title="Nenhum script encontrado"
-          description="Ajuste os filtros de busca ou crie um novo modelo de mensagem para a sua biblioteca."
-          actionLabel="Criar Script"
-          onAction={handleOpenAdd}
+      {/* Conteúdo da Aba 2: Motor de Fluxos */}
+      {activeTab === 'flows' && (
+        <FlowStepsExplorer
+          onScheduleStep={(step, text) => {
+            setScheduleInitialText(text);
+            setScheduleTemplateId(step.id);
+          }}
         />
       )}
 
-      {/* Modal Add / Edit Template */}
+      {/* Conteúdo da Aba 3: Matriz de Objeções */}
+      {activeTab === 'objections' && <ObjectionsExplorer />}
+
+      {/* Conteúdo da Aba 4: Follow-ups por Contexto */}
+      {activeTab === 'context_followups' && <ContextFollowUpsMatrix />}
+
+      {/* Conteúdo da Aba 5: Simulador de Scripts */}
+      {activeTab === 'simulator' && <ScriptSimulatorTester />}
+
+      {/* Conteúdo da Aba 1: Biblioteca & Templates Salvos */}
+      {activeTab === 'templates' && (
+        <div className="space-y-6">
+          {/* Filtros e Barra de Pesquisa */}
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 p-4 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+              <input
+                type="text"
+                placeholder="Pesquisar por título, conteúdo, tipo de ação..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-lg bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-900 dark:text-neutral-100 placeholder-neutral-500 focus:outline-hidden focus:border-emerald-500"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Seletor de Canal */}
+              <select
+                value={selectedChannel}
+                onChange={(e) => setSelectedChannel(e.target.value)}
+                aria-label="Filtrar por canal"
+                className="px-3 py-2 rounded-lg bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-800 dark:text-neutral-200 focus:outline-hidden focus:border-emerald-500"
+              >
+                <option value="all">Todos os Canais</option>
+                {CHANNEL_OPTIONS.map((ch) => (
+                  <option key={ch.value} value={ch.value}>
+                    {ch.icon} {ch.label}
+                  </option>
+                ))}
+              </select>
+
+              {/* Seletor de Tipo de Ação */}
+              <select
+                value={selectedActionType}
+                onChange={(e) => setSelectedActionType(e.target.value)}
+                aria-label="Filtrar por tipo de ação"
+                className="px-3 py-2 rounded-lg bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-800 dark:text-neutral-200 focus:outline-hidden focus:border-emerald-500"
+              >
+                <option value="all">Todos os Tipos de Ação</option>
+                {availableActionTypes.map((act) => (
+                  <option key={act} value={act}>
+                    🎯 {act}
+                  </option>
+                ))}
+              </select>
+
+              {/* Filtro de Favoritos */}
+              <Button
+                variant={showFavoritesOnly ? 'primary' : 'outline'}
+                size="xs"
+                onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                leftIcon={
+                  <Star className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />
+                }
+              >
+                Favoritos
+              </Button>
+
+              {/* Toggle de Arquivados */}
+              <Button
+                variant={showArchived ? 'primary' : 'ghost'}
+                size="xs"
+                onClick={() => setShowArchived(!showArchived)}
+                leftIcon={<Archive className="w-3.5 h-3.5" />}
+              >
+                {showArchived ? 'Ver Ativos' : 'Arquivados'}
+              </Button>
+            </div>
+          </div>
+
+          {/* Grid de Scripts */}
+          {filteredTemplates.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredTemplates.map((template) => {
+                const channelBadge = getChannelBadgeDetails(template.channel);
+                const livePreview = interpolateMessage(
+                  template.content,
+                  sampleContact,
+                  sampleService,
+                  sampleCompany
+                );
+                const validation = validateMessageContent(template.content);
+                const matchedService = services.find((s) => s.id === template.serviceId);
+                const displayActionType =
+                  template.actionType || template.category || template.type || 'Primeiro contato';
+
+                return (
+                  <Card
+                    key={template.id}
+                    padding="md"
+                    className={`bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 space-y-3.5 flex flex-col justify-between transition-all ${
+                      template.isArchived || template.status === 'archived'
+                        ? 'opacity-60 grayscale'
+                        : ''
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      {/* Cabeçalho com Badges de Canal e Tipo de Ação */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded font-medium ${channelBadge.bgClass} ${channelBadge.textClass}`}
+                            >
+                              {channelBadge.label}
+                            </span>
+
+                            <Badge variant="emerald" size="sm">
+                              🎯 {displayActionType}
+                            </Badge>
+
+                            {matchedService && (
+                              <Badge variant="neutral" size="sm">
+                                💼 {matchedService.name}
+                              </Badge>
+                            )}
+
+                            {template.version && (
+                              <span className="text-[10px] text-neutral-400 font-mono">
+                                {template.version}
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+                            {template.title}
+                          </h3>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleToggleFavorite(template)}
+                            className="p-1 rounded text-neutral-400 hover:text-amber-400 transition-colors"
+                            title={template.isFavorite ? 'Remover favorito' : 'Favoritar'}
+                          >
+                            <Star
+                              className={`w-4 h-4 ${
+                                template.isFavorite ? 'fill-amber-400 text-amber-400' : ''
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Prévia do Script Formatado com Amostra */}
+                      <div className="p-3 rounded-lg bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-700 dark:text-neutral-300 whitespace-pre-line leading-relaxed max-h-44 overflow-y-auto">
+                        {livePreview}
+                      </div>
+
+                      {/* Observações / Notas Rápidas */}
+                      {template.notes && (
+                        <p className="text-[11px] text-neutral-500 italic bg-neutral-100 dark:bg-neutral-800/40 p-2 rounded border border-neutral-200 dark:border-neutral-800/60">
+                          💬 <strong>Nota de envio:</strong> {template.notes}
+                        </p>
+                      )}
+
+                      {/* Validação de Variáveis e Caracteres */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-neutral-400 border-t border-neutral-100 dark:border-neutral-800/60">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono">{template.content.length} caracteres</span>
+                          {(validation.invalidVariables.length > 0 || validation.missingValueVariables.length > 0) && (
+                            <span className="text-amber-500 flex items-center gap-1 font-semibold">
+                              <AlertTriangle className="w-3 h-3" /> Variáveis pendentes
+                            </span>
+                          )}
+                        </div>
+
+                        {template.pipelineStage && (
+                          <span className="text-neutral-500">
+                            Funil: <strong>{template.pipelineStage}</strong>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Barra de Ações Rápidas */}
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => copyToClipboard(livePreview)}
+                          title="Copiar mensagem preenchida"
+                          leftIcon={<Copy className="w-3.5 h-3.5" />}
+                        >
+                          Copiar
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => handleDuplicate(template)}
+                          title="Duplicar script"
+                        >
+                          Duplicar
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => handleOpenEdit(template)}
+                          leftIcon={<Edit2 className="w-3.5 h-3.5" />}
+                        >
+                          Editar
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => handleToggleArchive(template)}
+                          className="text-neutral-400 hover:text-neutral-200"
+                        >
+                          {template.isArchived ? 'Desarquivar' : 'Arquivar'}
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => handleDeleteTemplate(template)}
+                          className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/10"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+
+                      <Button
+                        variant="primary"
+                        size="xs"
+                        onClick={() => {
+                          setScheduleInitialText(undefined);
+                          setScheduleTemplateId(template.id);
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                        leftIcon={<Calendar className="w-3.5 h-3.5" />}
+                      >
+                        Agendar
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<MessageSquareText className="w-8 h-8 text-neutral-400" />}
+              title="Nenhum script encontrado"
+              description="Não encontramos modelos de mensagens que correspondam aos filtros selecionados."
+              actionLabel="Criar Novo Script"
+              onAction={handleOpenAdd}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Modal de Agendamento disparado a partir do script */}
+      {scheduleTemplateId && (
+        <ScheduleMessageModal
+          isOpen={true}
+          onClose={() => {
+            setScheduleTemplateId(null);
+            setScheduleInitialText(undefined);
+          }}
+          preselectedTemplateId={scheduleTemplateId}
+          initialText={scheduleInitialText}
+        />
+      )}
+
+      {/* Modal de Adicionar / Editar Script */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingTemplate ? 'Editar Script de Mensagem' : 'Novo Script de Mensagem'}
-        maxWidth="xl"
+        size="lg"
       >
-        <form onSubmit={handleSaveTemplate} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
+        <form onSubmit={handleSaveTemplate} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                Título do Script *
+              </label>
               <Input
-                label="Título do Script *"
-                placeholder="Ex: Abordagem Direta WhatsApp - Clínicas"
+                placeholder="Ex: Abordagem Direta para Clínicas"
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
                 required
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Versão</label>
-              <input
-                type="text"
-                value={formVersion}
-                onChange={(e) => setFormVersion(e.target.value)}
-                placeholder="Ex: v1.0"
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Canal Padrão</label>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                Canal de Envio *
+              </label>
               <select
                 value={formChannel}
                 onChange={(e) => setFormChannel(e.target.value as ContactChannel)}
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-label="Selecionar canal de envio do script"
+                className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 focus:outline-hidden focus:border-emerald-500"
               >
-                <option value="whatsapp">WhatsApp</option>
-                <option value="linkedin">LinkedIn</option>
-                <option value="email">E-mail</option>
-                <option value="call">Ligação</option>
-                <option value="instagram">Instagram</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Tipo de Ação</label>
-              <select
-                value={formActionType}
-                onChange={(e) => setFormActionType(e.target.value)}
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {ACTION_TYPE_OPTIONS.map((at) => (
-                  <option key={at.id} value={at.id}>
-                    {at.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-neutral-300 mb-1">Vincular a Serviço</label>
-              <select
-                value={formServiceId}
-                onChange={(e) => setFormServiceId(e.target.value)}
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Nenhum (Geral)</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
+                {CHANNEL_OPTIONS.map((ch) => (
+                  <option key={ch.value} value={ch.value}>
+                    {ch.icon} {ch.label}
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Botão + VARIÁVEL e Toolbar Rápida (Ponto 30 & 39) */}
-          <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-neutral-200 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                Personalização de Variáveis:
-              </label>
+          {/* Tipo de Ação & Relação com a Cadência */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-neutral-300">
+                  Tipo de Ação (Vínculo Operacional) *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomTypeMode(!isCustomTypeMode)}
+                  className="text-[10px] text-emerald-400 hover:underline"
+                >
+                  {isCustomTypeMode ? 'Selecionar da lista' : '+ Criar novo tipo'}
+                </button>
+              </div>
 
-              <Button
-                type="button"
-                variant="primary"
-                size="xs"
-                onClick={() => setIsVariableModalOpen(true)}
-                leftIcon={<Plus className="w-3.5 h-3.5" />}
-                className="bg-blue-600 hover:bg-blue-500 text-white font-bold"
-              >
-                + ADICIONAR VARIÁVEL
-              </Button>
+              {isCustomTypeMode ? (
+                <Input
+                  placeholder="Ex: Reativação 30 Dias, Convite Webinar..."
+                  value={customActionType}
+                  onChange={(e) => setCustomActionType(e.target.value)}
+                  required
+                />
+              ) : (
+                <select
+                  value={formActionType}
+                  onChange={(e) => setFormActionType(e.target.value)}
+                  aria-label="Selecionar tipo de ação do script"
+                  className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 focus:outline-hidden focus:border-emerald-500"
+                >
+                  {availableActionTypes.map((act) => (
+                    <option key={act} value={act}>
+                      🎯 {act}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
-              {['[NOME]', '[EMPRESA]', '[SERVIÇO]', '[PROBLEMA]', '[CIDADE]', '[TRATAMENTO]', '[GÊNERO]', '[RESPONSÁVEL]', '[OFERTA]', '[PREÇO]', '[CTA]'].map((tag) => (
+            <div>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                Serviço Vinculado (Opcional)
+              </label>
+              <select
+                value={formServiceId}
+                onChange={(e) => setFormServiceId(e.target.value)}
+                aria-label="Selecionar serviço vinculado ao script"
+                className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 focus:outline-hidden focus:border-emerald-500"
+              >
+                <option value="">Qualquer Serviço / Geral</option>
+                {services.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    💼 {s.name} ({s.currency} {s.basePrice})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Variáveis Dinâmicas para Inserção Rápida */}
+          <div className="space-y-1.5 bg-neutral-950 p-3 rounded-lg border border-neutral-800">
+            <label className="text-[11px] font-semibold text-neutral-400 flex items-center gap-1">
+              <Code className="w-3 h-3 text-emerald-400" /> Clique para inserir variáveis dinâmicas:
+            </label>
+            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+              {ALLOWED_VARIABLES.map((v) => (
                 <button
-                  key={tag}
+                  key={v}
                   type="button"
-                  onClick={() => handleInsertVariable(tag)}
-                  className="px-2 py-1 rounded bg-neutral-950 border border-neutral-800 hover:border-blue-500/50 hover:bg-neutral-800 text-blue-300 text-[11px] font-mono transition-colors cursor-pointer"
+                  onClick={() => insertVariableIntoForm(v)}
+                  className="text-[10px] px-2 py-0.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-mono transition-colors"
                 >
-                  {tag}
+                  {`{{${v}}}`}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Content Editor & Live Preview */}
+          {/* Conteúdo do Script */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-neutral-300">
+                Conteúdo do Script *
+              </label>
+              <span className="text-[10px] text-neutral-500 font-mono">
+                {formContent.length} caracteres
+              </span>
+            </div>
+            <textarea
+              rows={6}
+              value={formContent}
+              onChange={(e) => setFormContent(e.target.value)}
+              placeholder="Digite o texto da mensagem usando as variáveis acima..."
+              className="w-full p-3 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 font-mono focus:outline-hidden focus:border-emerald-500 leading-relaxed"
+              required
+            />
+          </div>
+
+          {/* Notas Operacionais e Versão */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-neutral-300">Conteúdo do Script *</label>
-              <textarea
-                rows={9}
-                value={formContent}
-                onChange={(e) => setFormContent(e.target.value)}
-                placeholder="Escreva a mensagem usando variáveis como [NOME], [EMPRESA], [PROBLEMA]..."
-                className="w-full p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 font-sans leading-relaxed focus:outline-none focus:border-blue-500"
-                required
+            <div>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                Orientação de Envio / Gatilho Recomendado
+              </label>
+              <Input
+                placeholder="Ex: Enviar preferencialmente entre 10h e 11h30"
+                value={formNotes}
+                onChange={(e) => setFormNotes(e.target.value)}
               />
             </div>
 
-            <div className="space-y-1.5 flex flex-col justify-between">
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-medium text-neutral-300 flex items-center gap-1">
-                    <Eye className="w-3.5 h-3.5 text-blue-400" /> Pré-visualização ao Vivo:
-                  </label>
-
-                  <select
-                    value={formLiveVariationLevel}
-                    onChange={(e) => setFormLiveVariationLevel(e.target.value as VariationLevel)}
-                    className="bg-neutral-950 border border-neutral-800 rounded text-[10px] px-1.5 py-0.5 text-neutral-300"
-                  >
-                    <option value="none">Sem Variação</option>
-                    <option value="minor">Pequena Variação</option>
-                    <option value="contextual">Contextual</option>
-                    <option value="ai">Por IA</option>
-                  </select>
-                </div>
-
-                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-200 font-sans leading-relaxed whitespace-pre-line h-[165px] overflow-y-auto">
-                  {generateMessageVariation(
-                    formContent,
-                    {
-                      company: sampleCompany as any,
-                      contact: sampleContact as any,
-                      service: sampleService as any,
-                      lead: sampleLead as any,
-                    },
-                    formLiveVariationLevel
-                  )}
-                </div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                  Versão
+                </label>
+                <Input
+                  placeholder="v1.0"
+                  value={formVersion}
+                  onChange={(e) => setFormVersion(e.target.value)}
+                />
               </div>
 
-              <div className="text-[10px] text-neutral-400 italic">
-                Exemplo simulado com o lead {sampleCompany.name} ({sampleContact.name}).
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                  Status
+                </label>
+                <select
+                  value={formStatus}
+                  onChange={(e) => setFormStatus(e.target.value as any)}
+                  aria-label="Selecionar status do script"
+                  className="w-full px-3 py-2 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-neutral-100 focus:outline-hidden focus:border-emerald-500"
+                >
+                  <option value="active">Ativo</option>
+                  <option value="draft">Rascunho</option>
+                  <option value="archived">Arquivado</option>
+                </select>
               </div>
             </div>
           </div>
 
-          <Input
-            label="Notas Internas / Instruções de Envio"
-            placeholder="Ex: Usar quando o decisor for o Diretor Comercial."
-            value={formNotes}
-            onChange={(e) => setFormNotes(e.target.value)}
-          />
-
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-800">
-            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
+          <div className="flex justify-end gap-2 pt-3 border-t border-neutral-800">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsModalOpen(false)}
+            >
               Cancelar
             </Button>
-            <Button type="submit" variant="primary">
-              Salvar Script
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {editingTemplate ? 'Salvar Alterações' : 'Criar Script'}
             </Button>
           </div>
         </form>
       </Modal>
-
-      {/* Modal de Variáveis Dinâmicas (+ VARIÁVEL) */}
-      <VariableSelectorModal
-        isOpen={isVariableModalOpen}
-        onClose={() => setIsVariableModalOpen(false)}
-        onSelectVariable={handleInsertVariable}
-      />
-
-      {/* Drawer de Prévia e Auditoria (Card) */}
-      {previewTemplate && (
-        <MessagePreviewDrawer
-          isOpen={!!previewTemplate}
-          onClose={() => setPreviewTemplate(null)}
-          template={previewTemplate}
-          company={sampleCompany as any}
-          contact={sampleContact as any}
-          service={sampleService as any}
-          lead={sampleLead as any}
-          onScheduleAction={(msg) => {
-            setSchedulingTemplateId(previewTemplate.id);
-            setIsScheduleModalOpen(true);
-          }}
-        />
-      )}
-
-      {/* Modal de Personalização em Massa */}
-      <BulkPersonalizationModal
-        isOpen={isBulkModalOpen}
-        onClose={() => setIsBulkModalOpen(false)}
-        companies={companies}
-        contacts={contacts}
-        leads={leads}
-        templates={templates}
-        services={services}
-      />
-
-      {/* Global Schedule Message Modal */}
-      <ScheduleMessageModal
-        isOpen={isScheduleModalOpen}
-        onClose={() => setIsScheduleModalOpen(false)}
-        initialTemplateId={schedulingTemplateId}
-      />
     </div>
   );
 };

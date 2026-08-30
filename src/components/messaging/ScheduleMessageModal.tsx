@@ -56,6 +56,9 @@ interface ScheduleMessageModalProps {
   initialChannel?: ContactChannel;
   initialDate?: string;
   initialTime?: string;
+  initialScriptId?: string;
+  preselectedTemplateId?: string;
+  initialText?: string;
   onSuccess?: (action: ProspectAction) => void;
 }
 
@@ -69,6 +72,9 @@ export const ScheduleMessageModal: React.FC<ScheduleMessageModalProps> = ({
   initialChannel,
   initialDate,
   initialTime,
+  initialScriptId,
+  preselectedTemplateId,
+  initialText,
   onSuccess,
 }) => {
   const {
@@ -137,8 +143,17 @@ export const ScheduleMessageModal: React.FC<ScheduleMessageModalProps> = ({
       if (initialActionType) {
         setActionType(initialActionType);
       }
+
+      const scriptToSelect = initialScriptId || preselectedTemplateId;
+      if (scriptToSelect) {
+        setSelectedTemplateId(scriptToSelect);
+      }
+
+      if (initialText) {
+        setCustomMessage(initialText);
+      }
     }
-  }, [isOpen, initialLeadId, initialCompanyId, initialCampaignId, initialActionType, initialChannel, initialDate, initialTime, leads, campaigns]);
+  }, [isOpen, initialLeadId, initialCompanyId, initialCampaignId, initialActionType, initialChannel, initialDate, initialTime, initialScriptId, preselectedTemplateId, initialText, leads, campaigns]);
 
   // Lead, Empresa e Contato selecionados
   const selectedLead = useMemo(() => {

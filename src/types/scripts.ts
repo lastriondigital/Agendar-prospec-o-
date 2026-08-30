@@ -1,12 +1,23 @@
-export type ScriptProspectingType = 'identified_demand' | 'latent_opportunity' | 'identified_problem';
+import { ContactChannel, LeadStage, LeadStatus } from './index';
 
-export type ProspectingType = ScriptProspectingType;
+export type ProspectingFlowType =
+  | 'problema_identificado'
+  | 'oportunidade_latente'
+  | 'reativacao'
+  | 'custom';
 
-export type CommunicationStyle = 'consultivo' | 'profissional' | 'casual' | 'direto' | 'formal';
+export type CountryCode = 'BR' | 'PT' | 'MZ' | 'OTHER';
 
-export type ScriptTargetRole = 'responsavel' | 'funcionario' | 'desconhecido';
+export type CommunicationStyle =
+  | 'profissional'
+  | 'consultivo'
+  | 'casual'
+  | 'direto'
+  | 'formal';
 
-export type ScriptFollowUpState =
+export type ContactRoleType = 'decisor' | 'funcionario' | 'indeterminado';
+
+export type FollowUpStatus =
   | 'aguardando_resposta'
   | 'followup_recomendado'
   | 'followup_atrasado'
@@ -16,107 +27,117 @@ export type ScriptFollowUpState =
   | 'do_not_contact';
 
 export interface FollowUpItem {
-  id: string;
-  stepNumber: number; // 1 to 8
-  title?: string;
+  number: number; // 1 a 6 (ou 8)
+  intervalRecommended: string; // ex: "4–8 horas", "1 dia", "2 dias", "4 dias", "7 dias", "14 dias"
+  intervalHours: number; // número de horas para cálculo de agendamento
   message: string;
-  intervalHours: number;
-  intervalText: string; // "4–8 horas", "1 dia", "2 dias", "4 dias", "7 dias", "14 dias"
   objective: string;
-  tone: string;
-  condition: string; // Condição de utilização
-  whenNotToUse: string; // Quando NÃO utilizar
-}
-
-export interface DetailedObjection {
-  id: string;
-  code: string;
-  title: string; // O que o cliente disse (ex: "Está caro")
-  keywords: string[];
-  category: 'preco' | 'timing' | 'confianca' | 'necessidade' | 'autoridade' | 'concorrencia' | 'processo';
-  possibleMeaning: string; // O possível significado
-  whatNotToSay: string; // O que NÃO responder
-  diagnosticQuestion: string; // Pergunta de diagnóstico
-  shortResponse: string; // Resposta curta
-  consultativeResponse: string; // Resposta consultiva
-  whatsAppResponse: string; // Resposta para WhatsApp
-  callResponse: string; // Resposta para ligação
-  nextStep: string; // Próximo passo
-  followUps: FollowUpItem[]; // Follow-up 1 a 6 dedicados
+  tone: CommunicationStyle;
+  condition: string; // quando utilizar
+  whenNotToUse: string; // quando NÃO utilizar
 }
 
 export interface ScriptStepDefinition {
   id: string;
-  prospectingType: ScriptProspectingType;
   stepNumber: number;
-  code: string;
-  stepName: string;
-  phase:
-    | 'ATENCAO'
-    | 'INTERACAO'
-    | 'QUALIFICACAO'
-    | 'DIAGNOSTICO'
-    | 'VALIDACAO'
-    | 'DEMONSTRACAO'
-    | 'PROPOSTA'
-    | 'NEGOCIACAO'
-    | 'FECHAMENTO'
-    | 'POS_VENDA'
-    | 'RECOMENDACAO';
+  title: string;
+  flowType: ProspectingFlowType;
+  category: string;
   objective: string;
-  structure: string;
-  requiresClientResponse: boolean;
-  defaultScript: string;
-  variationsByStyle?: Partial<Record<CommunicationStyle, string>>;
-  variationsByCountry?: Partial<Record<string, string>>;
-  followUps: FollowUpItem[]; // 6 to 8 follow-ups
-  diagnosticPoints?: {
-    pointA: string; // Situação atual
-    pointB: string; // Situação desejada
-    pointC: string; // Consequência de permanecer no estado atual
+  purposeDescription: string;
+  isInitialContact?: boolean;
+  requiresResponse?: boolean;
+  roleTarget?: ContactRoleType;
+  scriptTemplate: string;
+  alternativeTemplates?: {
+    consultivo?: string;
+    direto?: string;
+    casual?: string;
+    formal?: string;
   };
-  diagnosticQuestions?: string[];
+  countryVariations?: {
+    BR?: string;
+    PT?: string;
+    MZ?: string;
+  };
+  diagnosticPoints?: {
+    pointA: string; // situação atual
+    pointB: string; // situação desejada
+    pointC: string; // consequência
+  };
+  followUps?: FollowUpItem[]; // 6 a 8 follow-ups se requiresResponse === true
+  dosAndDonts?: {
+    do: string[];
+    dont: string[];
+  };
 }
 
-export interface CommercialAnchorConfig {
+export type ObjectionCategory =
+  | 'preco'
+  | 'timing'
+  | 'concorrencia'
+  | 'necessidade'
+  | 'decisor'
+  | 'orcamento'
+  | 'confianca'
+  | 'tecnica'
+  | 'outros';
+
+export interface ObjectionComprehensive {
   id: string;
-  serviceId: string;
-  serviceName: string;
-  country: string;
-  currency: string;
-  currencySymbol: string;
-  anchorPrice: number; // Preço âncora de mercado (ex: R$ 2500)
-  finalPrice: number; // Preço proposto (ex: R$ 597)
-  marketRange: string; // Faixa de referência (ex: "R$ 2.000 a R$ 3.000")
-  justification: string; // Justificativa comercial (ex: "Condição especial de lançamento/portfólio")
-  paymentTerms: string; // Ex: "Aprovação primeiro, pagamento após aprovação"
+  number: number;
+  title: string;
+  category: ObjectionCategory;
+  clientPhrase: string; // 1. O que o cliente disse
+  underlyingMeaning: string; // 2. O possível significado
+  whatNotToSay: string; // 3. O que NÃO responder
+  diagnosticQuestion: string; // 4. Pergunta de diagnóstico
+  shortResponse: string; // 5. Resposta curta
+  consultativeResponse: string; // 6. Resposta consultiva
+  whatsappResponse: string; // 7. Resposta para WhatsApp
+  callResponse: string; // 8. Resposta para ligação
+  nextStep: string; // 9. Próximo passo
+  followUps: FollowUpItem[]; // 10-15. Follow-ups 1 a 6
+}
+
+export interface ContextualFollowUpScenario {
+  id: string;
+  number: number;
+  title: string;
+  description: string;
+  triggerCondition: string;
+  followUps: FollowUpItem[]; // 6 follow-ups
 }
 
 export interface ScriptRecommendationResult {
-  prospectingType: ScriptProspectingType;
-  step?: ScriptStepDefinition;
-  stageName: string;
+  stepId: string;
   stepNumber: number;
-  phaseName: string;
-  nextBestAction: string;
-  recommendedScript: string;
-  interpolatedScript: string;
-  reasoning: string;
-  isFollowUp: boolean;
-  followUpNumber?: number;
-  followUpSequence: FollowUpItem[];
-  matchedObjection?: DetailedObjection;
-  anchorConfig?: CommercialAnchorConfig;
-  diagnosticQuestions?: string[];
-  diagnosticPoints?: {
-    pointA: string;
-    pointB: string;
-    pointC: string;
+  stepTitle: string;
+  flowType: ProspectingFlowType;
+  rationale: string;
+  message: string;
+  rawTemplate: string;
+  alternatives: {
+    consultivo: string;
+    direto: string;
+    casual: string;
   };
-  isDecisionMakerConfirmed: boolean;
-  isEmployeeRoute: boolean;
-  doNotContact: boolean;
-  stopRuleTriggered: boolean;
-  stopRuleReason?: string;
-  recommendedIntervalText?: string;
+  variablesUsed: Record<string, string>;
+  followUps: FollowUpItem[];
+  currentFollowUpIndex: number;
+  isFollowUp: boolean;
+  isDnc: boolean;
+  isStopped: boolean;
+  stopReason?: string;
+  contactRoleDetected: ContactRoleType;
+  channel: ContactChannel;
+  whatsappUrl?: string;
+  country: CountryCode;
+  currency: string;
+  pricingAnchor?: {
+    regularPrice: number;
+    anchorPrice: number;
+    currency: string;
+    justification: string;
+  };
 }
